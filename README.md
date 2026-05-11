@@ -74,3 +74,73 @@ swichy/
 └── assets/
     ├── test.jpg
     └── test.mp4
+```
+
+---
+
+## ⚙️ Installation
+
+### 1️⃣ Clone the repository
+
+```bash
+git clone https://github.com/yourusername/swichy.git
+cd swichy
+```
+
+### 2️⃣ Create virtual environment
+
+```bash
+python -m venv venv
+```
+
+### 3️⃣ Activate virtual environment
+
+#### Windows
+
+```bash
+venv\Scripts\activate
+```
+
+#### Linux / macOS
+
+```bash
+source venv/bin/activate
+```
+
+### 4️⃣ Install dependencies
+
+```bash
+pip install mediapipe opencv-python numpy
+```
+
+Or using `requirements.txt`:
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+## 📦 Required Libraries
+
+- `mediapipe` → AI pose estimation
+- `opencv-python` → Computer vision & webcam processing
+- `numpy` → Mathematical operations
+
+---
+
+## ▶️ Run Swichy
+
+```bash
+python main.py
+```
+
+---
+
+## 🛠 Example requirements.txt
+
+```txt
+mediapipe
+opencv-python
+numpy
+```
