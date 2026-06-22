@@ -1,0 +1,34 @@
+# Phase detection thresholds for jump-shot FSM.
+# Tune these per camera distance and frame rate.
+
+hysteresis_frames: 3  # consecutive frames required to confirm a phase change
+
+thresholds:
+  # ready_stance -> loading
+  loading_hip_drop_velocity: -0.02      # m/s — hip dropping
+  loading_knee_flex_delta: -1.0        # degrees/frame — knee bending
+  loading_wrist_below_shoulder: 0.05   # m — wrist below shoulder plane
+
+  # loading -> knee_flexion / ball_lift
+  knee_extend_delta: 0.5               # degrees/frame — knee reversing (bottom of dip)
+  ball_lift_wrist_velocity: 0.03       # m/s — wrist rising
+
+  # ball_lift -> jump
+  jump_ankle_rise: 0.03                # m above baseline
+  jump_ankle_velocity: 0.02            # m/s upward
+
+  # jump -> release
+  release_peak_tolerance: 0.02         # m from wrist peak
+  release_elbow_min: 150               # degrees
+  release_wrist_velocity_max: 0.05     # m/s — wrist slowing at apex
+
+  # release -> follow_through
+  follow_through_wrist_down_velocity: -0.02
+  follow_through_elbow_min: 155
+
+  # follow_through -> landing
+  landing_ankle_tolerance: 0.04
+  landing_ankle_velocity_max: 0.01
+
+  # landing -> ready_stance
+  ready_max_velocity: 0.15             # m/s avg landmark speed

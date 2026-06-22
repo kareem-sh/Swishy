@@ -7,10 +7,11 @@ from modes.video_mode import run_video_mode
 # SELECT MODE
 # ==================================
 
-MODE = "live"
+# MODE = "live"
+# MODE = "live"
 
 # MODE = "image"
-# MODE = "video"
+MODE = "video"   # uses assets/test.mp4 (Mixkit jump-shot clip)
 
 
 # ==================================

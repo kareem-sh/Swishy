@@ -1,0 +1,6 @@
+# One Euro Filter parameters
+# Tuned for real-time basketball pose estimation (30 FPS)
+
+min_cutoff: 1.0    # Baseline smoothing when subject is still
+beta: 0.007        # Responsiveness during fast motion (release, jump)
+d_cutoff: 1.0      # Derivative smoothing cutoff

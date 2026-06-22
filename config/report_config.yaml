@@ -1,0 +1,15 @@
+# Detailed report generation settings
+
+max_key_frames_per_shot: 12
+store_frame_images_during_shot: true
+
+# Phases that always get a key frame captured (first occurrence)
+priority_phases:
+  - loading
+  - ball_lift
+  - release
+  - follow_through
+  - landing
+
+# Auto-save report when video/live session ends
+auto_save_report: true

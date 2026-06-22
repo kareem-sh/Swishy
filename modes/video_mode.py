@@ -1,102 +1,61 @@
 import cv2
-import time
+from pathlib import Path
 
 from mediapipe.tasks.python import vision
 
-from core.detector import PoseDetector
-from core.landmarks import extract_landmarks
-from core.drawing import draw_landmarks_on_image
+from config.settings import DEFAULT_FPS, WINDOW_NAME
+from feedback.console import print_shot_summary
+from feedback.session_recorder import SessionRecorder
+from pipeline import ShotAnalysisPipeline
+from pose.detector import PoseDetector
+from utils.timestamps import frame_timestamp_ms
+from visualization.renderer import render_frame
 
 
-def run_video_mode(video_path):
+def run_video_mode(video_path: str):
+    detector = PoseDetector(running_mode=vision.RunningMode.VIDEO)
+    pipeline = ShotAnalysisPipeline()
+    recorder = SessionRecorder(source_type="video", source_name=Path(video_path).name)
 
-    # Create detector using VIDEO mode
-    detector = PoseDetector(
-        running_mode=vision.RunningMode.VIDEO
-    )
-
-    # Open video file
     cap = cv2.VideoCapture(video_path)
-
-    # Check if video opened correctly
     if not cap.isOpened():
-        print("Error opening video.")
+        print(f"Error opening video: {video_path}")
         return
 
+    fps = cap.get(cv2.CAP_PROP_FPS) or DEFAULT_FPS
+    pipeline.set_fps(fps)
+    recorder.fps = fps
+    frame_index = 0
+
     while cap.isOpened():
-
-        # Read frame
         success, frame = cap.read()
-
-        # Stop when video ends
         if not success:
-            print("Video finished.")
             break
 
-        # Convert BGR -> RGB
-        rgb_frame = cv2.cvtColor(
-            frame,
-            cv2.COLOR_BGR2RGB
-        )
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        timestamp_ms = frame_timestamp_ms(frame_index, fps)
 
-        # Timestamp required by MediaPipe VIDEO mode
-        timestamp_ms = int(time.time() * 1000)
-
-        # Run pose detection
-        result = detector.detect_video_frame(
-            rgb_frame,
-            timestamp_ms
-        )
-
-        # Get frame size
+        result = detector.detect_video_frame(rgb_frame, timestamp_ms)
         h, w, _ = frame.shape
+        frame_result = pipeline.process_frame(result, w, h, timestamp_ms)
 
-        # Extract landmarks
-        landmarks = extract_landmarks(
-            result,
-            w,
-            h
-        )
+        if frame_result.shot_summary:
+            print_shot_summary(frame_result.shot_summary)
 
-        # Print coordinates
-        if landmarks:
+        annotated = render_frame(rgb_frame, result, frame_result)
+        annotated_bgr = cv2.cvtColor(annotated, cv2.COLOR_RGB2BGR)
+        recorder.on_frame(frame_index, annotated_bgr, frame_result)
 
-            print("\n====================")
-            print("POSE COORDINATES")
-            print("====================")
-
-            for name, point in landmarks.items():
-
-                print(
-                    f"{name}: "
-                    f"x={point['x']} "
-                    f"y={point['y']} "
-                    f"z={point['z']:.4f}"
-                )
-
-        # Draw skeleton + angles
-        annotated_image = draw_landmarks_on_image(
-            rgb_frame,
-            result,
-            landmarks
-        )
-
-        # Convert RGB -> BGR for OpenCV display
-        annotated_image = cv2.cvtColor(
-            annotated_image,
-            cv2.COLOR_RGB2BGR
-        )
-
-        # Show video
-        cv2.imshow(
-            "Basketball Pose Detection",
-            annotated_image
-        )
-
-        # Press Q to quit
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        cv2.imshow(WINDOW_NAME, annotated_bgr)
+        if cv2.waitKey(1) & 0xFF == ord("q"):
             break
 
-    # Cleanup
+        frame_index += 1
+
     cap.release()
     cv2.destroyAllWindows()
+
+    report = recorder.finalize()
+    if report.output_path:
+        print(f"\nDetailed report saved: {report.output_path}")
+        print(f"  Key frames: {Path(report.output_path).parent / 'frames'}")

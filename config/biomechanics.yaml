@@ -1,0 +1,114 @@
+# Biomechanical rules for basketball jump-shot analysis.
+# Each rule fires only during listed phases.
+# Ranges are guidelines — tune per skill level and camera setup.
+
+rules:
+  knee_flexion_loading:
+    name: "Knee Flexion (Load)"
+    metric: knee
+    phases: [loading, knee_flexion]
+    min: 70
+    max: 130
+    severity: warning
+    message_pass: "Good knee bend during load"
+    message_fail: "Bend knees more during load — power comes from the legs"
+    rationale: "Adequate knee flexion stores elastic energy for the jump"
+
+  hip_hinge_loading:
+    name: "Hip Hinge"
+    metric: hip
+    phases: [loading, knee_flexion]
+    min: 140
+    max: 175
+    severity: info
+    message_pass: "Hip angle looks balanced"
+    message_fail: "Adjust hip hinge — stay athletic, not folded or upright"
+    rationale: "Hip-shoulder-knee chain transfers force from legs to upper body"
+
+  elbow_slot_ball_lift:
+    name: "Elbow Position (Lift)"
+    metric: elbow
+    phases: [ball_lift]
+    min: 70
+    max: 120
+    severity: warning
+    message_pass: "Elbow in good slot during ball lift"
+    message_fail: "Keep elbow under the ball — avoid chicken wing"
+    rationale: "Elbow under the ball stabilizes the shooting path"
+
+  shoulder_alignment_lift:
+    name: "Shoulder Alignment"
+    metric: shoulder
+    phases: [ball_lift, jump]
+    min: 60
+    max: 120
+    severity: info
+    message_pass: "Shoulder alignment OK"
+    message_fail: "Square shoulders toward the basket during lift"
+    rationale: "Shoulder orientation affects shot direction consistency"
+
+  trunk_posture:
+    name: "Trunk Posture"
+    metric: trunk
+    phases: [ready_stance, loading, ball_lift, jump, release]
+    min: 5
+    max: 25
+    severity: warning
+    message_pass: "Trunk posture stable"
+    message_fail: "Stay tall through the torso — avoid excessive lean"
+    rationale: "Controlled trunk lean maintains balance through the shot"
+
+  head_stability:
+    name: "Head Stability"
+    metric: head_velocity
+    phases: [loading, ball_lift, jump, release]
+    min: null
+    max: 0.08
+    severity: info
+    message_pass: "Head stable during shot"
+    message_fail: "Keep head still — eyes on the target"
+    rationale: "Head movement shifts aim and disrupts consistency"
+
+  elbow_extension_release:
+    name: "Elbow Extension (Release)"
+    metric: elbow
+    phases: [release]
+    min: 155
+    max: 180
+    severity: warning
+    message_pass: "Full extension at release"
+    message_fail: "Extend elbow fully at release for arc and power"
+    rationale: "Near-full extension at release maximizes arc and follow-through"
+
+  release_height:
+    name: "Release Height"
+    metric: release_height
+    phases: [release]
+    min: 0.15
+    max: 0.55
+    severity: info
+    message_pass: "Release height in range"
+    message_fail: "Release higher — wrist above eye level relative to head"
+    rationale: "Higher release point is harder to block and improves arc"
+
+  follow_through_elbow:
+    name: "Follow-Through"
+    metric: elbow
+    phases: [follow_through]
+    min: 150
+    max: 180
+    severity: warning
+    message_pass: "Good follow-through extension"
+    message_fail: "Hold follow-through — snap wrist and extend elbow"
+    rationale: "Follow-through ensures backspin and consistent arc"
+
+  landing_balance:
+    name: "Landing Balance"
+    metric: ankle_rise
+    phases: [landing]
+    min: null
+    max: 0.06
+    severity: info
+    message_pass: "Balanced landing"
+    message_fail: "Land softly and balanced — avoid drifting"
+    rationale: "Controlled landing indicates balanced shot mechanics"
