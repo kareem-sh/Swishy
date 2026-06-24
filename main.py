@@ -7,7 +7,7 @@ from modes.video_mode import run_video_mode
 # SELECT MODE
 # ==================================
 
-MODE = "live"
+MODE = "image"
 
 # MODE = "image"
 # MODE = "video"
@@ -30,7 +30,7 @@ elif MODE == "image":
 elif MODE == "video":
 
     run_video_mode(
-        "assets/test.mp4"
+        "assets/Untitled.mov"
     )
 
 else:
