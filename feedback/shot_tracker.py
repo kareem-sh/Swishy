@@ -29,7 +29,7 @@ class ShotTracker:
         """Process phase change; return ShotSummary when a shot just completed."""
         completed: Optional[ShotSummary] = None
 
-        if not self.shot_in_progress and self._prev_phase == "ready_stance" and phase == "loading":
+        if not self.shot_in_progress and self._prev_phase == "ready_stance" and phase in ("loading", "ball_lift"):
             self.shot_in_progress = True
             self._shot_frames = []
 
@@ -64,6 +64,16 @@ class ShotTracker:
 
     def begin_summary_display(self, frames: int):
         self._summary_display_frames = frames
+
+    def finalize_in_progress(self, min_frames: int = 12) -> Optional[ShotSummary]:
+        """Score and close a shot that was still in progress when the session ended."""
+        if not self.shot_in_progress or len(self._shot_frames) < min_frames:
+            return None
+        self.shot_in_progress = False
+        summary = self._finalize()
+        self._shot_frames = []
+        self._summary_display_frames = 90
+        return summary
 
     def reset(self):
         self.shot_in_progress = False

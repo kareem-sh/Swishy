@@ -24,10 +24,10 @@ PHASE_LABELS = {
 
 # Valid FSM transitions (current -> next)
 TRANSITIONS = {
-    "ready_stance": ["loading"],
+    "ready_stance": ["loading", "ball_lift"],
     "loading": ["knee_flexion", "ball_lift"],
     "knee_flexion": ["ball_lift"],
-    "ball_lift": ["jump"],
+    "ball_lift": ["jump", "release"],
     "jump": ["release"],
     "release": ["follow_through"],
     "follow_through": ["landing"],

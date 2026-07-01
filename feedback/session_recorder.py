@@ -2,11 +2,12 @@
 
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, TYPE_CHECKING
 from uuid import uuid4
 
 import numpy as np
 
+from feedback.console import print_shot_summary
 from feedback.frame_capture import KeyFrameCapture
 from feedback.models import ShotSummary
 from feedback.report_builder import build_detailed_shot_report, build_session_report
@@ -14,6 +15,9 @@ from feedback.report_models import DetailedShotReport, SessionReport
 from feedback.report_writer import write_session_report
 from pipeline import FrameResult
 from utils.config_loader import load_yaml
+
+if TYPE_CHECKING:
+    from pipeline import ShotAnalysisPipeline
 
 
 class SessionRecorder:
@@ -119,7 +123,17 @@ class SessionRecorder:
         self._all_frame_images.update(detailed.frame_images)
         self.total_frames = 1
 
-    def finalize(self, output_dir: Optional[Path] = None) -> SessionReport:
+    def finalize(
+        self,
+        output_dir: Optional[Path] = None,
+        pipeline: Optional["ShotAnalysisPipeline"] = None,
+    ) -> SessionReport:
+        if pipeline is not None:
+            orphan = pipeline.finalize_session()
+            if orphan is not None:
+                print_shot_summary(orphan)
+                self._finish_shot(orphan)
+
         report = build_session_report(
             session_id=self.session_id,
             source_type=self.source_type,

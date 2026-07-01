@@ -111,7 +111,7 @@ def test_build_session_report_aggregates_improvements():
     assert any("Elbow Angle" in item for item in session.top_improvements)
 
 
-def test_write_session_report_creates_markdown_and_frames():
+def test_write_session_report_creates_pdf_and_frames():
     detailed = build_detailed_shot_report(
         summary=_summary(passed=False),
         phase_moments=[{
@@ -136,10 +136,8 @@ def test_write_session_report_creates_markdown_and_frames():
     with tempfile.TemporaryDirectory() as tmp:
         out = write_session_report(session, detailed.frame_images, Path(tmp))
         assert out.exists()
-        assert out.name == "REPORT.md"
-        content = out.read_text(encoding="utf-8")
-        assert "Shooting Form Analysis Report" in content
-        assert "Key Frames" in content
+        assert out.name == "REPORT.pdf"
+        assert out.stat().st_size > 500
         frames_dir = out.parent / "frames"
         assert frames_dir.exists()
         assert any(frames_dir.glob("*.jpg"))
@@ -148,5 +146,5 @@ def test_write_session_report_creates_markdown_and_frames():
 if __name__ == "__main__":
     test_build_detailed_shot_report_links_violation_frame()
     test_build_session_report_aggregates_improvements()
-    test_write_session_report_creates_markdown_and_frames()
+    test_write_session_report_creates_pdf_and_frames()
     print("All reporting tests passed.")

@@ -14,8 +14,10 @@ from config.settings import (
     FILTER_D_CUTOFF,
     FILTER_MIN_CUTOFF,
     FRAME_BUFFER_SIZE,
+    PRESENCE_THRESHOLD,
     SHOOTING_HAND,
     VISIBILITY_HOLD_FRAMES,
+    VISIBILITY_REQUIRE_PRESENCE,
     VISIBILITY_THRESHOLD,
 )
 from feedback.models import ShotSummary
@@ -33,6 +35,7 @@ from pose.landmarks import extract_all_landmarks
 from pose.visibility import VisibilityGate
 from utils.config_loader import load_yaml
 from utils.frame_buffer import FrameBuffer, FrameSnapshot
+from visualization.hud_display import HudDisplay, HudDisplaySmoother
 
 
 @dataclass
@@ -54,6 +57,7 @@ class FrameResult:
     shot_summary: Optional[ShotSummary] = None
     display_summary: Optional[ShotSummary] = None
     show_shot_summary: bool = False
+    hud_display: Optional["HudDisplay"] = None
 
 
 class ShotAnalysisPipeline:
@@ -76,6 +80,7 @@ class ShotAnalysisPipeline:
         filter_cfg = load_yaml("filter_config.yaml")
         phase_cfg = load_yaml("phases.yaml")
         scoring_cfg = load_yaml("scoring.yaml")
+        display_cfg = load_yaml("display.yaml")
 
         self._filter_bank = LandmarkFilterBank(
             min_cutoff=filter_cfg.get("min_cutoff", FILTER_MIN_CUTOFF),
@@ -84,7 +89,9 @@ class ShotAnalysisPipeline:
         )
         self._visibility = VisibilityGate(
             visibility_threshold=VISIBILITY_THRESHOLD,
+            presence_threshold=PRESENCE_THRESHOLD,
             hold_frames=VISIBILITY_HOLD_FRAMES,
+            require_presence=VISIBILITY_REQUIRE_PRESENCE,
         )
         self._angle_calculator = AngleCalculator(self._visibility)
         self._phase_detector = ShotPhaseDetector()
@@ -101,7 +108,10 @@ class ShotAnalysisPipeline:
         self._still_threshold = float(
             phase_cfg.get("thresholds", {}).get("ready_max_velocity", 0.15)
         )
-        self._summary_display_frames = int(scoring_cfg.get("summary_display_frames", 90))
+        self._summary_display_frames = int(
+            display_cfg.get("summary_display_frames", scoring_cfg.get("summary_display_frames", 90))
+        )
+        self._hud_display = HudDisplaySmoother()
 
     def set_fps(self, fps: float):
         if fps > 0:
@@ -172,6 +182,20 @@ class ShotAnalysisPipeline:
         self._prev_world = world
         self._prev_timestamp_ms = timestamp_ms
 
+        hud_display = self._hud_display.update(
+            FrameResult(
+                has_pose=True,
+                phase=phase,
+                phase_label=phase_label,
+                shooting_side=shooting_side,
+                angles=angles,
+                analysis=analysis,
+                shot_in_progress=self._shot_tracker.shot_in_progress,
+                last_shot_score=self._shot_tracker.last_score,
+                display_summary=display_summary,
+            )
+        )
+
         return FrameResult(
             image_landmarks=raw["image"],
             world_landmarks=world,
@@ -188,6 +212,7 @@ class ShotAnalysisPipeline:
             shot_summary=completed_shot,
             display_summary=display_summary,
             show_shot_summary=self._shot_tracker.show_shot_summary,
+            hud_display=hud_display,
         )
 
     def _compute_dt(self, timestamp_ms: int) -> float:
@@ -211,11 +236,16 @@ class ShotAnalysisPipeline:
 
         return self._resolved_side
 
+    def finalize_session(self) -> Optional[ShotSummary]:
+        """Close any shot still in progress (e.g. video ended mid-rep)."""
+        return self._shot_tracker.finalize_in_progress()
+
     def reset(self):
         self._filter_bank.reset()
         self._visibility.reset()
         self._phase_detector.reset()
         self._shot_tracker.reset()
+        self._hud_display.reset()
         self._frame_buffer.clear()
         self._frame_index = 0
         self._prev_world = None

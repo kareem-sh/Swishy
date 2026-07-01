@@ -20,29 +20,49 @@ Computing angles from bad positions produces **confidently wrong numbers** — w
 
 ## Strategy
 
-### 1. Per-landmark confidence gate
+MediaPipe provides two per-landmark scores:
+
+| Score | Meaning |
+|-------|---------|
+| **visibility** | Landmark is visible and not occluded |
+| **presence** | Landmark is likely present in the image |
+
+Using visibility alone can produce false positives when the model guesses a position for a body part that is not actually in frame. **Phase 2+ gating uses both signals.**
+
+### 1. Combined confidence gate
 
 ```python
-reliable = visibility >= threshold  # default 0.6
+confidence = min(visibility, presence)
+reliable = confidence >= threshold  # default 0.6
 ```
 
-Configurable via `VISIBILITY_THRESHOLD` in [`config/settings.py`](../config/settings.py).
+Both must be strong. If `presence` is missing (older API), visibility alone is used.
 
-### 2. Angle chain validation
+Configurable in [`config/settings.py`](../config/settings.py):
+
+- `VISIBILITY_THRESHOLD` (default 0.6)
+- `PRESENCE_THRESHOLD` (default 0.5)
+- `VISIBILITY_REQUIRE_PRESENCE` (default true)
+
+### 2. Per-landmark confidence gate (legacy note)
+
+Previously only `visibility >= threshold` was checked. Presence is now required for solid gating.
+
+### 3. Angle chain validation
 
 A joint angle requires three landmarks (proximal, vertex, distal). If **any** is unreliable → entire angle is invalid (`degrees=None`, `is_valid=False`).
 
-### 3. Temporal hold
+### 4. Temporal hold
 
 Brief occlusion (1–5 frames) is common during fast motion. Instead of immediately invalidating:
 
 - Hold the last reliable position
-- Decay confidence linearly: `visibility × (1 - hold_count / (hold_frames + 1))`
+- Decay confidence linearly: `confidence × (1 - hold_count / (hold_frames + 1))`
 - Mark `is_stable=False` so UI shows approximate value with `~` prefix
 
 If occlusion persists beyond `VISIBILITY_HOLD_FRAMES` (default 5), stop holding and mark unreliable.
 
-### 4. UI feedback
+### 5. UI feedback
 
 | State | Display | Color |
 |-------|---------|-------|

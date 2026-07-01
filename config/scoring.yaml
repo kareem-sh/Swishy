@@ -8,8 +8,8 @@ severity_weights:
 min_evaluated_rules: 2
 max_coaching_tips: 3
 
-# How long to show shot summary overlay (frames at ~30fps = 3 seconds)
-summary_display_frames: 90
+# How long to show shot summary overlay (prefer config/display.yaml)
+summary_display_frames: 60
 
 score_messages:
   excellent: 90

@@ -8,6 +8,8 @@ thresholds:
   loading_hip_drop_velocity: -0.02      # m/s — hip dropping
   loading_knee_flex_delta: -1.0        # degrees/frame — knee bending
   loading_wrist_below_shoulder: 0.05   # m — wrist below shoulder plane
+  loading_wrist_up_velocity: 0.03      # m/s — wrist rising into shot (re-shot)
+  loading_wrist_chest_offset: 0.35     # m — wrist within chest/ball-carry zone (hip-relative)
 
   # loading -> knee_flexion / ball_lift
   knee_extend_delta: 0.5               # degrees/frame — knee reversing (bottom of dip)
@@ -16,6 +18,10 @@ thresholds:
   # ball_lift -> jump
   jump_ankle_rise: 0.03                # m above baseline
   jump_ankle_velocity: 0.02            # m/s upward
+
+  # ball_lift -> release (set shot / no jump)
+  set_shot_wrist_down: 0.035           # m/s — wrist driving through
+  set_shot_elbow_min: 145               # degrees
 
   # jump -> release
   release_peak_tolerance: 0.02         # m from wrist peak

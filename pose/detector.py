@@ -7,16 +7,39 @@ from config.settings import (
     MIN_POSE_DETECTION_CONFIDENCE,
     MIN_PRESENCE_CONFIDENCE,
     MIN_TRACKING_CONFIDENCE,
-    MODEL_PATH,
 )
+from utils.performance import get_pose_model_path, resolve_pose_delegate, warn_if_gpu_unavailable
 
 
 class PoseDetector:
     """MediaPipe Pose Landmarker wrapper for image, video, and live stream."""
 
     def __init__(self, running_mode, result_callback=None):
-        base_options = python.BaseOptions(model_asset_path=MODEL_PATH)
+        warn_if_gpu_unavailable()
+        model_path = get_pose_model_path()
+        delegate = resolve_pose_delegate()
 
+        try:
+            base_options = python.BaseOptions(
+                model_asset_path=model_path,
+                delegate=delegate,
+            )
+            self.landmarker = self._create_landmarker(base_options, running_mode, result_callback)
+            self._delegate = "gpu" if delegate == python.BaseOptions.Delegate.GPU else "cpu"
+        except Exception as exc:
+            if delegate != python.BaseOptions.Delegate.CPU:
+                print(f"GPU init failed ({exc}); falling back to CPU.")
+                base_options = python.BaseOptions(
+                    model_asset_path=model_path,
+                    delegate=python.BaseOptions.Delegate.CPU,
+                )
+                self.landmarker = self._create_landmarker(base_options, running_mode, result_callback)
+                self._delegate = "cpu"
+            else:
+                raise
+
+    @staticmethod
+    def _create_landmarker(base_options, running_mode, result_callback):
         options = vision.PoseLandmarkerOptions(
             base_options=base_options,
             running_mode=running_mode,
@@ -27,8 +50,11 @@ class PoseDetector:
             num_poses=1,
             output_segmentation_masks=False,
         )
+        return vision.PoseLandmarker.create_from_options(options)
 
-        self.landmarker = vision.PoseLandmarker.create_from_options(options)
+    @property
+    def delegate(self) -> str:
+        return self._delegate
 
     def detect_image(self, rgb_image):
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_image)

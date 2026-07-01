@@ -1,6 +1,6 @@
 # Detailed Session Reports
 
-Swichy generates a **full markdown report** with **annotated key frames** after every video, live webcam session, or single-image analysis. The same reporting pipeline applies to all modes.
+Swichy generates a **PDF report** with **embedded annotated key frames** after every video, live webcam session, or single-image analysis. The same reporting pipeline applies to all modes.
 
 ---
 
@@ -10,14 +10,14 @@ After a session ends, Swichy saves:
 
 ```
 outputs/reports/{session_id}/
-├── REPORT.md          # Full form analysis (markdown)
+├── REPORT.pdf         # Full form analysis (PDF with images)
 └── frames/
     ├── shot_01_frame_00042_release.jpg
     ├── shot_01_frame_00058_release.jpg   # worst violation frame
     └── ...
 ```
 
-### REPORT.md includes
+### REPORT.pdf includes
 
 1. **Session overview** — source, FPS, shot count, overall score/grade
 2. **Strengths** — rules passed consistently across shots
@@ -26,7 +26,9 @@ outputs/reports/{session_id}/
    - Coach summary (coaching tips)
    - Phase timeline (when each phase occurred)
    - Full form checklist (every rule with measured value, range, rationale)
-   - **Key frames** — images showing exactly where to improve
+   - **Key frames** — images embedded with explanations
+
+Set `save_markdown_copy: true` in [`config/report_config.yaml`](../config/report_config.yaml) to also save `REPORT.md`.
 
 ### Key frame images
 
@@ -105,11 +107,11 @@ python main.py   # set MODE in main.py: video | live | image
 When the session ends (video finishes, press `q` in live/video, or close image window):
 
 ```
-Detailed report saved: outputs/reports/20250616_143022_a1b2c3/REPORT.md
+Detailed report saved: outputs/reports/20250616_143022_a1b2c3/REPORT.pdf
   Key frames: outputs/reports/20250616_143022_a1b2c3/frames
 ```
 
-Open `REPORT.md` in any markdown viewer. Images are embedded as relative paths under `frames/`.
+Open `REPORT.pdf` in any PDF viewer. Frame images and explanations are embedded in the document.
 
 ---
 

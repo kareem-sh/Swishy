@@ -68,6 +68,14 @@ def test_shot_tracker_completes():
     assert 0 <= done.score <= 100
 
 
+def test_shot_tracker_starts_on_ball_lift():
+    tracker = ShotTracker()
+    tracker._prev_phase = "ready_stance"
+    snap = _snapshot("ball_lift", [])
+    assert tracker.update("ball_lift", snap) is None
+    assert tracker.shot_in_progress
+
+
 def test_coaching_tips_include_violations():
     summary = score_shot(
         [_snapshot("release", [_rule("elbow", False)])],
@@ -80,5 +88,6 @@ def test_coaching_tips_include_violations():
 if __name__ == "__main__":
     test_score_shot_weighted()
     test_shot_tracker_completes()
+    test_shot_tracker_starts_on_ball_lift()
     test_coaching_tips_include_violations()
     print("All Phase 5 tests passed.")

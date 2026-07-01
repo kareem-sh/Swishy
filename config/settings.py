@@ -4,7 +4,7 @@ from pathlib import Path
 
 # Paths
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-MODEL_PATH = str(PROJECT_ROOT / "models" / "pose_landmarker_full.task")
+MODEL_PATH = str(PROJECT_ROOT / "models" / "pose_landmarker_full.task")  # default; see config/performance.yaml
 
 WINDOW_NAME = "Swichy — AI Basketball Coach"
 
@@ -13,9 +13,11 @@ MIN_POSE_DETECTION_CONFIDENCE = 0.5
 MIN_TRACKING_CONFIDENCE = 0.5
 MIN_PRESENCE_CONFIDENCE = 0.5
 
-# Visibility gating
+# Visibility gating (visibility + presence)
 VISIBILITY_THRESHOLD = 0.6
+PRESENCE_THRESHOLD = 0.5
 VISIBILITY_HOLD_FRAMES = 5
+VISIBILITY_REQUIRE_PRESENCE = True
 
 # One Euro filter defaults
 FILTER_MIN_CUTOFF = 1.0

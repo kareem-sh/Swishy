@@ -86,11 +86,19 @@ class ShotPhaseDetector:
         t = self._t
 
         if self.phase == "ready_stance":
-            if (
-                f.hip_velocity_y < t("loading_hip_drop_velocity", -0.02)
-                or (f.knee_angle is not None and f.knee_angle_delta < t("loading_knee_flex_delta", -1.0))
-            ) and f.wrist_y < f.shoulder_y + t("loading_wrist_below_shoulder", 0.05):
+            wrist_below_shoulder = f.wrist_y < f.shoulder_y + t("loading_wrist_below_shoulder", 0.05)
+            wrist_at_chest = f.wrist_y < f.hip_y_avg + t("loading_wrist_chest_offset", 0.35)
+            hip_loading = f.hip_velocity_y < t("loading_hip_drop_velocity", -0.02)
+            knee_loading = f.knee_angle is not None and f.knee_angle_delta < t("loading_knee_flex_delta", -1.0)
+            wrist_lift = f.wrist_velocity_y > t("loading_wrist_up_velocity", 0.03)
+            dip_loading = hip_loading or knee_loading
+
+            if dip_loading and (wrist_below_shoulder or wrist_at_chest):
                 return "loading"
+            if wrist_lift and wrist_at_chest:
+                return "loading"
+            if f.wrist_velocity_y > t("ball_lift_wrist_velocity", 0.03) and wrist_at_chest:
+                return "ball_lift"
             return None
 
         if self.phase == "loading":
@@ -109,6 +117,16 @@ class ShotPhaseDetector:
             ankle_rise = f.ankle_y_avg - f.ankle_baseline_y
             if ankle_rise > t("jump_ankle_rise", 0.03) or f.ankle_velocity_y > t("jump_ankle_velocity", 0.02):
                 return "jump"
+            wrist_over_hip = f.wrist_y > f.hip_y_avg - 0.05
+            if wrist_over_hip and f.wrist_velocity_y < -t("set_shot_wrist_down", 0.035):
+                return "release"
+            if (
+                f.elbow_angle is not None
+                and f.elbow_angle > t("set_shot_elbow_min", 145)
+                and f.wrist_velocity_y < 0
+                and wrist_over_hip
+            ):
+                return "release"
             return None
 
         if self.phase == "jump":

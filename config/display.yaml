@@ -1,0 +1,22 @@
+# On-screen HUD timing — lower = snappier overlay, higher = easier to read
+
+# Phase label: stable frames before update, then minimum hold
+phase_stable_frames: 4
+phase_min_hold_frames: 8
+
+# Angles panel: higher alpha = faster tracking; lower step/hold = quicker updates
+angle_ema_alpha: 0.28
+angle_step_degrees: 2
+angle_min_hold_frames: 4
+angle_invalid_hold_frames: 6
+
+# Coaching strip: how long tips stay before refreshing
+violation_hold_frames: 18
+violation_max_items: 3
+
+# Shot summary card (frames at 30fps ≈ 2 seconds)
+summary_display_frames: 60
+
+# Video playback: 1.0 = real-time, 2.0 = 2x speed, 0 = as fast as CPU allows
+video_playback_sync: true
+video_playback_speed: 2.0

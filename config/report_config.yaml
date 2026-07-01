@@ -13,3 +13,6 @@ priority_phases:
 
 # Auto-save report when video/live session ends
 auto_save_report: true
+
+# Primary output is REPORT.pdf; set true to also save REPORT.md
+save_markdown_copy: false

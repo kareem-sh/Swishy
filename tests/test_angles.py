@@ -60,13 +60,13 @@ def test_rotation_invariance():
 
 
 def test_visibility_gates_invalid_angle():
-    gate = VisibilityGate(visibility_threshold=0.6)
+    gate = VisibilityGate(visibility_threshold=0.6, presence_threshold=0.5)
     calc = AngleCalculator(gate)
 
     world = {
-        "right_shoulder": {"position": np.array([0.1, 0.5, 0.0]), "visibility": 0.9, "is_reliable": True, "is_stable": True},
-        "right_elbow": {"position": np.array([0.2, 0.4, 0.0]), "visibility": 0.3, "is_reliable": False, "is_stable": False},
-        "right_wrist": {"position": np.array([0.3, 0.3, 0.0]), "visibility": 0.9, "is_reliable": True, "is_stable": True},
+        "right_shoulder": {"position": np.array([0.1, 0.5, 0.0]), "visibility": 0.9, "presence": 0.9, "is_reliable": True, "is_stable": True},
+        "right_elbow": {"position": np.array([0.2, 0.4, 0.0]), "visibility": 0.3, "presence": 0.9, "is_reliable": False, "is_stable": False},
+        "right_wrist": {"position": np.array([0.3, 0.3, 0.0]), "visibility": 0.9, "presence": 0.9, "is_reliable": True, "is_stable": True},
     }
     world = gate.apply(world)
 
@@ -75,9 +75,24 @@ def test_visibility_gates_invalid_angle():
     assert not result.is_valid
 
 
+def test_presence_gates_high_visibility_low_presence():
+    gate = VisibilityGate(visibility_threshold=0.6, presence_threshold=0.5)
+    world = {
+        "right_knee": {
+            "position": np.array([0.0, 0.0, 0.0]),
+            "visibility": 0.95,
+            "presence": 0.2,
+        },
+    }
+    gated = gate.apply(world)
+    assert gated["right_knee"]["is_reliable"] is False
+    assert gated["right_knee"]["confidence"] < 0.5
+
+
 if __name__ == "__main__":
     test_right_angle()
     test_straight_line()
     test_rotation_invariance()
     test_visibility_gates_invalid_angle()
+    test_presence_gates_high_visibility_low_presence()
     print("All tests passed.")

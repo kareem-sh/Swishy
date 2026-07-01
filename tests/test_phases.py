@@ -56,8 +56,27 @@ def test_phase_order_complete():
     assert PHASE_ORDER[-1] == "landing"
 
 
+def test_ready_stance_to_loading_on_wrist_rise():
+    det = ShotPhaseDetector()
+    still = _make_features(total_velocity=0.05, wrist_y=0.02, hip_y_avg=0.0, shoulder_y=-0.4)
+    for _ in range(3):
+        det.update(still)
+
+    rising = _make_features(
+        total_velocity=0.08,
+        wrist_y=0.03,
+        wrist_velocity_y=0.05,
+        hip_y_avg=0.0,
+        shoulder_y=-0.4,
+    )
+    for _ in range(3):
+        det.update(rising)
+    assert det.phase == "loading"
+
+
 if __name__ == "__main__":
     test_phase_transitions()
     test_biomechanics_knee_rule()
     test_phase_order_complete()
+    test_ready_stance_to_loading_on_wrist_rise()
     print("All phase/rule tests passed.")

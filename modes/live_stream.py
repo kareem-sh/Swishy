@@ -78,7 +78,7 @@ def run_live_stream():
     cap.release()
     cv2.destroyAllWindows()
 
-    report = recorder.finalize()
+    report = recorder.finalize(pipeline=pipeline)
     if report.output_path:
         from pathlib import Path
         print(f"\nDetailed report saved: {report.output_path}")
