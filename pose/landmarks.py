@@ -54,6 +54,8 @@ BASKETBALL_LANDMARKS = {
     "right_elbow": 14,
     "left_wrist": 15,
     "right_wrist": 16,
+    "left_index": 19,
+    "right_index": 20,
     "left_hip": 23,
     "right_hip": 24,
     "left_knee": 25,

@@ -1,57 +1,57 @@
 # Swichy — AI Basketball Shooting Coach
 
-Real-time basketball shooting analysis using MediaPipe Pose, 3D vector biomechanics, and adaptive landmark filtering.
+Real-time basketball shooting analysis using MediaPipe Pose, 3D vector biomechanics, phase detection, and PDF performance reports.
 
 ## Features (Implemented)
 
-- Full-body pose detection (MediaPipe Pose Landmarker)
-- **3D world-space joint angles** (rotation-invariant, not 2D image-plane)
+- Full-body pose detection (MediaPipe Pose Landmarker **full** model, CPU on Windows)
+- **3D world-space joint angles** including **index finger alignment** (elbow → wrist → index)
 - **One Euro Filter** for real-time landmark smoothing
-- **Visibility-aware** angle computation (invalid when occluded)
-- **8-phase shot detection** (stance → loading → release → landing)
-- **10 configurable biomechanical rules** with phase-aware evaluation
-- **Per-shot scoring (0–100)** with grade and coaching tips
-- **Detailed session reports** — markdown + annotated key frames (all modes)
-- Auto-detect shooting hand (left/right)
+- **Visibility + presence gating** with temporal hold and gap notes in reports
+- **8-phase shot FSM** with hysteresis, dwell time, and set-shot paths
+- **12 biomechanical rules** (YAML-driven, research-informed)
+- **Per-shot scoring (0–100)** with grade, drills, and action items
+- **Mid-shot entry** — detects and scores reps that start mid-video/live with clear warnings
+- **PDF session reports** with embedded key frames, practice plan, and capture status
+- Structured **HUD** with smoothed on-screen text (`visualization/hud_display.py`)
 - Live webcam, video file, and image modes
-- Real-time coaching overlay + console shot report
+- Test assets: front / side / back view jump shots, dunks, layups
+
+## Not Yet Implemented (Stubs Ready)
+
+- **Phase 6:** Ball detection, tracking, make/miss outcome → [`ball/`](ball/), [`docs/PHASE_6_BALL_AND_OUTCOME.md`](docs/PHASE_6_BALL_AND_OUTCOME.md)
+- **Physics trajectory (#11):** → [`physics/`](physics/)
 
 ---
 
 ## Quick Start
 
-### Windows (recommended — use the project venv)
+### Windows
 
 ```powershell
 cd C:\Users\karim\Desktop\Swichy
-
-# Activate the virtual environment
 .\venv\Scripts\activate
-
-# Install dependencies (only needed once, or after requirements.txt changes)
 python -m pip install -r requirements.txt
 
-# Download MediaPipe model (only needed once — skip if models/pose_landmarker_full.task exists)
+# Download model once (skip if models/pose_landmarker_full.task exists)
 New-Item -ItemType Directory -Force -Path models | Out-Null
 Invoke-WebRequest -Uri "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/latest/pose_landmarker_full.task" -OutFile "models\pose_landmarker_full.task"
 
-# Run (use the venv python — do NOT use anaconda python.exe directly)
 python main.py
 ```
 
-**Important:** After `.\venv\Scripts\activate`, run `python main.py` — not `C:\Users\karim\anaconda3\python.exe main.py`. Anaconda and the venv are separate; packages installed in one are not visible to the other.
+**Use the venv Python** after `activate` — not Anaconda's global Python.
 
-### Linux / macOS
+### Change mode in [`main.py`](main.py)
 
-```bash
-pip install -r requirements.txt
-mkdir -p models
-curl -L -o models/pose_landmarker_full.task \
-  "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/latest/pose_landmarker_full.task"
-python main.py
+```python
+MODE = "video"   # live | image | video
+
+# Side-view jump shot (best for biomechanics):
+run_video_mode("assets/videos/video_07_side_jump_shot.mp4")
 ```
 
-Change mode in [`main.py`](main.py): `MODE = "live"` | `"image"` | `"video"`
+Reports save to `outputs/reports/{session_id}/REPORT.pdf`.
 
 ---
 
@@ -61,56 +61,50 @@ Change mode in [`main.py`](main.py): `MODE = "live"` | `"image"` | `"video"`
 Swichy/
 ├── main.py                 # Entry point
 ├── pipeline.py             # Central analysis pipeline
-├── config/
-│   ├── settings.py         # App settings
-│   ├── filter_config.yaml  # One Euro parameters
-│   ├── phases.yaml         # Phase detection thresholds
-│   ├── biomechanics.yaml   # Coaching rules
-│   ├── scoring.yaml        # Shot score weights
-│   └── report_config.yaml  # Report generation settings
-├── phase_detection/        # Phase 3 — shot phase FSM
-├── analysis/               # Phase 4 — rule engine
-├── feedback/               # Phase 5 — scoring + coaching + reports
-├── pose/                   # Detection + landmarks + visibility
+├── config/                 # YAML + settings.py
+├── pose/                   # Detection, landmarks, visibility
 ├── filters/                # One Euro Filter
-├── geometry/               # 3D vector math
-├── angles/                 # Joint angle calculator
-├── visualization/          # Rendering (no analysis)
-├── utils/                  # Timestamps, frame buffer, config loader
-├── modes/                  # Live, video, image I/O
-├── assets/                 # Test videos and images (included)
-├── models/                 # MediaPipe pose model (download once)
-├── docs/                   # Engineering + teaching documentation
-├── tests/                  # Unit tests
+├── geometry/ + angles/     # 3D joint math
+├── phase_detection/        # 8-phase FSM
+├── analysis/               # Biomechanical rule engine
+├── feedback/               # Scoring, coaching, PDF reports
+├── visualization/          # Renderer + HUD
+├── modes/                  # live, video, image
+├── ball/                   # Phase 6 stubs
+├── physics/                # Trajectory stubs
+├── assets/                 # Test media
+├── docs/                   # Full documentation
+└── tests/
 ```
 
 ---
 
-## Documentation (Start Here)
+## Documentation — Start Here
 
-| Doc | Topic |
-|-----|-------|
-| **[PHASES_OVERVIEW.md](docs/PHASES_OVERVIEW.md)** | **Phases 1→5 — full implementation guide** |
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System design and module responsibilities |
-| [PIPELINE.md](docs/PIPELINE.md) | End-to-end data flow |
-| [ANGLES_3D.md](docs/ANGLES_3D.md) | Phase 1 — 3D angles, vector math |
-| [FILTERS.md](docs/FILTERS.md) | Phase 2 — One Euro Filter |
-| [VISIBILITY.md](docs/VISIBILITY.md) | Phase 2 — Occlusion handling |
-| [PHASE_DETECTION.md](docs/PHASE_DETECTION.md) | Phase 3 — Shot phase FSM |
-| [BIOMECHANICS.md](docs/BIOMECHANICS.md) | Phase 4 — Rule engine |
-| [FEEDBACK_SCORING.md](docs/FEEDBACK_SCORING.md) | Phase 5 — Shot score + tips |
-| [REPORTING.md](docs/REPORTING.md) | Detailed reports + key frames |
-| [PHASE_6_BALL_AND_OUTCOME.md](docs/PHASE_6_BALL_AND_OUTCOME.md) | Phase 6 — Ball tracking + make/miss (planned) |
-| [FUTURE_IMPROVEMENTS.md](docs/FUTURE_IMPROVEMENTS.md) | Commercial roadmap |
+| Doc | Purpose |
+|-----|---------|
+| **[docs/MANUAL_COMPLETION_GUIDE.md](docs/MANUAL_COMPLETION_GUIDE.md)** | **Study the code + finish the project yourself** |
+| [docs/PHASES_OVERVIEW.md](docs/PHASES_OVERVIEW.md) | Phases 1→6 implementation map |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System design |
+| [docs/PIPELINE.md](docs/PIPELINE.md) | End-to-end data flow |
+| [docs/BIOMECHANICS_RESEARCH.md](docs/BIOMECHANICS_RESEARCH.md) | Papers → rules |
+| [docs/PHASE_6_BALL_AND_OUTCOME.md](docs/PHASE_6_BALL_AND_OUTCOME.md) | Next: ball + make/miss |
+| [assets/README.md](assets/README.md) | Test videos by camera angle |
+
+Full index: [docs/README.md](docs/README.md)
 
 ---
 
 ## Run Tests
 
-```bash
+```powershell
+.\venv\Scripts\activate
 python tests/test_angles.py
 python tests/test_phases.py
 python tests/test_feedback.py
+python tests/test_performance_plan.py
+python tests/test_visibility_gaps.py
+python tests/test_hud_display.py
 python tests/test_reporting.py
 ```
 
@@ -121,5 +115,6 @@ python tests/test_reporting.py
 - Python 3.10+
 - MediaPipe Pose Landmarker
 - OpenCV
-- NumPy
-- PyYAML
+- NumPy, PyYAML
+- fpdf2 (PDF reports)
+- yt-dlp (optional — re-download YouTube test clip)

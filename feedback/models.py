@@ -18,6 +18,14 @@ class ShotSummary:
     violations: List[RuleResult] = field(default_factory=list)
     coaching_tips: List[str] = field(default_factory=list)
     phases_seen: List[str] = field(default_factory=list)
+    started_mid_phase: bool = False
+    ended_early: bool = False
+    entry_phase: Optional[str] = None
+    missing_phases: List[str] = field(default_factory=list)
+    capture_note: str = ""
+    next_rep_focus: List[str] = field(default_factory=list)
+    practice_drills: List[str] = field(default_factory=list)
+    performance_actions: List[str] = field(default_factory=list)
 
     @property
     def grade(self) -> str:

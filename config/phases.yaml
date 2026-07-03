@@ -1,7 +1,8 @@
 # Phase detection thresholds for jump-shot FSM.
 # Tune these per camera distance and frame rate.
 
-hysteresis_frames: 3  # consecutive frames required to confirm a phase change
+hysteresis_frames: 5  # consecutive frames required to confirm a phase change
+min_dwell_frames: 3   # minimum frames to hold a phase before allowing exit
 
 thresholds:
   # ready_stance -> loading
@@ -27,10 +28,14 @@ thresholds:
   release_peak_tolerance: 0.02         # m from wrist peak
   release_elbow_min: 150               # degrees
   release_wrist_velocity_max: 0.05     # m/s — wrist slowing at apex
+  release_index_up_velocity: 0.04      # m/s — index driving through release
+  release_index_align_min: 155         # degrees — elbow-wrist-index line
 
   # release -> follow_through
   follow_through_wrist_down_velocity: -0.02
   follow_through_elbow_min: 155
+  follow_through_index_align_min: 160  # degrees — finger fully extended
+  follow_through_index_down_velocity: -0.02
 
   # follow_through -> landing
   landing_ankle_tolerance: 0.04

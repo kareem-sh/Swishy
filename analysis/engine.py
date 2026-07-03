@@ -109,6 +109,7 @@ class BiomechanicsEngine:
             "hip": f"{side}_hip",
             "elbow": f"{side}_elbow",
             "shoulder": f"{side}_shoulder",
+            "index_align": f"{side}_index_align",
             "trunk": "trunk",
         }
 

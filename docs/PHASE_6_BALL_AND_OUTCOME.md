@@ -1,8 +1,11 @@
 # Phase 6 — Ball Tracking & Shot Outcome (Future Plan)
 
-> **Status:** Planned — not implemented  
+> **Status:** Stub modules created — **you implement** the logic  
+> **Stub code:** [`ball/`](../ball/) (detector, tracker, timeseries, outcome, fusion) + [`physics/`](../physics/)  
+> **Config:** [`config/ball.yaml`](../config/ball.yaml), [`config/hoop_roi.yaml`](../config/hoop_roi.yaml)  
 > **Depends on:** Phases 1–5b (pose, phases, rules, form scoring, session reports)  
-> **Goal:** Detect the ball, track it through release and flight, and answer: *Did the player score?* — using **time-series** signals, not just a single frame.
+> **Study guide:** [MANUAL_COMPLETION_GUIDE.md](MANUAL_COMPLETION_GUIDE.md)  
+> **Goal:** Detect the ball, track it through release and flight, and answer: *Did the player score?*
 
 ---
 
@@ -34,10 +37,10 @@ This document is the implementation blueprint for step 2.
 Camera → Pose → Filter → Angles → Phases → Rules → Form Score → Report
 ```
 
-Shot boundaries are inferred from **body phases** only:
+Shot boundaries are inferred from **body phases**:
 
-- Shot **starts:** `ready_stance → loading`
-- Shot **ends:** `landing → ready_stance`
+- Shot **starts:** `ready_stance → loading/ball_lift` OR **mid-entry** if recording starts mid-rep
+- Shot **ends:** `landing → ready_stance` OR session `finalize_in_progress()`
 
 There is no object in the scene besides the player skeleton.
 

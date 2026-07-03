@@ -81,12 +81,29 @@ def _add_title_page(pdf: FPDF, report: SessionReport):
             _multi(pdf, f"  {i}. {item}", 6)
         pdf.ln(2)
 
-    _section_heading(pdf, "How to Read This Report")
+    if report.session_notes:
+        _section_heading(pdf, "Capture Notes")
+        pdf.set_font("Helvetica", "", 10)
+        pdf.set_text_color(140, 90, 0)
+        for note in report.session_notes:
+            _multi(pdf, f"  ! {note}", 6)
+        pdf.set_text_color(60, 60, 60)
+        pdf.ln(2)
+
+    if report.practice_plan:
+        _section_heading(pdf, "Your Practice Plan")
+        pdf.set_font("Helvetica", "", 10)
+        for i, item in enumerate(report.practice_plan, 1):
+            _multi(pdf, f"  {i}. {item}", 6)
+        pdf.ln(4)
+
+    _section_heading(pdf, "How to Use This Report")
     pdf.set_font("Helvetica", "", 10)
     _multi(pdf,
-        "Each shot section includes a form checklist, coaching tips, and annotated "
-        "key frames showing exactly when and where technique needs improvement. "
-        "Start with Priority Improvements, then review the images for each shot."
+        "1. Read Priority Improvements and do the Practice Plan drills before your next session. "
+        "2. For each shot, check Capture Status if recording started late or ended early. "
+        "3. Use Next Rep Focus for one correction per attempt. "
+        "4. Review key-frame images to see exactly when form broke down."
     )
 
 
@@ -104,8 +121,31 @@ def _add_shot_section(pdf: FPDF, shot: DetailedShotReport, frames_dir: Path):
         f"Rules: {s.passed_count}/{s.total_count} passed"
     ), ln=True)
     if s.phases_seen:
-        pdf.cell(0, 6, _safe(f"Phases: {', '.join(s.phases_seen)}"), ln=True)
-    pdf.ln(4)
+        pdf.cell(0, 6, _safe(f"Phases captured: {', '.join(s.phases_seen)}"), ln=True)
+    pdf.ln(2)
+
+    _add_capture_status(pdf, shot)
+
+    if s.next_rep_focus:
+        _section_heading(pdf, "Next Rep Focus")
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.set_text_color(20, 80, 140)
+        for i, item in enumerate(s.next_rep_focus, 1):
+            _multi(pdf, f"  {i}. {item}", 6)
+        pdf.set_text_color(70, 70, 70)
+        pdf.ln(2)
+
+    if s.practice_drills:
+        _section_heading(pdf, "Drills for This Shot")
+        for drill in s.practice_drills:
+            _multi(pdf, f"  > {drill}", 6)
+        pdf.ln(2)
+
+    if s.performance_actions:
+        _section_heading(pdf, "Action Items")
+        for action in s.performance_actions:
+            _multi(pdf, f"  - {action}", 6)
+        pdf.ln(2)
 
     if s.coaching_tips:
         _section_heading(pdf, "Coach Summary")
@@ -125,6 +165,19 @@ def _add_shot_section(pdf: FPDF, shot: DetailedShotReport, frames_dir: Path):
             pdf.cell(80, 5, _safe(pm.phase_label))
             pdf.cell(30, 5, str(pm.frame_index), ln=True)
         pdf.ln(3)
+
+    if shot.visibility_gaps:
+        _section_heading(pdf, "Tracking Reliability Notes")
+        pdf.set_font("Helvetica", "", 9)
+        pdf.set_text_color(120, 80, 0)
+        _multi(pdf,
+            "Some body parts were occluded or below confidence for longer than the "
+            "hold window. Angles for those periods were excluded from scoring."
+        )
+        for gap in shot.visibility_gaps:
+            _multi(pdf, f"  ! {gap.summary()}")
+        pdf.set_text_color(70, 70, 70)
+        pdf.ln(2)
 
     _section_heading(pdf, "Form Checklist")
     for ev in shot.rule_evaluations:
@@ -147,6 +200,40 @@ def _add_shot_section(pdf: FPDF, shot: DetailedShotReport, frames_dir: Path):
         _section_heading(pdf, "Key Frames - Where to Improve")
         for kf in shot.key_frames:
             _add_key_frame(pdf, kf, frames_dir)
+
+
+def _add_capture_status(pdf: FPDF, shot: DetailedShotReport):
+    s = shot.summary
+    if not s.capture_note and not s.missing_phases:
+        return
+
+    _section_heading(pdf, "Capture Status")
+    pdf.set_font("Helvetica", "", 10)
+
+    if s.started_mid_phase or s.ended_early:
+        pdf.set_text_color(160, 100, 0)
+    else:
+        pdf.set_text_color(40, 120, 60)
+
+    if s.capture_note:
+        _multi(pdf, s.capture_note, 6)
+
+    if s.missing_phases:
+        from phase_detection.phases import PHASE_LABELS
+        labels = ", ".join(PHASE_LABELS.get(p, p) for p in s.missing_phases)
+        pdf.set_text_color(100, 100, 100)
+        _multi(pdf, f"Phases not scored (not on camera): {labels}", 6)
+
+    if s.started_mid_phase:
+        _multi(
+            pdf,
+            "Swichy still detected your current phase and tracked the shot through "
+            "release, follow-through, and landing where visible.",
+            6,
+        )
+
+    pdf.set_text_color(70, 70, 70)
+    pdf.ln(2)
 
 
 def _add_key_frame(pdf: FPDF, kf, frames_dir: Path):

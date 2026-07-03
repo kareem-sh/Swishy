@@ -76,6 +76,12 @@ def _draw_top_bar(image, frame_result: FrameResult, w: int, compact: bool, hud_d
     status_size = cv2.getTextSize(status, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 1)[0]
     _put_line(image, status, w - status_size[0] - 14, 28, 0.55, color, 1)
 
+    if frame_result.capture_warning:
+        warn = frame_result.capture_warning
+        if len(warn) > 52:
+            warn = warn[:49] + "..."
+        _put_line(image, warn, 14, bar_h - 6, 0.38, (0, 180, 255), 1)
+
     if not compact:
         rules = (hud_display.rules_line if hud_display and hud_display.rules_line else None)
         if not rules and frame_result.analysis and frame_result.analysis.total_count > 0:

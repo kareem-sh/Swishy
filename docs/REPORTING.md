@@ -1,55 +1,83 @@
 # Detailed Session Reports
 
-Swichy generates a **PDF report** with **embedded annotated key frames** after every video, live webcam session, or single-image analysis. The same reporting pipeline applies to all modes.
+Swichy writes a **PDF performance report** after every video, live session, or image analysis. Reports focus on **what to fix next** and **which drills to run**, not just raw scores.
 
 ---
 
-## What You Get
-
-After a session ends, Swichy saves:
+## Output Location
 
 ```
 outputs/reports/{session_id}/
-├── REPORT.pdf         # Full form analysis (PDF with images)
+├── REPORT.pdf              # Primary deliverable
 └── frames/
     ├── shot_01_frame_00042_release.jpg
-    ├── shot_01_frame_00058_release.jpg   # worst violation frame
     └── ...
 ```
 
-### REPORT.pdf includes
-
-1. **Session overview** — source, FPS, shot count, overall score/grade
-2. **Strengths** — rules passed consistently across shots
-3. **Priority improvements** — most frequent failures across the session
-4. **Per-shot breakdown**
-   - Coach summary (coaching tips)
-   - Phase timeline (when each phase occurred)
-   - Full form checklist (every rule with measured value, range, rationale)
-   - **Key frames** — images embedded with explanations
-
-Set `save_markdown_copy: true` in [`config/report_config.yaml`](../config/report_config.yaml) to also save `REPORT.md`.
-
-### Key frame images
-
-Each saved frame is annotated with:
-
-- Phase and timestamp header
-- **"IMPROVE HERE"** callout listing issues on that frame
-- Angle summary at the bottom
+Optional: set `save_markdown_copy: true` in [`config/report_config.yaml`](../config/report_config.yaml) for `REPORT.md`.
 
 ---
 
-## How Key Frames Are Selected
+## PDF Structure
 
-During each shot, `KeyFrameCapture` records:
+### Title page
+- Overall score and grade
+- **Strengths** — rules passed across shots
+- **Priority improvements** — most common failures
+- **Capture notes** — shots that started mid-rep or ended early
+- **Your practice plan** — session-level drills (from `performance_plan.py`)
+- How to use the report
+
+### Per shot
+| Section | Content |
+|---------|---------|
+| **Capture status** | Mid-entry warning, missing phases, reliability note |
+| **Next rep focus** | Top 1–2 corrections for the next attempt |
+| **Drills for this shot** | Specific exercises per failed rules |
+| **Action items** | Step-by-step improvements |
+| **Coach summary** | Coaching tips |
+| **Phase timeline** | When each phase occurred |
+| **Tracking reliability** | Periods when elbow/knee/index/etc. were occluded |
+| **Form checklist** | Every rule: measured value, range, rationale |
+| **Key frames** | Embedded annotated images |
+
+---
+
+## Mid-Shot Entry in Reports
+
+If video or live stream **starts during** loading/jump/release (not from ready stance):
+
+1. `ShotTracker` begins recording immediately (`started_mid_phase=True`)
+2. Phases from that point through landing are still detected and scored
+3. PDF **Capture Status** explains what was not on camera
+4. Rules for missing phases are simply not evaluated (not penalized)
+
+Example note:
+> Recording started mid-shot at Jump. Earlier phases were not captured. Missing from start: Ready Stance, Loading, Knee Flexion, Ball Lift.
+
+---
+
+## Key Frame Selection
+
+`feedback/frame_capture.py` during each shot:
 
 | Trigger | When |
 |---------|------|
-| **Priority phases** | First frame of `loading`, `ball_lift`, `release`, `follow_through`, `landing` |
-| **Violations** | Worst frame per failed rule (largest distance from ideal range) |
+| Priority phases | First frame of loading, ball_lift, release, follow_through, landing |
+| Violations | Worst frame per failed rule (furthest from ideal range) |
 
-Up to `max_key_frames_per_shot` frames are kept (default: 12). Configure in [`config/report_config.yaml`](../config/report_config.yaml).
+Max frames: `max_key_frames_per_shot` in `report_config.yaml` (default 12).
+
+Annotated by `visualization/report_frame.py` with "IMPROVE HERE" callouts.
+
+---
+
+## Visibility Gap Notes
+
+`feedback/visibility_gaps.py` tracks when landmarks stay unreliable longer than `VISIBILITY_HOLD_FRAMES` (default 5).
+
+Report example:
+> 00:01.20 → 00:01.65 during Release: could not reliably see the shooting elbow (8 frames below confidence threshold)
 
 ---
 
@@ -57,26 +85,26 @@ Up to `max_key_frames_per_shot` frames are kept (default: 12). Configure in [`co
 
 ```mermaid
 flowchart TD
-    A[Video / Live / Image mode] --> B[SessionRecorder.on_frame]
-    B --> C[KeyFrameCapture]
-    B --> D[ShotTracker via pipeline]
-    D --> E[Shot complete]
-    E --> F[build_detailed_shot_report]
-    F --> G[SessionRecorder.finalize]
-    G --> H[write_session_report]
-    H --> I[REPORT.md + frames/]
+    Mode[modes/] --> Recorder[session_recorder.py]
+    Recorder --> Capture[frame_capture.py]
+    Recorder --> Gaps[visibility_gaps.py]
+    Pipeline[pipeline.py] --> Tracker[shot_tracker.py]
+    Tracker -->|ShotSummary| Recorder
+    Recorder --> Builder[report_builder.py]
+    Builder --> Plan[performance_plan.py]
+    Builder --> Writer[report_writer.py]
+    Writer --> PDF[report_pdf.py]
 ```
-
-### Module roles
 
 | Module | Role |
 |--------|------|
-| `feedback/session_recorder.py` | Collects frames and shots across a session |
-| `feedback/frame_capture.py` | Selects informative key frames per shot |
-| `feedback/report_builder.py` | Builds `DetailedShotReport` and `SessionReport` |
-| `feedback/report_writer.py` | Saves markdown + annotated JPGs |
-| `feedback/report_models.py` | Data models for reports |
-| `visualization/report_frame.py` | Draws issue callouts on saved frames |
+| `session_recorder.py` | Per-frame collection across session |
+| `frame_capture.py` | Key frame selection |
+| `visibility_gaps.py` | Occlusion period notes |
+| `report_builder.py` | `DetailedShotReport`, `SessionReport` |
+| `performance_plan.py` | Drills, action items, capture notes |
+| `report_pdf.py` | PDF layout + embedded images |
+| `report_writer.py` | Write to `outputs/reports/` |
 
 ---
 
@@ -88,47 +116,42 @@ flowchart TD
 max_key_frames_per_shot: 12
 store_frame_images_during_shot: true
 auto_save_report: true
+save_markdown_copy: false
 ```
 
-- **`auto_save_report`** — when `true`, reports are saved automatically to `outputs/reports/` when a session ends
-- **`REPORT_OUTPUT_DIR`** — override path in [`config/settings.py`](../config/settings.py)
+[`config/settings.py`](../config/settings.py) → `REPORT_OUTPUT_DIR`
 
 ---
 
 ## Usage
 
-Reports are generated automatically — no extra flags needed.
-
 ```powershell
 .\venv\Scripts\activate
-python main.py   # set MODE in main.py: video | live | image
+python main.py   # MODE = video | live | image
 ```
 
-When the session ends (video finishes, press `q` in live/video, or close image window):
+End session (video ends, press `q`, or close image window):
 
 ```
-Detailed report saved: outputs/reports/20250616_143022_a1b2c3/REPORT.pdf
-  Key frames: outputs/reports/20250616_143022_a1b2c3/frames
+Detailed report saved: outputs/reports/.../REPORT.pdf
 ```
-
-Open `REPORT.pdf` in any PDF viewer. Frame images and explanations are embedded in the document.
 
 ---
 
-## Applying Feedback Across Modes
+## By Mode
 
-| Mode | What gets reported |
-|------|-------------------|
-| **Video** | All detected shots + key frames per shot |
-| **Live** | All shots during the webcam session |
-| **Image** | Single-shot snapshot with form checklist and one key frame |
+| Mode | Report content |
+|------|----------------|
+| **Video** | All detected shots + key frames |
+| **Live** | All shots during webcam session |
+| **Image** | Single-shot checklist + one key frame |
 
-The **same rule checklist and coaching rationale** apply everywhere — only the number of shots and key frames differ.
+Same rules and rationale apply in all modes.
 
 ---
 
-## Related docs
+## Related
 
-- [FEEDBACK_SCORING.md](FEEDBACK_SCORING.md) — how shot scores and tips are computed
-- [BIOMECHANICS.md](BIOMECHANICS.md) — rule definitions and rationale text in reports
-- [PHASE_DETECTION.md](PHASE_DETECTION.md) — phase timeline in reports
+- [FEEDBACK_SCORING.md](FEEDBACK_SCORING.md)
+- [BIOMECHANICS.md](BIOMECHANICS.md)
+- [MANUAL_COMPLETION_GUIDE.md](MANUAL_COMPLETION_GUIDE.md)

@@ -1,64 +1,29 @@
 # Swichy Architecture
 
-## What Changed
-
-Phase 1 refactored Swichy from a flat `core/` prototype into a layered, production-oriented package structure:
-
-| New Module | Purpose |
-|------------|---------|
-| [`pose/`](../pose/) | MediaPipe detector, landmark extraction (image + world), visibility gating |
-| [`filters/`](../filters/) | One Euro Filter for real-time landmark smoothing |
-| [`geometry/`](../geometry/) | 3D vector mathematics (rotation-invariant) |
-| [`angles/`](../angles/) | Joint angle definitions and 3D calculator |
-| [`pipeline.py`](../pipeline.py) | Central orchestrator connecting all stages |
-| [`visualization/`](../visualization/) | Rendering only — no analysis logic |
-| [`utils/`](../utils/) | Timestamps, config loading, frame buffer |
-| [`config/`](../config/) | Settings + YAML configs |
-
-The old `core/` package remains as **thin deprecation shims** pointing to the new modules.
+Layered design: **input → pipeline (analysis) → output (HUD + PDF)**. Each module has one job.
 
 ---
 
-## Why It Changed
-
-### Problem with the old design
-
-The original code mixed three concerns in one file (`core/drawing.py`):
-
-1. **Detection visualization** (skeleton drawing)
-2. **Angle computation** (2D trigonometry)
-3. **Coaching logic** (elbow < 70° rule)
-
-This made the system:
-
-- **Untestable** — you could not verify angle math without opening an OpenCV window
-- **Unreusable** — analysis could not feed a mobile app, API, or dashboard
-- **Inaccurate** — 2D image-plane angles change when the camera rotates
-
-### The new design principle: separation of concerns
-
-```
-Input (camera) → Pipeline (analysis) → Output (visualization + feedback)
-```
-
-Each layer has one job. The pipeline produces a `FrameResult` dataclass that any consumer can use.
-
----
-
-## System Diagram
+## System Diagram (Current)
 
 ```mermaid
 flowchart TD
-    Camera[Camera / Video / Image] --> Detector[pose/detector.py]
-    Detector --> Extract[pose/landmarks.py]
-    Extract --> Filter[filters/one_euro.py]
+    Input[Camera / Video / Image] --> Modes[modes/]
+    Modes --> Detector[pose/detector.py]
+    Detector --> Landmarks[pose/landmarks.py]
+    Landmarks --> Filter[filters/one_euro.py]
     Filter --> Visibility[pose/visibility.py]
     Visibility --> Angles[angles/calculator.py]
-    Angles --> Buffer[utils/frame_buffer.py]
-    Buffer --> Pipeline[pipeline.py]
-    Pipeline --> Renderer[visualization/renderer.py]
-    Pipeline --> FuturePhases[phase_detection - Phase 3]
-    Pipeline --> FutureRules[analysis - Phase 4]
+    Angles --> Features[phase_detection/features.py]
+    Features --> Phases[phase_detection/detector.py]
+    Phases --> Rules[analysis/engine.py]
+    Rules --> Tracker[feedback/shot_tracker.py]
+    Tracker --> Scorer[feedback/scorer.py]
+    Scorer --> Plan[feedback/performance_plan.py]
+    Plan --> Pipeline[pipeline.py FrameResult]
+    Pipeline --> HUD[visualization/hud.py]
+    Pipeline --> Recorder[feedback/session_recorder.py]
+    Recorder --> PDF[feedback/report_pdf.py]
 ```
 
 ---
@@ -66,91 +31,132 @@ flowchart TD
 ## Module Responsibilities
 
 ### `pose/`
-
-- **`detector.py`** — Wraps MediaPipe Pose Landmarker (IMAGE, VIDEO, LIVE_STREAM)
-- **`landmarks.py`** — Extracts image landmarks (for drawing) and world landmarks (for angles)
-- **`visibility.py`** — Confidence gating and temporal hold during brief occlusion
-
-### `geometry/`
-
-Pure math. No MediaPipe, no OpenCV. Unit-testable in isolation.
-
-### `angles/`
-
-- **`joint_chains.py`** — Defines which three landmarks form each joint angle
-- **`calculator.py`** — Computes angles using 3D vectors from world landmarks
+| File | Role |
+|------|------|
+| `detector.py` | MediaPipe Pose Landmarker (IMAGE / VIDEO / LIVE_STREAM) |
+| `landmarks.py` | Image + world landmarks; basketball subset incl. **index finger** |
+| `visibility.py` | `min(visibility, presence)` gating + temporal hold |
 
 ### `filters/`
+| File | Role |
+|------|------|
+| `one_euro.py` | Adaptive smoothing per landmark axis |
 
-- **`one_euro.py`** — Adaptive low-pass filter per landmark axis
+### `geometry/` + `angles/`
+| File | Role |
+|------|------|
+| `vectors.py` | 3D dot product angles, trunk vs vertical |
+| `joint_chains.py` | elbow, knee, hip, shoulder, **index_align**, trunk |
+| `calculator.py` | `AngleResult` with `is_valid`, `is_stable` |
 
-### `pipeline.py`
+### `phase_detection/`
+| File | Role |
+|------|------|
+| `phases.py` | `PHASE_ORDER`, `TRANSITIONS`, labels |
+| `features.py` | Velocities, index finger kinematics |
+| `detector.py` | FSM: hysteresis (5) + min dwell (3) |
 
-Single entry point: `ShotAnalysisPipeline.process_frame()`. All modes (live, video, image) call this.
+### `analysis/`
+| File | Role |
+|------|------|
+| `engine.py` | YAML rule evaluation per phase |
+| `models.py` | `RuleResult`, `AnalysisResult` |
+
+### `feedback/`
+| File | Role |
+|------|------|
+| `shot_tracker.py` | Shot boundaries; **mid-entry** when recording starts mid-rep |
+| `scorer.py` | Weighted 0–100 per shot |
+| `generator.py` | Coaching tip strings |
+| `performance_plan.py` | Drills, action items, capture notes |
+| `visibility_gaps.py` | Occlusion periods for PDF |
+| `session_recorder.py` | Session-level shot + frame collection |
+| `frame_capture.py` | Key frame selection |
+| `report_builder.py` | `DetailedShotReport`, `SessionReport` |
+| `report_pdf.py` | Primary PDF output |
+| `report_writer.py` | Save PDF + optional markdown |
+| `console.py` | Terminal shot summary |
 
 ### `visualization/`
+| File | Role |
+|------|------|
+| `renderer.py` | Skeleton drawing |
+| `hud.py` | Structured panels (phase, angles, violations) |
+| `hud_display.py` | EMA + hold frames so on-screen text is readable |
+| `report_frame.py` | Annotated frames for PDF |
 
-- **`renderer.py`** — Draws skeleton and angle overlays from `FrameResult`. Never computes angles.
+### `modes/`
+| File | Role |
+|------|------|
+| `live_stream.py` | Webcam + `SessionRecorder` |
+| `video_mode.py` | File playback + recorder |
+| `image_mode.py` | Single image report |
+
+### `ball/` + `physics/` (stubs)
+Empty implementations with TODOs — see [PHASE_6_BALL_AND_OUTCOME.md](PHASE_6_BALL_AND_OUTCOME.md).
+
+### `config/`
+| File | Role |
+|------|------|
+| `settings.py` | Paths, visibility thresholds, shooting hand |
+| `phases.yaml` | FSM thresholds |
+| `biomechanics.yaml` | 12 rules |
+| `scoring.yaml` | Score weights |
+| `display.yaml` | HUD smoothing, video playback speed |
+| `report_config.yaml` | Key frames, auto-save |
+| `filter_config.yaml` | One Euro parameters |
+| `ball.yaml`, `hoop_roi.yaml`, `physics.yaml` | Phase 6 / #11 config |
 
 ---
 
-## AI Concepts to Study
+## Design Principles
 
-### Concept: Separation of Concerns (Software Architecture)
+### Separation of concerns
+`visualization/` never computes angles. `analysis/` never draws. `pipeline.py` is the single orchestrator.
 
-**What it is:** Each module handles one responsibility and exposes a clear interface.
+### Phase-conditioned logic
+Rules and scoring depend on **when** in the shot something happens, not just raw angles.
 
-**Why we use it:** Enables independent testing, swapping components (e.g. replace MediaPipe with MoveNet), and scaling to a commercial product.
-
-**Alternatives:** Monolithic script (everything in `main.py`), microservices (overkill for now).
-
-**Advantages:** Testable, maintainable, team-friendly.
-
-**Disadvantages:** More files, initial setup cost.
-
-**Difficulty:** Beginner
-
-**Topics to study:**
-- SOLID principles (especially Single Responsibility)
-- Layered architecture
-- Dependency injection
-
-**Resources to search:**
-- "Python project structure best practices"
-- "Separation of concerns computer science"
+### Configuration over code
+Thresholds and rules live in YAML so you can tune without rewriting Python.
 
 ---
 
-### Concept: Data Pipeline Pattern
+## `FrameResult` (pipeline output)
 
-**What it is:** Data flows through a sequence of transformation stages, each producing structured output for the next.
+```python
+@dataclass
+class FrameResult:
+    image_landmarks, world_landmarks
+    angles: Dict[str, AngleResult]
+    features: KinematicFeatures
+    analysis: AnalysisResult
+    phase, phase_label, shooting_side
+    shot_in_progress, shot_summary, capture_warning
+    hud_display: HudDisplay          # smoothed for overlay
+    timestamp_ms, has_pose
+```
 
-**Why we use it:** Basketball analysis requires ordered steps: raw landmarks must be filtered before angles are computed, and angles must exist before phase detection can run.
-
-**Alternatives:** Event-driven architecture, graph-based processing (Apache Beam).
-
-**Advantages:** Predictable flow, easy to debug stage-by-stage.
-
-**Disadvantages:** Sequential — cannot parallelize stages within one frame.
-
-**Difficulty:** Beginner–Intermediate
-
-**Topics to study:**
-- ETL pipelines
-- DAG (Directed Acyclic Graph) processing
-- Frame-based video analytics
+Any consumer (HUD, API, mobile) can use `FrameResult` without OpenCV.
 
 ---
 
 ## Learning Roadmap
 
-1. **Week 1–2:** Run the project, read `PIPELINE.md`, trace one frame through the code
-2. **Week 3–4:** Study `ANGLES_3D.md` and `FILTERS.md` — understand the math
-3. **Week 5–6:** Read MediaPipe Pose Landmarker docs — understand world vs image landmarks
-4. **Week 7+:** Implement Phase 3 (phase detection) using the frame buffer
+| Week | Focus |
+|------|-------|
+| 1–2 | [PIPELINE.md](PIPELINE.md) + trace `process_frame()` |
+| 3 | [ANGLES_3D.md](ANGLES_3D.md), [FILTERS.md](FILTERS.md), [VISIBILITY.md](VISIBILITY.md) |
+| 4 | [PHASE_DETECTION.md](PHASE_DETECTION.md) — tune `phases.yaml` on side-view video |
+| 5 | [BIOMECHANICS.md](BIOMECHANICS.md) + [BIOMECHANICS_RESEARCH.md](BIOMECHANICS_RESEARCH.md) |
+| 6 | [FEEDBACK_SCORING.md](FEEDBACK_SCORING.md) + [REPORTING.md](REPORTING.md) |
+| 7+ | [MANUAL_COMPLETION_GUIDE.md](MANUAL_COMPLETION_GUIDE.md) → implement Phase 6 |
 
 ---
 
-## Future Improvements
+## Related
 
-See [`FUTURE_IMPROVEMENTS.md`](FUTURE_IMPROVEMENTS.md).
+- [MANUAL_COMPLETION_GUIDE.md](MANUAL_COMPLETION_GUIDE.md) — file map + completion checklist
+- [FUTURE_IMPROVEMENTS.md](FUTURE_IMPROVEMENTS.md) — roadmap after Phase 6
+
+The legacy `core/` package contains thin deprecation shims pointing to new modules.

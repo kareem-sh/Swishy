@@ -1,10 +1,11 @@
 """Build detailed shot and session reports from captured data."""
 
 from collections import Counter
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import numpy as np
 
+from feedback.performance_plan import build_shot_performance_plan
 from feedback.models import ShotSummary
 from feedback.report_models import (
     DetailedShotReport,
@@ -12,6 +13,7 @@ from feedback.report_models import (
     PhaseMoment,
     RuleEvaluation,
     SessionReport,
+    VisibilityGapNote,
 )
 from phase_detection.phases import PHASE_LABELS
 from utils.config_loader import load_yaml
@@ -23,6 +25,7 @@ def build_detailed_shot_report(
     key_frame_pairs: List[tuple],
     start_ms: int,
     end_ms: int,
+    visibility_gaps: Optional[List[VisibilityGapNote]] = None,
 ) -> DetailedShotReport:
     biomech = load_yaml("biomechanics.yaml")
     rules_cfg = biomech.get("rules", {})
@@ -75,12 +78,15 @@ def build_detailed_shot_report(
         if ev.rule_id in violation_frames:
             ev.key_frame_filename = violation_frames[ev.rule_id]
 
+    summary = build_shot_performance_plan(summary)
+
     return DetailedShotReport(
         summary=summary,
         phase_timeline=timeline,
         rule_evaluations=evaluations,
         key_frames=populated_frames,
         frame_images=frame_images,
+        visibility_gaps=visibility_gaps or [],
         start_timestamp_ms=start_ms,
         end_timestamp_ms=end_ms,
     )
@@ -132,7 +138,59 @@ def build_session_report(
         for name, count in strength_counts.most_common(5)
     ]
 
+    report.session_notes = _session_capture_notes(shots)
+    report.practice_plan = _build_session_practice_plan(shots, violation_counts)
+
     return report
+
+
+def _session_capture_notes(shots: List[DetailedShotReport]) -> List[str]:
+    notes: List[str] = []
+    mid_starts = [s for s in shots if s.summary.started_mid_phase]
+    early_ends = [s for s in shots if s.summary.ended_early]
+
+    if mid_starts:
+        nums = ", ".join(str(s.summary.shot_number) for s in mid_starts)
+        notes.append(
+            f"Shot(s) {nums} started mid-rep — camera was on after the load began. "
+            f"Start recording before you dip to score leg drive and ball lift."
+        )
+    if early_ends:
+        nums = ", ".join(str(s.summary.shot_number) for s in early_ends)
+        notes.append(
+            f"Shot(s) {nums} ended before landing — analysis still covers visible phases "
+            f"but landing balance was not scored."
+        )
+    return notes
+
+
+def _build_session_practice_plan(
+    shots: List[DetailedShotReport],
+    violation_counts: Counter,
+) -> List[str]:
+    plan: List[str] = []
+    seen_drills: set[str] = set()
+
+    for shot in shots:
+        for drill in shot.summary.practice_drills:
+            if drill not in seen_drills:
+                plan.append(drill)
+                seen_drills.add(drill)
+
+    if violation_counts:
+        top_name, top_count = violation_counts.most_common(1)[0]
+        plan.insert(
+            0,
+            f"Session priority: fix '{top_name}' — it failed in {top_count}/{len(shots)} shot(s). "
+            f"Do one drill below before your next live session.",
+        )
+    elif shots:
+        plan.append(
+            "Strong session overall — add game-speed reps and film yourself from the side "
+            "to keep mechanics under pressure."
+        )
+
+    return plan[:6]
 
 
 def _grade(score: int) -> str:

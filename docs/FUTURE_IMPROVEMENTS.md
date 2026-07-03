@@ -312,16 +312,16 @@ This file is append-only. Each enhancement includes description, difficulty, exp
 1. **Phase 3:** Temporal phase detection (FSM) — **done**
 2. **Phase 4:** Biomechanical rule engine — **done**
 3. **Phase 5:** Feedback + scoring — **done**
-4. **Phase 5b:** Session reports — **done**
-5. **Phase 6:** Ball tracking + make/miss outcome — [PHASE_6_BALL_AND_OUTCOME.md](PHASE_6_BALL_AND_OUTCOME.md)
-6. Release timing prediction (#7)
-7. Ball-body synchronization (#6) — overlaps Phase 6
+4. **Phase 5b:** PDF session reports + performance plan — **done**
+5. **Phase 6:** Ball tracking + make/miss — **stubs in `ball/`** — [PHASE_6_BALL_AND_OUTCOME.md](PHASE_6_BALL_AND_OUTCOME.md)
+6. **#11 Physics trajectory** — **stubs in `physics/`**
+7. Release timing prediction (#7)
 8. Personalized player models (#5)
-7. Shot classification (#8)
-8. Kinematic chain optimization (#10)
-9. Coach dashboard (#16)
-10. AI coaching feedback (#17)
-11. Multi-camera (#1) / depth estimation (#14)
-12. ML-based phase detection (#2, #3)
-13. Edge deployment (#12)
-14. RL coach (#4) — research stage
+9. Shot classification (#8) — use assets README to label dunk vs jump shot
+10. Kinematic chain optimization (#10)
+11. Coach dashboard (#16)
+12. Multi-camera (#1) / depth estimation (#14)
+13. ML-based phase detection (#2, #3)
+14. Edge deployment (#12)
+
+**Study and complete manually:** [MANUAL_COMPLETION_GUIDE.md](MANUAL_COMPLETION_GUIDE.md)

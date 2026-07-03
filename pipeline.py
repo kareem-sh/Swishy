@@ -58,6 +58,7 @@ class FrameResult:
     display_summary: Optional[ShotSummary] = None
     show_shot_summary: bool = False
     hud_display: Optional["HudDisplay"] = None
+    capture_warning: Optional[str] = None
 
 
 class ShotAnalysisPipeline:
@@ -213,6 +214,7 @@ class ShotAnalysisPipeline:
             display_summary=display_summary,
             show_shot_summary=self._shot_tracker.show_shot_summary,
             hud_display=hud_display,
+            capture_warning=self._shot_tracker.capture_warning,
         )
 
     def _compute_dt(self, timestamp_ms: int) -> float:

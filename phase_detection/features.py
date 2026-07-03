@@ -25,6 +25,9 @@ class KinematicFeatures:
     hip_y_avg: float = 0.0
     hip_velocity_y: float = 0.0
     elbow_angle: Optional[float] = None
+    index_y: float = 0.0
+    index_velocity_y: float = 0.0
+    index_align_angle: Optional[float] = None
     shoulder_y: float = 0.0
     nose_y: float = 0.0
     nose_velocity_y: float = 0.0
@@ -78,11 +81,14 @@ def extract_features(
 ) -> KinematicFeatures:
     """Build kinematic features for the current frame."""
     wrist_key = f"{shooting_side}_wrist"
+    index_key = f"{shooting_side}_index"
     knee_key = f"{shooting_side}_knee"
     elbow_key = f"{shooting_side}_elbow"
+    index_align_key = f"{shooting_side}_index_align"
     shoulder_key = f"{shooting_side}_shoulder"
 
     wrist_y = _lm_y(world_landmarks, wrist_key) or 0.0
+    index_y = _lm_y(world_landmarks, index_key) or wrist_y
     ankle_y = _avg_y(world_landmarks, ("left_ankle", "right_ankle")) or 0.0
     hip_y = _avg_y(world_landmarks, ("left_hip", "right_hip")) or 0.0
     shoulder_y = _lm_y(world_landmarks, shoulder_key) or 0.0
@@ -90,22 +96,28 @@ def extract_features(
 
     knee_angle = None
     elbow_angle = None
+    index_align_angle = None
     if knee_key in angles and angles[knee_key].is_valid:
         knee_angle = angles[knee_key].degrees
     if elbow_key in angles and angles[elbow_key].is_valid:
         elbow_angle = angles[elbow_key].degrees
+    if index_align_key in angles and angles[index_align_key].is_valid:
+        index_align_angle = angles[index_align_key].degrees
 
-    wrist_vel = ankle_vel = hip_vel = nose_vel = 0.0
+    wrist_vel = ankle_vel = hip_vel = nose_vel = index_vel = 0.0
     knee_delta = 0.0
 
     if prev_world is not None and dt_s > 0:
         prev_wrist = _lm_y(prev_world, wrist_key)
+        prev_index = _lm_y(prev_world, index_key)
         prev_ankle = _avg_y(prev_world, ("left_ankle", "right_ankle"))
         prev_hip = _avg_y(prev_world, ("left_hip", "right_hip"))
         prev_nose = _lm_y(prev_world, "nose")
 
         if prev_wrist is not None:
             wrist_vel = (wrist_y - prev_wrist) / dt_s
+        if prev_index is not None:
+            index_vel = (index_y - prev_index) / dt_s
         if prev_ankle is not None:
             ankle_vel = (ankle_y - prev_ankle) / dt_s
         if prev_hip is not None:
@@ -131,6 +143,9 @@ def extract_features(
         hip_y_avg=hip_y,
         hip_velocity_y=hip_vel,
         elbow_angle=elbow_angle,
+        index_y=index_y,
+        index_velocity_y=index_vel,
+        index_align_angle=index_align_angle,
         shoulder_y=shoulder_y,
         nose_y=nose_y,
         nose_velocity_y=nose_vel,

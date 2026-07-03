@@ -9,6 +9,14 @@ def print_shot_summary(summary: ShotSummary):
     print("=" * 50)
     print(f"  Rules: {summary.passed_count}/{summary.total_count} passed")
 
+    if summary.capture_note:
+        print(f"\n  Capture: {summary.capture_note}")
+
+    if summary.next_rep_focus:
+        print("\n  Next rep focus:")
+        for item in summary.next_rep_focus:
+            print(f"    * {item}")
+
     if summary.passed_rules:
         print("\n  Passed:")
         for rule in summary.passed_rules:
@@ -18,6 +26,11 @@ def print_shot_summary(summary: ShotSummary):
         print("\n  Fix next:")
         for rule in summary.violations:
             print(f"    - {rule.name}: {rule.message}")
+
+    if summary.practice_drills:
+        print("\n  Drills:")
+        for drill in summary.practice_drills:
+            print(f"    > {drill}")
 
     if summary.coaching_tips:
         print("\n  Coach says:")

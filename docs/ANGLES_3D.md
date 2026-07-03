@@ -74,9 +74,12 @@ Each angle is defined by three landmarks where the **middle landmark is the vert
 | `right_knee` | right_hip | right_knee | right_ankle |
 | `right_hip` | right_shoulder | right_hip | right_knee |
 | `right_shoulder` | right_hip | right_shoulder | right_elbow |
+| `right_index_align` | right_elbow | right_wrist | right_index |
 | `trunk` | mid_hip | mid_shoulder | vertical reference |
 
 Left-side chains mirror right-side. The shooting side (auto-detected or configured) determines which side is analyzed.
+
+**Index alignment** measures how straight the shooting finger is relative to the forearm — used for release and follow-through rules and phase detection.
 
 ---
 
@@ -180,9 +183,9 @@ One Euro Filter (smooth positions)
         ↓
 Visibility Gate (reject unreliable)
         ↓
-3D Angle Computation  ← YOU ARE HERE
+3D Angle Computation
         ↓
-Frame Buffer
+Phase Detection + Rules
         ↓
-Phase Detection (Phase 3)
+Reports (visibility gap notes if occluded too long)
 ```

@@ -1,68 +1,32 @@
 # Phase Detection
 
-## What Changed
-
-| File | Change |
-|------|--------|
-| [`phase_detection/detector.py`](../phase_detection/detector.py) | **New** — `ShotPhaseDetector` FSM |
-| [`phase_detection/features.py`](../phase_detection/features.py) | **New** — `KinematicFeatures`, velocity extraction |
-| [`phase_detection/phases.py`](../phase_detection/phases.py) | **New** — Phase order and valid transitions |
-| [`config/phases.yaml`](../config/phases.yaml) | **New** — Configurable thresholds |
-| [`pipeline.py`](../pipeline.py) | Integrated phase detection after angle computation |
-| [`utils/frame_buffer.py`](../utils/frame_buffer.py) | Stores phase + features per frame |
-| [`visualization/renderer.py`](../visualization/renderer.py) | Displays human-readable phase label |
+Finite state machine (FSM) that labels **where** the player is in the jump-shot sequence.
 
 ---
 
-## Why It Changed
+## Modules
 
-Per-frame angles cannot answer *"Is this the release?"* A jump shot is a **sequence**. Phase detection segments that sequence so biomechanical rules (Phase 4) only fire at meaningful moments.
-
-Without phases, you would penalize a bent elbow during loading — that is correct form at that moment.
+| File | Role |
+|------|------|
+| `phase_detection/detector.py` | `ShotPhaseDetector` FSM |
+| `phase_detection/features.py` | `KinematicFeatures` |
+| `phase_detection/phases.py` | Order, transitions, labels |
+| `config/phases.yaml` | Thresholds |
 
 ---
 
-## The 8 Phases Explained
+## The 8 Phases
 
-### 1. Ready Stance
-Player is still. Low total landmark velocity. Waiting to shoot.
-
-**Signals:** `total_velocity < ready_max_velocity`
-
-### 2. Loading
-Athletic dip — hips drop, knees bend, ball stays below shoulder.
-
-**Signals:** `hip_velocity_y < 0`, knee flexing, wrist below shoulder
-
-### 3. Knee Flexion
-Bottom of the dip — knees reversing from flexion to extension.
-
-**Signals:** `knee_angle_delta > 0` (angle increasing = leg extending)
-
-### 4. Ball Lift
-Ball rises toward set point. Wrist moving upward.
-
-**Signals:** `wrist_velocity_y > ball_lift_wrist_velocity`
-
-### 5. Jump
-Feet leave the ground. Ankles rise above standing baseline.
-
-**Signals:** `ankle_y - ankle_baseline > jump_ankle_rise`
-
-### 6. Release
-Ball leaves the hand. Wrist at or near peak height, elbow extending.
-
-**Signals:** wrist near tracked peak, elbow > 155°, wrist slowing
-
-### 7. Follow-Through
-Arm continues up and forward after release. Wrist moves down, elbow stays extended.
-
-**Signals:** `wrist_velocity_y < 0`, elbow extended
-
-### 8. Landing
-Feet return to floor. Ankles near baseline, body slowing.
-
-**Signals:** ankle near baseline → then `ready_stance` when still
+| # | ID | Label | What happens |
+|---|-----|-------|--------------|
+| 1 | `ready_stance` | Ready Stance | Still before shot |
+| 2 | `loading` | Loading | Hip/knee dip, ball low |
+| 3 | `knee_flexion` | Knee Flexion | Bottom of dip |
+| 4 | `ball_lift` | Ball Lift | Ball rising to set point |
+| 5 | `jump` | Jump | Feet leave floor |
+| 6 | `release` | Release | Ball leaves hand |
+| 7 | `follow_through` | Follow-Through | Arm extends after release |
+| 8 | `landing` | Landing | Feet return |
 
 ---
 
@@ -70,84 +34,87 @@ Feet return to floor. Ankles near baseline, body slowing.
 
 ```mermaid
 stateDiagram-v2
-    ReadyStance --> Loading: hip_drop_or_knee_flex
+    ReadyStance --> Loading: dip_or_wrist_lift
+    ReadyStance --> BallLift: direct_lift
     Loading --> KneeFlexion: knee_reversing
     Loading --> BallLift: wrist_rising
     KneeFlexion --> BallLift: wrist_above_hip
     BallLift --> Jump: ankles_rise
-    Jump --> Release: wrist_apex
-    Release --> FollowThrough: wrist_descending
+    BallLift --> Release: set_shot_path
+    Jump --> Release: apex_or_index_snap
+    Release --> FollowThrough: wrist_down_or_index
     FollowThrough --> Landing: ankles_down
     Landing --> ReadyStance: body_still
 ```
 
+**Set shot path:** `ball_lift → release` without jump when elbow extends and wrist drives through.
+
 ---
 
-## Hysteresis
+## Stability (No Flicker)
 
-Without hysteresis, a single noisy frame could flip `loading` → `jump` → `loading`. The detector requires **3 consecutive frames** (configurable via `hysteresis_frames`) agreeing on the next phase before transitioning.
+From `config/phases.yaml`:
+
+| Setting | Default | Purpose |
+|---------|---------|---------|
+| `hysteresis_frames` | 5 | Consecutive frames agreeing before transition |
+| `min_dwell_frames` | 3 | Minimum time in phase before leaving |
+
+If the player **pauses** in a phase, no transition fires until movement triggers the next phase.
+
+---
+
+## Index Finger Signals
+
+Landmarks: `left_index` / `right_index` (MediaPipe 19/20)
+
+| Feature | Use |
+|---------|-----|
+| `index_align_angle` | elbow → wrist → index angle |
+| `index_velocity_y` | Finger drive at release |
+| `index_y` | Height tracking |
+
+Release transitions use index snap + elbow extension. Follow-through uses index alignment > 160° (gooseneck).
 
 ---
 
 ## KinematicFeatures
 
-Each frame produces:
-
 | Field | Meaning |
 |-------|---------|
-| `wrist_y` | Shooting wrist height (world Y, meters) |
-| `wrist_velocity_y` | Wrist vertical speed (m/s) |
-| `ankle_y_avg` | Average ankle height |
-| `ankle_baseline_y` | Standing ankle height (learned when still) |
-| `knee_angle` | Shooting leg knee angle (degrees) |
-| `knee_angle_delta` | Change in knee angle since last frame |
-| `hip_velocity_y` | Hip vertical speed |
-| `elbow_angle` | Shooting arm elbow angle |
-| `nose_velocity_y` | Head stability proxy |
-| `total_velocity` | Average landmark speed — stillness detector |
+| `wrist_y`, `wrist_velocity_y` | Shooting hand height/speed |
+| `index_y`, `index_velocity_y` | Index finger kinematics |
+| `index_align_angle` | Finger-through-ball alignment |
+| `ankle_y_avg`, `ankle_baseline_y` | Jump detection |
+| `knee_angle`, `knee_angle_delta` | Load and extension |
+| `hip_velocity_y` | Loading dip |
+| `elbow_angle` | Slot, release, follow-through |
+| `nose_velocity_y` | Head stability (rules) |
+| `total_velocity` | Stillness for ready_stance |
 
 ---
 
-## Tuning `config/phases.yaml`
+## Tuning `phases.yaml`
 
-If phases switch too early:
-- Increase `hysteresis_frames` (e.g. 5)
-- Make thresholds stricter (larger `jump_ankle_rise`, smaller velocity triggers)
+**Phases switch too early:** increase `hysteresis_frames`, `min_dwell_frames`, or raise velocity thresholds.
 
-If phases switch too late:
-- Decrease `hysteresis_frames` (e.g. 2)
-- Lower velocity thresholds
+**Phases switch too late:** decrease hysteresis or lower thresholds.
+
+Test on [`assets/videos/video_07_side_jump_shot.mp4`](../assets/videos/video_07_side_jump_shot.mp4) (side view).
 
 ---
 
-## AI Concepts to Study
+## Pipeline
 
-### Concept: Finite State Machine (FSM)
-
-**What it is:** A system with discrete states and rules for moving between them.
-
-**Why we use it:** Shot phases are sequential with clear boundaries — ideal for FSM.
-
-**Alternatives:** HMM, LSTM classifier, Transformer sequence model (see FUTURE_IMPROVEMENTS.md).
-
-**Difficulty:** Beginner–Intermediate
-
-**Topics:** State machines, hysteresis, zero-crossing detection, peak detection
-
-**Resources:** "finite state machine motion analysis", "basketball shot phase segmentation"
-
----
-
-## Pipeline Position
-
-```
-3D Angles
-    ↓
-Kinematic Features  ← extract velocities from world landmarks
-    ↓
-Phase Detection FSM  ← YOU ARE HERE
-    ↓
-Biomechanical Rules
+```python
+features = extract_features(world, angles, shooting_side, prev_world, ...)
+phase = self._phase_detector.update(features)
 ```
 
-See also: [PHASES_OVERVIEW.md](PHASES_OVERVIEW.md), [BIOMECHANICS.md](BIOMECHANICS.md)
+---
+
+## Related
+
+- [BIOMECHANICS.md](BIOMECHANICS.md) — rules gated by phase
+- [FEEDBACK_SCORING.md](FEEDBACK_SCORING.md) — shot boundaries use phases
+- [PHASES_OVERVIEW.md](PHASES_OVERVIEW.md)

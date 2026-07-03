@@ -18,12 +18,14 @@ class ShotPhaseDetector:
     def __init__(self):
         cfg = load_yaml("phases.yaml")
         self._cfg = cfg
-        self._hysteresis_frames = cfg.get("hysteresis_frames", 3)
+        self._hysteresis_frames = cfg.get("hysteresis_frames", 5)
+        self._min_dwell_frames = cfg.get("min_dwell_frames", 3)
         self._thresholds = cfg.get("thresholds", {})
 
         self.phase = "ready_stance"
         self._pending_phase: Optional[str] = None
         self._pending_count = 0
+        self._frames_in_phase = 0
         self._wrist_peak_y = 0.0
         self._knee_min_angle = 180.0
         self._in_shot = False
@@ -32,6 +34,7 @@ class ShotPhaseDetector:
         self.phase = "ready_stance"
         self._pending_phase = None
         self._pending_count = 0
+        self._frames_in_phase = 0
         self._wrist_peak_y = 0.0
         self._knee_min_angle = 180.0
         self._in_shot = False
@@ -49,15 +52,19 @@ class ShotPhaseDetector:
                 self._pending_phase = candidate
                 self._pending_count = 1
 
-            if self._pending_count >= self._hysteresis_frames:
+            dwell_ok = self._frames_in_phase >= self._min_dwell_frames or self.phase == "ready_stance"
+            if self._pending_count >= self._hysteresis_frames and dwell_ok:
                 if self._is_valid_transition(self.phase, candidate):
                     self.phase = candidate
+                    self._frames_in_phase = 0
                 self._pending_phase = None
                 self._pending_count = 0
-        else:
+        elif candidate == self.phase:
             self._pending_phase = None
             self._pending_count = 0
+        # When candidate is None the player is holding the current phase — keep it.
 
+        self._frames_in_phase += 1
         self._track_shot_metrics(features)
         return self.phase
 
@@ -127,20 +134,42 @@ class ShotPhaseDetector:
                 and wrist_over_hip
             ):
                 return "release"
+            index_release = (
+                f.index_align_angle is not None
+                and f.index_align_angle > t("release_index_align_min", 150)
+                and f.index_velocity_y > t("release_index_up_velocity", 0.03)
+            )
+            if index_release and wrist_over_hip:
+                return "release"
             return None
 
         if self.phase == "jump":
             wrist_near_peak = f.wrist_y >= self._wrist_peak_y - t("release_peak_tolerance", 0.02)
             elbow_extended = f.elbow_angle is not None and f.elbow_angle > t("release_elbow_min", 150)
             wrist_slow = abs(f.wrist_velocity_y) < t("release_wrist_velocity_max", 0.05)
+            index_snap = f.index_velocity_y > t("release_index_up_velocity", 0.04)
+            index_extended = (
+                f.index_align_angle is not None
+                and f.index_align_angle > t("release_index_align_min", 155)
+            )
             if (wrist_near_peak and wrist_slow) or (elbow_extended and f.wrist_velocity_y < 0):
+                return "release"
+            if index_snap and elbow_extended:
+                return "release"
+            if index_extended and elbow_extended:
                 return "release"
             return None
 
         if self.phase == "release":
+            index_follow = (
+                f.index_align_angle is not None
+                and f.index_align_angle > t("follow_through_index_align_min", 160)
+            )
             if f.wrist_velocity_y < t("follow_through_wrist_down_velocity", -0.02):
                 return "follow_through"
             if f.elbow_angle is not None and f.elbow_angle > t("follow_through_elbow_min", 155):
+                return "follow_through"
+            if index_follow and f.index_velocity_y < t("follow_through_index_down_velocity", -0.02):
                 return "follow_through"
             return None
 

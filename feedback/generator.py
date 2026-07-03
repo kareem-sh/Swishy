@@ -1,6 +1,7 @@
 """Generate prioritized coaching text from a shot summary."""
 
 from feedback.models import ShotSummary
+from phase_detection.phases import PHASE_LABELS
 from utils.config_loader import load_yaml
 
 _SEVERITY_RANK = {"error": 3, "warning": 2, "info": 1}
@@ -16,6 +17,19 @@ def generate_coaching_tips(summary: ShotSummary) -> list[str]:
 
     if summary.total_count == 0:
         return summary.coaching_tips or ["Keep your full body visible to the camera."]
+
+    if summary.started_mid_phase and summary.entry_phase:
+        label = PHASE_LABELS.get(summary.entry_phase, summary.entry_phase)
+        tips.append(
+            f"Recording began mid-shot at {label} — start the camera before your load "
+            f"next time for a complete form score."
+        )
+
+    if summary.ended_early:
+        tips.append(
+            "Shot was cut off before landing — let the rep finish so follow-through and "
+            "balance can be scored."
+        )
 
     sorted_violations = sorted(
         summary.violations,

@@ -31,7 +31,13 @@ def _aggregate_rules(frames: List[FrameSnapshot]) -> Dict[str, RuleResult]:
     return aggregated
 
 
-def score_shot(frames: List[FrameSnapshot], shot_number: int) -> ShotSummary:
+def score_shot(
+    frames: List[FrameSnapshot],
+    shot_number: int,
+    started_mid_phase: bool = False,
+    ended_early: bool = False,
+    entry_phase: str | None = None,
+) -> ShotSummary:
     """Compute 0-100 score and collect pass/fail lists for one shot."""
     cfg = load_yaml("scoring.yaml")
     weights = cfg.get("severity_weights", {"error": 3, "warning": 2, "info": 1})
@@ -48,6 +54,9 @@ def score_shot(frames: List[FrameSnapshot], shot_number: int) -> ShotSummary:
             total_count=0,
             coaching_tips=["Not enough data to score this shot — stay in frame."],
             phases_seen=_phases_seen(frames),
+            started_mid_phase=started_mid_phase,
+            ended_early=ended_early,
+            entry_phase=entry_phase,
         )
 
     total_weight = sum(float(weights.get(r.severity, 1)) for r in rule_list)
@@ -68,6 +77,9 @@ def score_shot(frames: List[FrameSnapshot], shot_number: int) -> ShotSummary:
         passed_rules=passed,
         violations=violations,
         phases_seen=_phases_seen(frames),
+        started_mid_phase=started_mid_phase,
+        ended_early=ended_early,
+        entry_phase=entry_phase,
     )
 
 

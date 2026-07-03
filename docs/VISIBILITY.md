@@ -70,6 +70,14 @@ If occlusion persists beyond `VISIBILITY_HOLD_FRAMES` (default 5), stop holding 
 | Valid + unstable (held) | `Elbow: ~145` | Orange |
 | Invalid | `Elbow: N/A` | Gray |
 
+### 6. Report visibility gaps
+
+If a landmark stays unreliable longer than `VISIBILITY_HOLD_FRAMES`, `feedback/visibility_gaps.py` records a **VisibilityGapNote** for the PDF report:
+
+> 00:01.20 → 00:01.65 during Release: could not reliably see the shooting elbow
+
+Tracked parts: shooting elbow, knee, index alignment, shoulder, wrist.
+
 ---
 
 ## Camera View Considerations

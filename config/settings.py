@@ -4,7 +4,7 @@ from pathlib import Path
 
 # Paths
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-MODEL_PATH = str(PROJECT_ROOT / "models" / "pose_landmarker_full.task")  # default; see config/performance.yaml
+MODEL_PATH = str(PROJECT_ROOT / "models" / "pose_landmarker_full.task")
 
 WINDOW_NAME = "Swichy — AI Basketball Coach"
 

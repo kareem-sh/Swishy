@@ -13,6 +13,7 @@ from feedback.models import ShotSummary
 from feedback.report_builder import build_detailed_shot_report, build_session_report
 from feedback.report_models import DetailedShotReport, SessionReport
 from feedback.report_writer import write_session_report
+from feedback.visibility_gaps import VisibilityGapTracker
 from pipeline import FrameResult
 from utils.config_loader import load_yaml
 
@@ -46,6 +47,7 @@ class SessionRecorder:
         self._shot_start_ms = 0
         self._shot_frames: List[FrameResult] = []
         self._shots: List[DetailedShotReport] = []
+        self._visibility_tracker = VisibilityGapTracker()
 
     def on_frame(
         self,
@@ -69,6 +71,7 @@ class SessionRecorder:
                 self._prev_phase = frame_result.phase
 
             self._shot_frames.append(frame_result)
+            self._visibility_tracker.update(frame_index, frame_result)
             if self._store_all_shot_frames:
                 self._all_frame_images[frame_index] = annotated_bgr.copy()
             self._capture.consider(frame_index, annotated_bgr, frame_result)
@@ -167,6 +170,7 @@ class SessionRecorder:
         self._shot_frames = []
         self._shot_start_ms = frame_result.timestamp_ms
         self._prev_phase = frame_result.phase
+        self._visibility_tracker.reset()
         self._phase_moments.append({
             "phase": frame_result.phase,
             "phase_label": frame_result.phase_label,
@@ -180,6 +184,7 @@ class SessionRecorder:
 
         key_frame_pairs = self._capture.finalize()
         end_ms = self._shot_frames[-1].timestamp_ms if self._shot_frames else self._shot_start_ms
+        visibility_gaps = self._visibility_tracker.finalize()
 
         detailed = build_detailed_shot_report(
             summary=summary,
@@ -187,6 +192,7 @@ class SessionRecorder:
             key_frame_pairs=key_frame_pairs,
             start_ms=self._shot_start_ms,
             end_ms=end_ms,
+            visibility_gaps=visibility_gaps,
         )
         self._shots.append(detailed)
         self._all_frame_images.update(detailed.frame_images)

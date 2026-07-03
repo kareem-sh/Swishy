@@ -74,6 +74,24 @@ def test_shot_tracker_starts_on_ball_lift():
     snap = _snapshot("ball_lift", [])
     assert tracker.update("ball_lift", snap) is None
     assert tracker.shot_in_progress
+    assert not tracker._started_mid_phase
+
+
+def test_shot_tracker_starts_mid_phase():
+    tracker = ShotTracker()
+    snap = _snapshot("jump", [_rule("a", True)])
+    assert tracker.update("jump", snap) is None
+    assert tracker.shot_in_progress
+    assert tracker._started_mid_phase
+    assert tracker._entry_phase == "jump"
+
+
+def test_shot_tracker_skipped_load_counts_as_mid_start():
+    tracker = ShotTracker()
+    tracker.update("ready_stance", _snapshot("ready_stance", []))
+    tracker.update("jump", _snapshot("jump", [_rule("a", True)]))
+    assert tracker.shot_in_progress
+    assert tracker._started_mid_phase
 
 
 def test_coaching_tips_include_violations():
@@ -89,5 +107,7 @@ if __name__ == "__main__":
     test_score_shot_weighted()
     test_shot_tracker_completes()
     test_shot_tracker_starts_on_ball_lift()
+    test_shot_tracker_starts_mid_phase()
+    test_shot_tracker_skipped_load_counts_as_mid_start()
     test_coaching_tips_include_violations()
     print("All Phase 5 tests passed.")

@@ -16,7 +16,10 @@ def _make_features(**kwargs) -> KinematicFeatures:
     defaults = dict(
         wrist_y=0.5, wrist_velocity_y=0.0, ankle_y_avg=0.1, ankle_velocity_y=0.0,
         ankle_baseline_y=0.1, knee_angle=120.0, knee_angle_delta=0.0,
-        hip_y_avg=0.6, hip_velocity_y=0.0, elbow_angle=90.0,
+        hip_y_avg=0.6, hip_velocity_y=0.0,         elbow_angle=90.0,
+        index_y=0.55,
+        index_velocity_y=0.0,
+        index_align_angle=170.0,
         shoulder_y=0.8, nose_y=0.9, nose_velocity_y=0.0,
         total_velocity=0.05, shooting_side="right",
     )
@@ -28,9 +31,10 @@ def test_phase_transitions():
     det = ShotPhaseDetector()
     assert det.phase == "ready_stance"
 
-    det.update(_make_features(hip_velocity_y=-0.05, wrist_y=0.4, shoulder_y=0.8))
-    det.update(_make_features(hip_velocity_y=-0.05, wrist_y=0.4, shoulder_y=0.8))
-    det.update(_make_features(hip_velocity_y=-0.05, wrist_y=0.4, shoulder_y=0.8))
+    # Need hysteresis_frames (5) consecutive loading signals + min_dwell in ready_stance
+    loading = _make_features(hip_velocity_y=-0.05, wrist_y=0.4, shoulder_y=0.8)
+    for _ in range(5):
+        det.update(loading)
     assert det.phase == "loading"
 
 
@@ -69,7 +73,7 @@ def test_ready_stance_to_loading_on_wrist_rise():
         hip_y_avg=0.0,
         shoulder_y=-0.4,
     )
-    for _ in range(3):
+    for _ in range(5):
         det.update(rising)
     assert det.phase == "loading"
 

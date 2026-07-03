@@ -9,7 +9,6 @@ from feedback.session_recorder import SessionRecorder
 from pipeline import ShotAnalysisPipeline
 from pose.detector import PoseDetector
 from utils.config_loader import load_yaml
-from utils.performance import get_pose_model_path
 from utils.timestamps import frame_timestamp_ms
 from visualization.renderer import render_frame
 
@@ -36,7 +35,6 @@ def run_video_mode(video_path: str):
     fps = cap.get(cv2.CAP_PROP_FPS) or DEFAULT_FPS
     pipeline.set_fps(fps)
     recorder.fps = fps
-    print(f"Pose backend: {detector.delegate.upper()} | model: {Path(get_pose_model_path()).name}")
     frame_index = 0
 
     while cap.isOpened():
