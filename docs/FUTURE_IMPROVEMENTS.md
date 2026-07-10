@@ -324,4 +324,4 @@ This file is append-only. Each enhancement includes description, difficulty, exp
 13. ML-based phase detection (#2, #3)
 14. Edge deployment (#12)
 
-**Study and complete manually:** [MANUAL_COMPLETION_GUIDE.md](MANUAL_COMPLETION_GUIDE.md)
+**Study and complete manually:** [MANUAL_COMPLETION_GUIDE.md](MANUAL_COMPLETION_GUIDE.md) · **Product + team plan:** [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)

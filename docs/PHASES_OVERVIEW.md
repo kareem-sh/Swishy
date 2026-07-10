@@ -160,7 +160,7 @@ Camera
 
 **Plan:** [PHASE_6_BALL_AND_OUTCOME.md](PHASE_6_BALL_AND_OUTCOME.md)
 
-**Your task:** Implement stubs, integrate into `pipeline.py`, extend PDF with make/miss.
+**Next:** [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) — mobile app, datasets, team tasks.
 
 ---
 

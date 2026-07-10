@@ -9,6 +9,7 @@ Read these in order to learn the system and complete remaining work manually.
 | # | Document | What you will learn |
 |---|----------|---------------------|
 | **0** | **[MANUAL_COMPLETION_GUIDE.md](MANUAL_COMPLETION_GUIDE.md)** | **Study path, file map, what's done vs stubbed** |
+| **0b** | **[PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)** | **Mobile app, datasets, team tasks, timeline** |
 | 1 | [PHASES_OVERVIEW.md](PHASES_OVERVIEW.md) | All phases 1→6 — implementation map |
 | 2 | [ARCHITECTURE.md](ARCHITECTURE.md) | Module design, separation of concerns |
 | 3 | [PIPELINE.md](PIPELINE.md) | End-to-end data flow, `FrameResult` |

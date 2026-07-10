@@ -84,6 +84,7 @@ Swichy/
 | Doc | Purpose |
 |-----|---------|
 | **[docs/MANUAL_COMPLETION_GUIDE.md](docs/MANUAL_COMPLETION_GUIDE.md)** | **Study the code + finish the project yourself** |
+| **[docs/PRODUCT_ROADMAP.md](docs/PRODUCT_ROADMAP.md)** | **Mobile app, datasets, team tasks, timeline** |
 | [docs/PHASES_OVERVIEW.md](docs/PHASES_OVERVIEW.md) | Phases 1→6 implementation map |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System design |
 | [docs/PIPELINE.md](docs/PIPELINE.md) | End-to-end data flow |

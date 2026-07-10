@@ -35,7 +35,8 @@ Camera / Video / Image
 | 7 | [FEEDBACK_SCORING.md](FEEDBACK_SCORING.md) | `feedback/shot_tracker.py`, `scorer.py` |
 | 8 | [REPORTING.md](REPORTING.md) | `feedback/report_pdf.py`, `session_recorder.py` |
 | 9 | [PHASE_6_BALL_AND_OUTCOME.md](PHASE_6_BALL_AND_OUTCOME.md) | `ball/` stubs — **your next build** |
-| 10 | [FUTURE_IMPROVEMENTS.md](FUTURE_IMPROVEMENTS.md) | Roadmap after Phase 6 |
+| 10 | [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) | **Mobile app, datasets, team tasks, timeline** |
+| 11 | [FUTURE_IMPROVEMENTS.md](FUTURE_IMPROVEMENTS.md) | Roadmap after Phase 6 |
 
 **Hands-on:** Run `python main.py` with `MODE = "video"` and a test clip from [`assets/README.md`](../assets/README.md). Set breakpoints in `pipeline.py` line 120 (`process_frame`).
 
