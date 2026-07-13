@@ -30,7 +30,7 @@ elif MODE == "image":
 elif MODE == "video":
 
     run_video_mode(
-        "assets/Untitled.mov"
+        "assets/test.mp4"
     )
 
 else:
