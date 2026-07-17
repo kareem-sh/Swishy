@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from analysis.engine import BiomechanicsEngine
 from angles.calculator import AngleResult
 from phase_detection.detector import ShotPhaseDetector
-from phase_detection.features import KinematicFeatures
+from phase_detection.features import KinematicFeatures, extract_features
 from phase_detection.phases import PHASE_ORDER
 
 
@@ -78,9 +78,94 @@ def test_ready_stance_to_loading_on_wrist_rise():
     assert det.phase == "loading"
 
 
+def test_index_tip_can_confirm_release():
+    det = ShotPhaseDetector()
+    det.phase = "ball_lift"
+    index_release = _make_features(
+        wrist_y=0.6,
+        wrist_velocity_y=0.1,
+        hip_y_avg=0.5,
+        elbow_angle=90.0,
+        index_align_angle=170.0,
+        index_velocity_y=0.1,
+    )
+
+    for _ in range(5):
+        det.update(index_release)
+    assert det.phase == "release"
+
+
+def test_unreliable_index_does_not_copy_wrist_velocity():
+    current = {
+        "right_wrist": {
+            "position": [0.0, 0.6, 0.0],
+            "is_reliable": True,
+        },
+        "right_index": {
+            "position": [0.0, 0.7, 0.0],
+            "is_reliable": False,
+        },
+    }
+    previous = {
+        "right_wrist": {
+            "position": [0.0, 0.5, 0.0],
+            "is_reliable": True,
+        },
+        "right_index": {
+            "position": [0.0, 0.6, 0.0],
+            "is_reliable": True,
+        },
+    }
+
+    features = extract_features(
+        current,
+        angles={},
+        shooting_side="right",
+        prev_world=previous,
+        dt_s=0.1,
+    )
+    assert features.wrist_velocity_y > 0
+    assert features.index_velocity_y == 0.0
+
+
+def test_diagnostic_foot_motion_does_not_change_phase_speed():
+    current = {
+        "right_wrist": {
+            "position": [0.0, 0.5, 0.0],
+            "is_reliable": True,
+        },
+        "right_foot_index": {
+            "position": [10.0, 10.0, 10.0],
+            "is_reliable": True,
+        },
+    }
+    previous = {
+        "right_wrist": {
+            "position": [0.0, 0.5, 0.0],
+            "is_reliable": True,
+        },
+        "right_foot_index": {
+            "position": [0.0, 0.0, 0.0],
+            "is_reliable": True,
+        },
+    }
+
+    features = extract_features(
+        current,
+        angles={},
+        shooting_side="right",
+        prev_world=previous,
+        dt_s=0.1,
+    )
+    assert features.total_velocity == 0.0
+
+
 if __name__ == "__main__":
     test_phase_transitions()
     test_biomechanics_knee_rule()
     test_phase_order_complete()
     test_ready_stance_to_loading_on_wrist_rise()
+    test_index_tip_can_confirm_release()
+    test_unreliable_index_does_not_copy_wrist_velocity()
+    test_diagnostic_foot_motion_does_not_change_phase_speed()
     print("All phase/rule tests passed.")

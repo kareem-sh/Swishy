@@ -1,40 +1,40 @@
 # Manual Study & Completion Guide
 
-Use this document to **learn the Swichy codebase** and **finish the remaining work yourself**. Everything implemented today is documented here with file paths, reading order, and what is still stubbed.
+Use this document to practise working through the Swichy codebase and finish
+the remaining experimental features. For the canonical reading order and
+implementation status, start with [docs/README.md](README.md).
 
 ---
 
 ## What Swichy Does Today (Complete)
 
-```
+```text
 Camera / Video / Image
-  → Pose (MediaPipe)
-  → One Euro Filter
-  → Visibility + Presence Gating
-  → 3D Joint Angles (+ index finger alignment)
-  → Phase FSM (8 phases, hysteresis + dwell)
-  → Biomechanical Rules (12 rules, YAML-driven)
-  → Shot Scoring (0–100) + Coaching Tips
-  → PDF Session Report (drills, action items, key frames)
+├─ BGR → basketball YOLO → ball/rim → temporal tracker
+└─ RGB → MediaPipe → filter → visibility → 3D joint angles
+                       → phase FSM → rules → score → PDF report
 ```
 
 **Entry point:** [`main.py`](../main.py) → [`modes/`](../modes/) → [`pipeline.py`](../pipeline.py)
 
 ---
 
-## Recommended Reading Order (Study the Code)
+## Quick code map
+
+The canonical sequence is [docs/README.md](README.md); this table only maps
+topics to source files.
 
 | Step | Read | Then open in code |
 |------|------|-------------------|
 | 1 | [ARCHITECTURE.md](ARCHITECTURE.md) | Folder structure |
 | 2 | [PIPELINE.md](PIPELINE.md) | `pipeline.py` — trace `process_frame()` |
-| 3 | [ANGLES_3D.md](ANGLES_3D.md) | `angles/calculator.py`, `geometry/vectors.py` |
+| 3 | [LANDMARKS.md](LANDMARKS.md) + [ANGLES_3D.md](ANGLES_3D.md) | `pose/landmarks.py`, `angles/calculator.py` |
 | 4 | [FILTERS.md](FILTERS.md) + [VISIBILITY.md](VISIBILITY.md) | `filters/one_euro.py`, `pose/visibility.py` |
 | 5 | [PHASE_DETECTION.md](PHASE_DETECTION.md) | `phase_detection/detector.py`, `features.py` |
 | 6 | [BIOMECHANICS.md](BIOMECHANICS.md) + [BIOMECHANICS_RESEARCH.md](BIOMECHANICS_RESEARCH.md) | `analysis/engine.py`, `config/biomechanics.yaml` |
 | 7 | [FEEDBACK_SCORING.md](FEEDBACK_SCORING.md) | `feedback/shot_tracker.py`, `scorer.py` |
 | 8 | [REPORTING.md](REPORTING.md) | `feedback/report_pdf.py`, `session_recorder.py` |
-| 9 | [PHASE_6_BALL_AND_OUTCOME.md](PHASE_6_BALL_AND_OUTCOME.md) | `ball/` stubs — **your next build** |
+| 9 | [PHASE_6_BALL_AND_OUTCOME.md](PHASE_6_BALL_AND_OUTCOME.md) | Integrated detection; outcome fusion remains |
 | 10 | [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) | **Mobile app, datasets, team tasks, timeline** |
 | 11 | [FUTURE_IMPROVEMENTS.md](FUTURE_IMPROVEMENTS.md) | Roadmap after Phase 6 |
 
@@ -61,7 +61,7 @@ Swichy/
 │   └── vectors.py               # 3D angle math (dot product, vertical)
 │
 ├── angles/
-│   ├── joint_chains.py          # elbow, knee, hip, shoulder, index_align, trunk
+│   ├── joint_chains.py          # body, index alignment, ankle-flexion chains
 │   └── calculator.py            # AngleResult per joint
 │
 ├── phase_detection/
@@ -96,8 +96,8 @@ Swichy/
 │   ├── video_mode.py            # File playback + SessionRecorder
 │   └── image_mode.py            # Single-frame analysis
 │
-├── ball/                        # ⚠ STUBS — Phase 6 (you implement)
-├── physics/                     # ⚠ STUBS — Improvement #11
+├── ball/                        # Phase 6a integrated; outcome fusion experimental
+├── physics/                     # Experimental improvement #11
 │
 ├── config/
 │   ├── settings.py              # Thresholds, paths, shooting hand
@@ -107,7 +107,7 @@ Swichy/
 │   ├── scoring.yaml
 │   ├── display.yaml             # HUD hold frames, video playback speed
 │   ├── report_config.yaml
-│   ├── ball.yaml                # Phase 6 config (stub)
+│   ├── ball.yaml                # Active YOLO, tracking, and outcome config
 │   ├── hoop_roi.yaml
 │   └── physics.yaml
 │
@@ -180,26 +180,30 @@ python tests/test_performance_plan.py
 python tests/test_visibility_gaps.py
 python tests/test_hud_display.py
 python tests/test_reporting.py
+python tests/test_ball_tracking.py
+python tests/test_runtime_utilities.py
 ```
 
 ---
 
 ## What You Still Need to Build (Manual Completion)
 
-### Priority 1 — Phase 6: Ball & Shot Outcome
+### Priority 1 — Complete Phase 6 outcome fusion
 **Plan:** [PHASE_6_BALL_AND_OUTCOME.md](PHASE_6_BALL_AND_OUTCOME.md)
 
-| Stub file | Your task |
+| Module | Current state and next task |
 |-----------|-----------|
-| `ball/detector.py` | Detect ball per frame (color/YOLO) |
-| `ball/tracker.py` | Track ball across frames |
-| `ball/timeseries.py` | Ball height/velocity series |
-| `ball/release_sync.py` | Align ball release with pose release phase |
-| `ball/trajectory.py` | Fit arc |
-| `ball/outcome.py` | Make/miss classification |
-| `ball/fusion.py` | Merge ball + pose into `ShotSummary` |
+| `ball/detector.py` | Integrated; validate precision/recall on labeled phone footage |
+| `ball/tracker.py` | Integrated; tune short-gap prediction on real shots |
+| `ball/timeseries.py` | Integrated; preserve per-shot evidence for reports |
+| `ball/release_sync.py` | Experimental; validate ball–wrist release alignment |
+| `ball/trajectory.py` | Experimental; validate arc fit and entry-angle proxy |
+| `ball/outcome.py` | Experimental; classify completed shot windows |
+| `ball/fusion.py` | Experimental; attach outcome to `ShotSummary` and reports |
 
-**Integration point:** Call from `pipeline.py` after phase detection; extend `ShotSummary` with outcome field.
+**Integration point:** Ball detection already runs in `pipeline.py`. Remaining
+work starts when a shot window completes: classify its ball time series, attach
+the result to `ShotSummary`, and pass it to session reporting.
 
 ### Priority 2 — Physics trajectory (#11)
 **Stubs:** `physics/trajectory.py`, `physics/models.py`  
@@ -221,8 +225,8 @@ From [FUTURE_IMPROVEMENTS.md](FUTURE_IMPROVEMENTS.md):
 | 1 | Run app, read pipeline + angles, tune one rule in `biomechanics.yaml` |
 | 2 | Understand FSM — tune `phases.yaml` on side-view video |
 | 3 | Read scoring + reports — generate PDFs, verify drills make sense |
-| 4 | Start Phase 6 — ball detection on still frames |
-| 5 | Ball tracking + timeseries |
+| 4 | Validate ball/rim boxes and label representative phone footage |
+| 5 | Fine-tune detection or tracking only where measurements show a gap |
 | 6 | Release sync + make/miss outcome |
 | 7 | Integrate outcome into PDF report |
 | 8+ | Dashboard, mobile, or ML experiments |
@@ -244,7 +248,9 @@ From [FUTURE_IMPROVEMENTS.md](FUTURE_IMPROVEMENTS.md):
 | Document | Topic |
 |----------|-------|
 | [README.md](README.md) | Doc index |
+| [LANDMARKS.md](LANDMARKS.md) | Index finger, feet, shoes, and reliability |
 | [PHASES_OVERVIEW.md](PHASES_OVERVIEW.md) | Phases 1–6 summary |
 | [BIOMECHANICS_RESEARCH.md](BIOMECHANICS_RESEARCH.md) | Papers → rules mapping |
+| [GPU_YOLO_SETUP.md](GPU_YOLO_SETUP.md) | CUDA and detector verification |
 | [PHASE_6_BALL_AND_OUTCOME.md](PHASE_6_BALL_AND_OUTCOME.md) | Ball tracking design |
 | [FUTURE_IMPROVEMENTS.md](FUTURE_IMPROVEMENTS.md) | Long-term roadmap |

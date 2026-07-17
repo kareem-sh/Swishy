@@ -3,11 +3,18 @@ Central analysis pipeline: detect -> filter -> gate -> angles -> phases -> rules
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
+
+import numpy as np
 
 from analysis.engine import BiomechanicsEngine
 from analysis.models import AnalysisResult
 from angles.calculator import AngleCalculator, AngleResult
+from ball.detector import BallDetector
+from ball.models import BallDetection, BallSnapshot, RimDetection
+from ball.outcome import OutcomeClassifier
+from ball.timeseries import BallTimeSeriesBuffer
+from ball.tracker import BallTracker
 from config.settings import (
     DEFAULT_FPS,
     FILTER_BETA,
@@ -59,6 +66,10 @@ class FrameResult:
     show_shot_summary: bool = False
     hud_display: Optional["HudDisplay"] = None
     capture_warning: Optional[str] = None
+    # Phase 6 — ball / rim (custom basketball YOLO)
+    ball: Optional[BallDetection] = None
+    rim: Optional[RimDetection] = None
+    ball_snapshot: Optional[BallSnapshot] = None
 
 
 class ShotAnalysisPipeline:
@@ -66,6 +77,7 @@ class ShotAnalysisPipeline:
     End-to-end per-frame processing for basketball shooting analysis.
 
     Stages:
+        0. Ball + rim YOLO (optional, parallel to pose)
         1. Extract image + world landmarks
         2. One Euro filter on world positions
         3. Visibility gating
@@ -82,6 +94,7 @@ class ShotAnalysisPipeline:
         phase_cfg = load_yaml("phases.yaml")
         scoring_cfg = load_yaml("scoring.yaml")
         display_cfg = load_yaml("display.yaml")
+        ball_cfg = load_yaml("ball.yaml")
 
         self._filter_bank = LandmarkFilterBank(
             min_cutoff=filter_cfg.get("min_cutoff", FILTER_MIN_CUTOFF),
@@ -113,18 +126,70 @@ class ShotAnalysisPipeline:
             display_cfg.get("summary_display_frames", scoring_cfg.get("summary_display_frames", 90))
         )
         self._hud_display = HudDisplaySmoother()
+        self._show_ball_overlay = bool(display_cfg.get("show_ball_overlay", True))
+
+        # Phase 6 — custom basketball YOLO (ball + hoop)
+        self._ball_enabled = bool(ball_cfg.get("enabled", False))
+        self._ball_detector: Optional[BallDetector] = None
+        tracking_cfg = ball_cfg.get("tracking", {})
+        self._ball_tracker = BallTracker(
+            max_gap_frames=int(tracking_cfg.get("max_missing_frames", 4)),
+            position_alpha=float(tracking_cfg.get("position_alpha", 0.80)),
+            velocity_alpha=float(tracking_cfg.get("velocity_alpha", 0.50)),
+        )
+        self._ball_buffer = BallTimeSeriesBuffer()
+        self._outcome = OutcomeClassifier()
+        if self._ball_enabled:
+            try:
+                detector = BallDetector("ball.yaml")
+                self._ball_detector = detector if detector.ready else None
+            except Exception as exc:
+                print(f"Warning: ball/rim detector disabled ({exc})")
+                self._ball_detector = None
 
     def set_fps(self, fps: float):
         if fps > 0:
             self._fps = fps
 
-    def process_frame(self, detection_result, width: int, height: int, timestamp_ms: int) -> FrameResult:
+    def _process_ball(
+        self, bgr_frame: Optional[np.ndarray], timestamp_ms: int
+    ) -> Tuple[Optional[BallDetection], Optional[RimDetection], Optional[BallSnapshot]]:
+        if self._ball_detector is None or bgr_frame is None:
+            return None, None, None
+
+        court = self._ball_detector.detect_court(
+            bgr_frame, self._frame_index, timestamp_ms
+        )
+        snapshot = self._ball_tracker.update(
+            court.ball, self._frame_index, timestamp_ms
+        )
+        if snapshot is not None:
+            self._ball_buffer.push(snapshot)
+        if court.rim is not None:
+            self._outcome.set_rim_from_detection(court.rim.center_xy, court.rim.bbox_xyxy)
+        return court.ball, court.rim, snapshot
+
+    def process_frame(
+        self,
+        detection_result,
+        width: int,
+        height: int,
+        timestamp_ms: int,
+        bgr_frame: Optional[np.ndarray] = None,
+    ) -> FrameResult:
         self._frame_index += 1
         timestamp_s = timestamp_ms / 1000.0
+        ball, rim, ball_snapshot = self._process_ball(bgr_frame, timestamp_ms)
 
         raw = extract_all_landmarks(detection_result, width, height)
         if raw is None:
-            return FrameResult(timestamp_ms=timestamp_ms, has_pose=False)
+            return FrameResult(
+                timestamp_ms=timestamp_ms,
+                has_pose=False,
+                ball=ball,
+                rim=rim,
+                ball_snapshot=ball_snapshot,
+            )
 
         world = self._filter_bank.filter_landmarks(raw["world"], timestamp_s)
         world = self._visibility.apply(world)
@@ -215,6 +280,9 @@ class ShotAnalysisPipeline:
             show_shot_summary=self._shot_tracker.show_shot_summary,
             hud_display=hud_display,
             capture_warning=self._shot_tracker.capture_warning,
+            ball=ball,
+            rim=rim,
+            ball_snapshot=ball_snapshot,
         )
 
     def _compute_dt(self, timestamp_ms: int) -> float:
@@ -253,6 +321,10 @@ class ShotAnalysisPipeline:
         self._prev_world = None
         self._prev_timestamp_ms = None
         self._ankle_baseline_y = 0.0
+        self._ball_tracker.reset()
+        self._ball_buffer.clear()
+        if self._ball_detector is not None:
+            self._ball_detector.reset()
 
     @property
     def frame_buffer(self) -> FrameBuffer:
@@ -261,3 +333,22 @@ class ShotAnalysisPipeline:
     @property
     def shot_tracker(self) -> ShotTracker:
         return self._shot_tracker
+
+    @property
+    def ball_buffer(self) -> BallTimeSeriesBuffer:
+        return self._ball_buffer
+
+    @property
+    def ball_enabled(self) -> bool:
+        return self._ball_detector is not None
+
+    @property
+    def show_ball_overlay(self) -> bool:
+        return self._show_ball_overlay and self.ball_enabled
+
+    @property
+    def ball_device(self):
+        """Configured ball/rim inference device, or None when disabled."""
+        if self._ball_detector is None:
+            return None
+        return self._ball_detector.device

@@ -10,6 +10,7 @@ import numpy as np
 
 from angles.calculator import AngleResult
 from pipeline import FrameResult
+from utils.config_loader import load_yaml
 from visualization.hud import draw_hud
 
 POSE_CONNECTIONS = [
@@ -20,7 +21,15 @@ POSE_CONNECTIONS = [
     (11, 23), (12, 24), (23, 24),
     (23, 25), (25, 27),
     (24, 26), (26, 28),
+    (15, 19), (16, 20),
+    (27, 29), (29, 31), (27, 31),
+    (28, 30), (30, 32), (28, 32),
 ]
+
+# BGR colors on an RGB canvas (OpenCV draw calls before RGB→BGR convert in modes)
+_BALL_COLOR = (255, 140, 0)   # orange-ish in RGB
+_RIM_COLOR = (0, 220, 80)     # green in RGB
+_SHOW_BALL_OVERLAY = bool(load_yaml("display.yaml").get("show_ball_overlay", True))
 
 
 def _angle_color(result: AngleResult) -> tuple:
@@ -31,11 +40,68 @@ def _angle_color(result: AngleResult) -> tuple:
     return (0, 255, 0)
 
 
-def render_frame(rgb_image: np.ndarray, detection_result, frame_result: FrameResult) -> np.ndarray:
-    """Draw skeleton, compact joint markers, and organized HUD."""
-    annotated = np.copy(rgb_image)
+def _draw_ball_rim(annotated: np.ndarray, frame_result: FrameResult) -> None:
+    """Overlay ball + rim boxes from the custom basketball YOLO."""
+    if not _SHOW_BALL_OVERLAY:
+        return
+    if frame_result.rim is not None:
+        x1, y1, x2, y2 = map(int, frame_result.rim.bbox_xyxy)
+        cv2.rectangle(annotated, (x1, y1), (x2, y2), _RIM_COLOR, 2, cv2.LINE_AA)
+        cv2.circle(
+            annotated,
+            (int(frame_result.rim.x), int(frame_result.rim.y)),
+            4,
+            _RIM_COLOR,
+            -1,
+            cv2.LINE_AA,
+        )
+        cv2.putText(
+            annotated,
+            f"rim {frame_result.rim.confidence:.2f}",
+            (x1, max(18, y1 - 8)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.55,
+            _RIM_COLOR,
+            2,
+            cv2.LINE_AA,
+        )
 
-    if not detection_result.pose_landmarks:
+    # Prefer smoothed track center when available
+    ball = frame_result.ball
+    snap = frame_result.ball_snapshot
+    if ball is None and snap is None:
+        return
+
+    if ball is not None:
+        x1, y1, x2, y2 = map(int, ball.bbox_xyxy)
+        cv2.rectangle(annotated, (x1, y1), (x2, y2), _BALL_COLOR, 2, cv2.LINE_AA)
+        conf = ball.confidence
+        label_xy = (x1, max(18, y1 - 8))
+    else:
+        conf = snap.confidence
+        label_xy = (int(snap.x) + 8, int(snap.y) - 8)
+
+    cx = int(snap.x) if snap is not None else int(ball.x)
+    cy = int(snap.y) if snap is not None else int(ball.y)
+    cv2.circle(annotated, (cx, cy), 5, _BALL_COLOR, -1, cv2.LINE_AA)
+    cv2.putText(
+        annotated,
+        f"ball {conf:.2f}",
+        label_xy,
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.55,
+        _BALL_COLOR,
+        2,
+        cv2.LINE_AA,
+    )
+
+
+def render_frame(rgb_image: np.ndarray, detection_result, frame_result: FrameResult) -> np.ndarray:
+    """Draw ball/rim, skeleton, compact joint markers, and organized HUD."""
+    annotated = np.copy(rgb_image)
+    _draw_ball_rim(annotated, frame_result)
+
+    if not detection_result or not getattr(detection_result, "pose_landmarks", None):
         return annotated
 
     height, width, _ = annotated.shape
@@ -64,7 +130,12 @@ def render_frame(rgb_image: np.ndarray, detection_result, frame_result: FrameRes
 
 def _draw_shooting_chain_highlight(image, frame_result: FrameResult, side: str, image_landmarks: dict):
     """Highlight shooting-side joints without duplicating HUD text."""
-    chain = [f"{side}_shoulder", f"{side}_elbow", f"{side}_wrist"]
+    chain = [
+        f"{side}_shoulder",
+        f"{side}_elbow",
+        f"{side}_wrist",
+        f"{side}_index",
+    ]
     points = []
     for name in chain:
         if name in image_landmarks:

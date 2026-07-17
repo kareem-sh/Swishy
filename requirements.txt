@@ -3,3 +3,9 @@ opencv-python>=4.8.0
 numpy>=1.24.0
 PyYAML>=6.0
 fpdf2>=2.7.0
+ultralytics>=8.3.0
+huggingface_hub>=0.23.0
+# Install CUDA PyTorch separately (recommended for GPU):
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+torch>=2.0.0
+torchvision>=0.15.0

@@ -1,31 +1,35 @@
-"""Multi-frame ball tracking (Phase 6a)."""
+"""Lightweight constant-velocity basketball tracker."""
 
-from typing import List, Optional
-import numpy as np
+from __future__ import annotations
+
+from typing import List, Optional, Tuple
 
 from ball.models import BallDetection, BallSnapshot
 
 
 class BallTracker:
-    """Maintain ball identity and smooth position across frames."""
+    """Smooth detections and predict through short missed-detection gaps.
 
-    def __init__(self):
+    The measurement receives most of the weight to avoid the visible lag caused
+    by a moving average on a fast ball. Velocity is smoothed separately.
+    """
+
+    def __init__(
+        self,
+        max_gap_frames: int = 4,
+        position_alpha: float = 0.80,
+        velocity_alpha: float = 0.50,
+    ):
+        self.max_gap_frames = max(0, int(max_gap_frames))
+        self.position_alpha = min(1.0, max(0.0, float(position_alpha)))
+        self.velocity_alpha = min(1.0, max(0.0, float(velocity_alpha)))
+
         self.track_id = 0
-        self.track_history = []
-        self.current_position = None
+        self.track_history: List[BallSnapshot] = []
+        self.current_position: Optional[Tuple[float, float]] = None
+        self.current_velocity: Tuple[float, float] = (0.0, 0.0)
         self.last_detection_frame = -1
-        self.max_gap_frames = 2
-        
-        # Kalman filter parameters (simplified)
-        self.kalman = None
-        self._init_kalman()
-
-    def _init_kalman(self):
-        """Initialize Kalman filter for tracking."""
-        # Simple moving average filter instead of full Kalman
-        self.position_history = []
-        self.velocity_history = []
-        self.max_history = 5
+        self.last_timestamp_ms: Optional[int] = None
 
     def update(
         self,
@@ -33,83 +37,114 @@ class BallTracker:
         frame_index: int,
         timestamp_ms: int,
     ) -> Optional[BallSnapshot]:
-        """Update tracker state; return smoothed snapshot or None."""
-        
+        """Update state with a detection or a short constant-velocity prediction."""
         if detection is not None:
-            # Update with new detection
-            self.current_position = (detection.x, detection.y)
-            self.last_detection_frame = frame_index
-            self.position_history.append((detection.x, detection.y, timestamp_ms))
-            
-            if len(self.position_history) > self.max_history:
-                self.position_history.pop(0)
-            
-            # Smooth position
-            if len(self.position_history) >= 3:
-                smooth_x = np.mean([p[0] for p in self.position_history[-3:]])
-                smooth_y = np.mean([p[1] for p in self.position_history[-3:]])
-            else:
-                smooth_x, smooth_y = detection.x, detection.y
-            
-            # Create snapshot
-            snapshot = BallSnapshot(
-                x=int(smooth_x),
-                y=int(smooth_y),
-                radius=detection.radius,
-                confidence=detection.confidence,
-                frame_index=frame_index,
-                timestamp_ms=timestamp_ms,
-                track_id=self.track_id
+            snapshot = self._update_from_detection(
+                detection,
+                frame_index,
+                timestamp_ms,
             )
-            
             self.track_history.append(snapshot)
             return snapshot
-            
+
+        snapshot = self._predict_missing(frame_index, timestamp_ms)
+        if snapshot is not None:
+            self.track_history.append(snapshot)
+        return snapshot
+
+    def _update_from_detection(
+        self,
+        detection: BallDetection,
+        frame_index: int,
+        timestamp_ms: int,
+    ) -> BallSnapshot:
+        measured_x, measured_y = detection.center_xy
+
+        if self.current_position is None or self.last_timestamp_ms is None:
+            smoothed = (measured_x, measured_y)
+            velocity = (0.0, 0.0)
         else:
-            # No detection - interpolate if gap is small
-            if (frame_index - self.last_detection_frame) <= self.max_gap_frames:
-                # Interpolate from last known position
-                if len(self.track_history) >= 2:
-                    last = self.track_history[-1]
-                    prev = self.track_history[-2] if len(self.track_history) >= 2 else last
-                    
-                    # Linear interpolation
-                    dt = 1.0  # Assuming 1 frame gap
-                    vx = (last.x - prev.x) / (last.frame_index - prev.frame_index) if last.frame_index != prev.frame_index else 0
-                    vy = (last.y - prev.y) / (last.frame_index - prev.frame_index) if last.frame_index != prev.frame_index else 0
-                    
-                    interp_x = int(last.x + vx * dt)
-                    interp_y = int(last.y + vy * dt)
-                    
-                    snapshot = BallSnapshot(
-                        x=interp_x,
-                        y=interp_y,
-                        radius=last.radius,
-                        confidence=last.confidence * 0.5,  # Lower confidence for interpolated
-                        frame_index=frame_index,
-                        timestamp_ms=timestamp_ms,
-                        track_id=self.track_id,
-                        is_interpolated=True
-                    )
-                    
-                    self.track_history.append(snapshot)
-                    return snapshot
-            
+            dt = max((timestamp_ms - self.last_timestamp_ms) / 1000.0, 1e-3)
+            predicted_x = self.current_position[0] + self.current_velocity[0] * dt
+            predicted_y = self.current_position[1] + self.current_velocity[1] * dt
+            alpha = self.position_alpha
+            smoothed = (
+                alpha * measured_x + (1.0 - alpha) * predicted_x,
+                alpha * measured_y + (1.0 - alpha) * predicted_y,
+            )
+
+            measured_velocity = (
+                (smoothed[0] - self.current_position[0]) / dt,
+                (smoothed[1] - self.current_position[1]) / dt,
+            )
+            beta = self.velocity_alpha
+            velocity = (
+                beta * measured_velocity[0]
+                + (1.0 - beta) * self.current_velocity[0],
+                beta * measured_velocity[1]
+                + (1.0 - beta) * self.current_velocity[1],
+            )
+
+        self.current_position = smoothed
+        self.current_velocity = velocity
+        self.last_detection_frame = frame_index
+        self.last_timestamp_ms = timestamp_ms
+
+        return BallSnapshot(
+            timestamp_ms=timestamp_ms,
+            frame_index=frame_index,
+            center_xy=smoothed,
+            confidence=detection.confidence,
+            velocity_xy=velocity,
+            state="unknown",
+            track_id=self.track_id,
+        )
+
+    def _predict_missing(
+        self,
+        frame_index: int,
+        timestamp_ms: int,
+    ) -> Optional[BallSnapshot]:
+        gap = frame_index - self.last_detection_frame
+        if (
+            gap <= 0
+            or gap > self.max_gap_frames
+            or self.current_position is None
+            or self.last_timestamp_ms is None
+            or not self.track_history
+        ):
             return None
 
-    def reset(self):
-        """Clear track state (new shot or new session)."""
+        dt = max((timestamp_ms - self.last_timestamp_ms) / 1000.0, 0.0)
+        predicted = (
+            self.current_position[0] + self.current_velocity[0] * dt,
+            self.current_position[1] + self.current_velocity[1] * dt,
+        )
+        self.current_position = predicted
+        self.last_timestamp_ms = timestamp_ms
+
+        return BallSnapshot(
+            timestamp_ms=timestamp_ms,
+            frame_index=frame_index,
+            center_xy=predicted,
+            confidence=self.track_history[-1].confidence * 0.65,
+            velocity_xy=self.current_velocity,
+            state="unknown",
+            track_id=self.track_id,
+            is_interpolated=True,
+        )
+
+    def reset(self) -> None:
+        """Clear state for a new shot/session."""
         self.track_id += 1
         self.track_history = []
         self.current_position = None
+        self.current_velocity = (0.0, 0.0)
         self.last_detection_frame = -1
-        self.position_history = []
-        self.velocity_history = []
+        self.last_timestamp_ms = None
 
     def get_track(self) -> List[BallSnapshot]:
-        """Return full track history for current shot."""
         return self.track_history.copy()
 
-    def get_current_position(self) -> Optional[tuple]:
-        """Get current ball position."""
+    def get_current_position(self) -> Optional[Tuple[float, float]]:
         return self.current_position

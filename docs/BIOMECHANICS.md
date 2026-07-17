@@ -71,6 +71,35 @@ Ranges are **zones**, not exact targets — see [BIOMECHANICS_RESEARCH.md](BIOME
 2. Add drill mapping in `feedback/performance_plan.py` → `RULE_DRILLS`
 3. If new metric needed, extend `_measure()` in `analysis/engine.py`
 
+Example rule:
+
+```yaml
+- id: index_alignment_release
+  phases: [release]
+  metric: index_align
+  min: 155
+  max: 180
+  severity: warning
+  message_fail: "Finish with the wrist and index finger extended"
+```
+
+At runtime, the engine evaluates this entry only during `release`:
+
+```python
+analysis = engine.evaluate(
+    phase=frame_result.phase,
+    angles=frame_result.angles,
+    features=frame_result.features,
+    shooting_side=frame_result.shooting_side,
+)
+```
+
+If the index tip is occluded, `index_align` is invalid and the rule is skipped;
+the player is not penalized for missing evidence.
+
+`ankle_flexion` is currently diagnostic and must not be added as a scoring rule
+until the validation protocol in [LANDMARKS.md](LANDMARKS.md) passes.
+
 ---
 
 ## Severity

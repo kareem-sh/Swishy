@@ -10,6 +10,24 @@ from typing import Dict, Optional
 
 import numpy as np
 
+_MOTION_LANDMARKS = (
+    "nose",
+    "left_shoulder",
+    "right_shoulder",
+    "left_elbow",
+    "right_elbow",
+    "left_wrist",
+    "right_wrist",
+    "left_index",
+    "right_index",
+    "left_hip",
+    "right_hip",
+    "left_knee",
+    "right_knee",
+    "left_ankle",
+    "right_ankle",
+)
+
 
 @dataclass
 class KinematicFeatures:
@@ -55,8 +73,11 @@ def _landmark_speed(world: Dict[str, dict], prev_world: Dict[str, dict], dt_s: f
         return 0.0
     total = 0.0
     count = 0
-    for name in world:
+    # Keep the original phase signal stable when diagnostic landmarks are added.
+    for name in _MOTION_LANDMARKS:
         if name not in prev_world:
+            continue
+        if name not in world:
             continue
         a = world[name].get("position")
         b = prev_world[name].get("position")
@@ -88,7 +109,8 @@ def extract_features(
     shoulder_key = f"{shooting_side}_shoulder"
 
     wrist_y = _lm_y(world_landmarks, wrist_key) or 0.0
-    index_y = _lm_y(world_landmarks, index_key) or wrist_y
+    index_y_value = _lm_y(world_landmarks, index_key)
+    index_y = index_y_value if index_y_value is not None else 0.0
     ankle_y = _avg_y(world_landmarks, ("left_ankle", "right_ankle")) or 0.0
     hip_y = _avg_y(world_landmarks, ("left_hip", "right_hip")) or 0.0
     shoulder_y = _lm_y(world_landmarks, shoulder_key) or 0.0
@@ -116,7 +138,7 @@ def extract_features(
 
         if prev_wrist is not None:
             wrist_vel = (wrist_y - prev_wrist) / dt_s
-        if prev_index is not None:
+        if index_y_value is not None and prev_index is not None:
             index_vel = (index_y - prev_index) / dt_s
         if prev_ankle is not None:
             ankle_vel = (ankle_y - prev_ankle) / dt_s

@@ -35,6 +35,7 @@ def run_video_mode(video_path: str):
     fps = cap.get(cv2.CAP_PROP_FPS) or DEFAULT_FPS
     pipeline.set_fps(fps)
     recorder.fps = fps
+    wait_ms = _video_wait_ms(fps)
     frame_index = 0
 
     while cap.isOpened():
@@ -47,7 +48,9 @@ def run_video_mode(video_path: str):
 
         result = detector.detect_video_frame(rgb_frame, timestamp_ms)
         h, w, _ = frame.shape
-        frame_result = pipeline.process_frame(result, w, h, timestamp_ms)
+        frame_result = pipeline.process_frame(
+            result, w, h, timestamp_ms, bgr_frame=frame
+        )
 
         if frame_result.shot_summary:
             print_shot_summary(frame_result.shot_summary)
@@ -57,7 +60,7 @@ def run_video_mode(video_path: str):
         recorder.on_frame(frame_index, annotated_bgr, frame_result)
 
         cv2.imshow(WINDOW_NAME, annotated_bgr)
-        if cv2.waitKey(_video_wait_ms(fps)) & 0xFF == ord("q"):
+        if cv2.waitKey(wait_ms) & 0xFF == ord("q"):
             break
 
         frame_index += 1

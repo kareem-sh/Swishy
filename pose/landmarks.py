@@ -62,6 +62,10 @@ BASKETBALL_LANDMARKS = {
     "right_knee": 26,
     "left_ankle": 27,
     "right_ankle": 28,
+    "left_heel": 29,
+    "right_heel": 30,
+    "left_foot_index": 31,
+    "right_foot_index": 32,
 }
 
 

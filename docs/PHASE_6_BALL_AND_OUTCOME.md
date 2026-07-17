@@ -1,17 +1,22 @@
-# Phase 6 — Ball Tracking & Shot Outcome (Future Plan)
+# Phase 6 — Ball Tracking & Shot Outcome
 
-> **Status:** Stub modules created — **you implement** the logic  
-> **Stub code:** [`ball/`](../ball/) (detector, tracker, timeseries, outcome, fusion) + [`physics/`](../physics/)  
-> **Config:** [`config/ball.yaml`](../config/ball.yaml), [`config/hoop_roi.yaml`](../config/hoop_roi.yaml)  
-> **Depends on:** Phases 1–5b (pose, phases, rules, form scoring, session reports)  
-> **Study guide:** [MANUAL_COMPLETION_GUIDE.md](MANUAL_COMPLETION_GUIDE.md)  
+> **Status:** Phase 6a ball/rim detection is integrated; release synchronization,
+> make/miss classification, and reporting still require validation and completion.
+> **Code:** [`ball/`](../ball/) (model loader, detector, tracker, timeseries,
+> outcome experiments) + [`physics/`](../physics/)
+> **Config:** [`config/ball.yaml`](../config/ball.yaml), [`config/hoop_roi.yaml`](../config/hoop_roi.yaml)
+> **Depends on:** Phases 1–5b (pose, phases, rules, form scoring, session reports)
+> **Study guide:** [MANUAL_COMPLETION_GUIDE.md](MANUAL_COMPLETION_GUIDE.md)
 > **Goal:** Detect the ball, track it through release and flight, and answer: *Did the player score?*
+
+For CUDA, model selection, and the YOLO26/custom-weight distinction, read
+[GPU_YOLO_SETUP.md](GPU_YOLO_SETUP.md) first.
 
 ---
 
 ## Why This Phase Exists
 
-Swichy today answers **how** the player shot:
+Swichy's pose branch answers **how** the player shot:
 
 | Question | Current system | Phase 6 |
 |----------|----------------|---------|
@@ -20,21 +25,28 @@ Swichy today answers **how** the player shot:
 | Did the ball go in? | **Not measured** | **Make / miss / unknown** |
 | Was form linked to outcome? | **Not measured** | Correlate form score vs result |
 
-The ball is never detected in the current pipeline. Modes (`live`, `video`, `image`) only run **body pose** analysis. A complete coaching product needs both:
+The current pipeline detects the ball and rim in every mode and carries those
+results in `FrameResult`. What remains is a validated link from each completed
+shot window to make/miss evidence:
 
 1. **Form quality** — already built (Phases 4–5b)
 2. **Performance outcome** — whether the attempt scored
 
-This document is the implementation blueprint for step 2.
+This document separates the integrated detection/tracking work from the
+remaining release, trajectory, outcome, and reporting work.
 
 ---
 
-## Current Flow vs Proposed Flow
+## Integrated Flow vs Remaining Flow
 
-### Today (Phases 1–5b)
+### Current integrated flow
 
-```
-Camera → Pose → Filter → Angles → Phases → Rules → Form Score → Report
+```text
+Camera
+├─ BGR → basketball YOLO → ball + rim → ball tracker/time series
+└─ RGB → pose → filter → angles → phases → rules → form score
+                              ↓
+                    FrameResult → HUD/recorder/report
 ```
 
 Shot boundaries are inferred from **body phases**:
@@ -42,22 +54,26 @@ Shot boundaries are inferred from **body phases**:
 - Shot **starts:** `ready_stance → loading/ball_lift` OR **mid-entry** if recording starts mid-rep
 - Shot **ends:** `landing → ready_stance` OR session `finalize_in_progress()`
 
-There is no object in the scene besides the player skeleton.
+`FrameResult` now includes raw ball/rim detections and a smoothed
+`ball_snapshot`. The renderer draws these results, and the outcome classifier
+receives a geometry-corrected rim region.
 
-### Proposed (Phase 6)
+### Remaining Phase 6b–6d flow
 
 ```
-Camera → Pose branch (existing)
-      → Ball branch (new)
+Completed ShotSummary + ball time series
               ↓
-      Time-series fusion
+      Release synchronization
+              ↓
+      Trajectory/outcome evidence
               ↓
       Outcome engine (make / miss / unknown)
               ↓
       Extended ShotSummary + SessionReport
 ```
 
-The pose branch stays unchanged. A parallel **ball branch** adds detection, tracking, and trajectory time-series. A fusion layer links ball events to the existing shot window.
+The remaining fusion layer must link existing ball observations to the correct
+shot window and preserve evidence when confidence is insufficient.
 
 ---
 
@@ -65,19 +81,20 @@ The pose branch stays unchanged. A parallel **ball branch** adds detection, trac
 
 ### Functional requirements
 
-1. **Ball detection** — locate the ball in image space each frame (or at high-confidence frames)
-2. **Ball tracking** — maintain ball identity across frames after release
-3. **Release sync** — align ball leaving the hand with body `release` phase (±N frames)
-4. **Outcome classification** — `made` | `missed` | `unknown` per shot attempt
-5. **Timeseries evidence** — store the signal trail that led to the decision (for reports and debugging)
-6. **Mode parity** — same outcome logic for `video` and `live`; `image` mode remains form-only (no flight)
+1. **Ball/rim detection — integrated:** locate both objects in image space.
+2. **Ball tracking — integrated:** smooth detections and bridge short gaps.
+3. **Release sync — remaining:** align ball departure with body `release` (±N frames).
+4. **Outcome classification — remaining:** `made` | `missed` | `unknown`.
+5. **Timeseries evidence — partial:** buffer exists; report evidence is not fused.
+6. **Mode parity — partial:** detections work in all modes; flight outcome requires
+   a temporal source, so a single image cannot produce make/miss.
 
 ### Non-goals (v1)
 
 - Exact 3D ball position without calibration
 - Net physics simulation
 - Multi-ball drills (one ball per shot window)
-- Automatic hoop detection in arbitrary gym angles (v1 may require fixed camera or manual hoop ROI)
+- Guaranteed hoop detection at arbitrary gym angles without target-camera validation
 
 ---
 
@@ -85,16 +102,17 @@ The pose branch stays unchanged. A parallel **ball branch** adds detection, trac
 
 ```mermaid
 flowchart TD
-    subgraph existing [Existing — unchanged]
+    subgraph integrated [Integrated]
         A[Pose Detector] --> B[ShotAnalysisPipeline]
         B --> C[FrameResult]
         C --> D[ShotTracker]
         D --> E[ShotSummary — form only]
+        F[Ball/Rim Detector] --> G[Ball Tracker]
+        G --> H[BallTimeSeriesBuffer]
+        H --> C
     end
 
-    subgraph phase6 [Phase 6 — new]
-        F[Ball Detector] --> G[Ball Tracker]
-        G --> H[BallTimeSeriesBuffer]
+    subgraph remaining [Remaining Phase 6b–6d]
         H --> I[ReleaseSync]
         I --> J[TrajectoryAnalyzer]
         J --> K[OutcomeClassifier]
@@ -107,12 +125,12 @@ flowchart TD
     M --> N[Extended SessionReport]
 ```
 
-### Proposed new modules (future)
+### Phase 6 modules
 
 | Module | Responsibility |
 |--------|----------------|
-| `ball/detector.py` | Per-frame ball bounding box or center |
-| `ball/tracker.py` | Multi-frame ball ID + Kalman / ByteTrack-style smoothing |
+| `ball/detector.py` | Multi-scale per-frame ball and rim detections |
+| `ball/tracker.py` | Constant-velocity smoothing and short-gap prediction |
 | `ball/timeseries.py` | Ring buffer of `BallSnapshot` (position, velocity, confidence) |
 | `ball/release_sync.py` | Match ball departure to wrist landmarks + `release` phase |
 | `ball/trajectory.py` | Fit parabolic arc; estimate apex, entry angle proxy |
@@ -124,7 +142,7 @@ flowchart TD
 ### Extensions to existing types
 
 ```python
-# Future — not implemented
+# Implemented in ball/models.py (abridged)
 
 @dataclass
 class BallSnapshot:
@@ -147,12 +165,13 @@ class ShotOutcome:
     timeseries_summary: dict           # compact stats for report
 
 @dataclass
-class ShotSummary:  # extended
+class ShotSummary:  # remaining extension in feedback/models.py
     # ... existing form fields ...
     outcome: ShotOutcome | None = None
 ```
 
-`FrameResult` may later gain optional `ball: BallSnapshot | None` without breaking current consumers.
+`FrameResult` already exposes `ball`, `rim`, and `ball_snapshot`. The remaining
+type change is attaching `ShotOutcome | None` to the completed `ShotSummary`.
 
 ---
 
@@ -313,12 +332,15 @@ New key frame types:
 
 ## Implementation Phases (Suggested Order)
 
-### 6a — Ball detection prototype
+### 6a — Ball/rim detection prototype (integrated)
 
-- [ ] `ball/detector.py` with YOLO or color fallback  
-- [ ] Overlay ball bbox in `visualization/renderer.py` (debug mode)  
-- [ ] `BallTimeSeriesBuffer` with velocity computation  
-- [ ] No outcome yet — validate detection stability on `assets/videos/*.mp4`
+- [x] `ball/yolo_model.py` loads basketball-specific weights
+- [x] `ball/detector.py` detects ball + rim with color fallback
+- [x] Overlay ball/rim boxes in `visualization/renderer.py`
+- [x] `BallTimeSeriesBuffer` stores tracked observations
+- [x] Image/video/live modes pass frames to the ball branch
+- [ ] Fine-tune `yolo26n.pt` on representative phone footage
+- [ ] Establish labeled validation metrics across camera views
 
 ### 6b — Release synchronization
 
@@ -378,11 +400,14 @@ Before starting Phase 6:
 - [x] Stable shot window from `ShotTracker`  
 - [x] `FrameBuffer` / per-shot frame history  
 - [x] Session reports (`SessionRecorder`)  
+- [x] CUDA-capable Ultralytics runtime and custom basketball weights
+- [x] Ball/rim detection, tracking, overlays, and verification scripts
 - [ ] Labeled ball positions on sample videos (even 50 frames manual)  
-- [ ] Hoop visible in at least one test video  
-- [ ] Decision on detector (YOLO vs color)
+- [x] Hoop visible in test videos
+- [x] Detector selected: custom E-BARD YOLO with multi-scale inference
 
-**Python packages (future):** likely `ultralytics` or ONNX runtime for ball YOLO; existing OpenCV + NumPy sufficient for timeseries math.
+**Python packages:** `ultralytics`, CUDA-enabled PyTorch, OpenCV, and NumPy are
+installed and verified. See [GPU_YOLO_SETUP.md](GPU_YOLO_SETUP.md).
 
 ---
 
@@ -400,4 +425,8 @@ Before starting Phase 6:
 
 ## Summary
 
-Phase 6 closes the loop between **shooting form** and **shooting results**. The current Swichy pipeline is body-only; the next step adds a parallel ball pipeline and uses **time-series fusion** (position, velocity, release sync, hoop ROI events) to determine whether each attempt scored. Implementation is deliberately deferred; this document defines the architecture, data models, and rollout order for when development starts.
+Phase 6 closes the loop between **shooting form** and **shooting results**.
+Phase 6a already provides a parallel ball/rim pipeline, tracking, overlays, and
+time-series observations. The next work is Phase 6b–6d: validate release sync,
+classify make/miss with explicit evidence, attach the result to `ShotSummary`,
+and include it in session reports.

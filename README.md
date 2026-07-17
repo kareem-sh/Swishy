@@ -6,6 +6,7 @@ Real-time basketball shooting analysis using MediaPipe Pose, 3D vector biomechan
 
 - Full-body pose detection (MediaPipe Pose Landmarker **full** model, CPU on Windows)
 - **3D world-space joint angles** including **index finger alignment** (elbow → wrist → index)
+- Visibility-gated **ankle flexion** from knee → ankle → shoe tip (diagnostic; not scored)
 - **One Euro Filter** for real-time landmark smoothing
 - **Visibility + presence gating** with temporal hold and gap notes in reports
 - **8-phase shot FSM** with hysteresis, dwell time, and set-shot paths
@@ -14,12 +15,15 @@ Real-time basketball shooting analysis using MediaPipe Pose, 3D vector biomechan
 - **Mid-shot entry** — detects and scores reps that start mid-video/live with clear warnings
 - **PDF session reports** with embedded key frames, practice plan, and capture status
 - Structured **HUD** with smoothed on-screen text (`visualization/hud_display.py`)
+- Custom **basketball + rim YOLO** detection with CUDA auto-selection
+- Ball tracking, rim persistence, and overlays in image/video/live modes
 - Live webcam, video file, and image modes
 - Test assets: front / side / back view jump shots, dunks, layups
 
-## Not Yet Implemented (Stubs Ready)
+## In Progress
 
-- **Phase 6:** Ball detection, tracking, make/miss outcome → [`ball/`](ball/), [`docs/PHASE_6_BALL_AND_OUTCOME.md`](docs/PHASE_6_BALL_AND_OUTCOME.md)
+- **Phase 6 outcome:** release synchronization and validated make/miss reporting
+  → [`ball/`](ball/), [`docs/PHASE_6_BALL_AND_OUTCOME.md`](docs/PHASE_6_BALL_AND_OUTCOME.md)
 - **Physics trajectory (#11):** → [`physics/`](physics/)
 
 ---
@@ -30,7 +34,10 @@ Real-time basketball shooting analysis using MediaPipe Pose, 3D vector biomechan
 
 ```powershell
 cd C:\Users\karim\Desktop\Swichy
-.\venv\Scripts\activate
+.\venv\Scripts\Activate.ps1
+
+# NVIDIA GPU: install CUDA PyTorch first (see docs/GPU_YOLO_SETUP.md)
+python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
 python -m pip install -r requirements.txt
 
 # Download model once (skip if models/pose_landmarker_full.task exists)
@@ -41,6 +48,8 @@ python main.py
 ```
 
 **Use the venv Python** after `activate` — not Anaconda's global Python.
+For GPU verification and model details, read
+[docs/GPU_YOLO_SETUP.md](docs/GPU_YOLO_SETUP.md).
 
 ### Change mode in [`main.py`](main.py)
 
@@ -70,7 +79,7 @@ Swichy/
 ├── feedback/               # Scoring, coaching, PDF reports
 ├── visualization/          # Renderer + HUD
 ├── modes/                  # live, video, image
-├── ball/                   # Phase 6 stubs
+├── ball/                   # Ball/rim detection, tracking, outcome experiments
 ├── physics/                # Trajectory stubs
 ├── assets/                 # Test media
 ├── docs/                   # Full documentation
@@ -83,16 +92,15 @@ Swichy/
 
 | Doc | Purpose |
 |-----|---------|
-| **[docs/MANUAL_COMPLETION_GUIDE.md](docs/MANUAL_COMPLETION_GUIDE.md)** | **Study the code + finish the project yourself** |
-| **[docs/PRODUCT_ROADMAP.md](docs/PRODUCT_ROADMAP.md)** | **Mobile app, datasets, team tasks, timeline** |
-| [docs/PHASES_OVERVIEW.md](docs/PHASES_OVERVIEW.md) | Phases 1→6 implementation map |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System design |
-| [docs/PIPELINE.md](docs/PIPELINE.md) | End-to-end data flow |
-| [docs/BIOMECHANICS_RESEARCH.md](docs/BIOMECHANICS_RESEARCH.md) | Papers → rules |
-| [docs/PHASE_6_BALL_AND_OUTCOME.md](docs/PHASE_6_BALL_AND_OUTCOME.md) | Next: ball + make/miss |
+| **[docs/README.md](docs/README.md)** | **Ordered beginner learning path** |
+| [docs/PIPELINE.md](docs/PIPELINE.md) | Current pose + ball/rim data flow |
+| [docs/LANDMARKS.md](docs/LANDMARKS.md) | Index finger, feet, shoes, and reliability |
+| [docs/PHASE_DETECTION.md](docs/PHASE_DETECTION.md) | Features, FSM, hysteresis, tuning |
+| [docs/GPU_YOLO_SETUP.md](docs/GPU_YOLO_SETUP.md) | CUDA and YOLO setup |
+| [docs/PRODUCT_ROADMAP.md](docs/PRODUCT_ROADMAP.md) | Mobile app, datasets, team tasks |
 | [assets/README.md](assets/README.md) | Test videos by camera angle |
 
-Full index: [docs/README.md](docs/README.md)
+The full index keeps filenames stable and gives the exact recommended order.
 
 ---
 
@@ -107,6 +115,9 @@ python tests/test_performance_plan.py
 python tests/test_visibility_gaps.py
 python tests/test_hud_display.py
 python tests/test_reporting.py
+python tests/test_ball_tracking.py
+python tests/test_runtime_utilities.py
+python scripts/check_docs.py
 ```
 
 ---
@@ -115,6 +126,7 @@ python tests/test_reporting.py
 
 - Python 3.10+
 - MediaPipe Pose Landmarker
+- Ultralytics + CUDA-enabled PyTorch (basketball/rim YOLO)
 - OpenCV
 - NumPy, PyYAML
 - fpdf2 (PDF reports)

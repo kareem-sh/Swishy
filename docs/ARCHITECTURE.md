@@ -92,8 +92,14 @@ flowchart TD
 | `video_mode.py` | File playback + recorder |
 | `image_mode.py` | Single image report |
 
-### `ball/` + `physics/` (stubs)
-Empty implementations with TODOs — see [PHASE_6_BALL_AND_OUTCOME.md](PHASE_6_BALL_AND_OUTCOME.md).
+### `ball/` + `physics/`
+
+- `ball/` contains the integrated YOLO ball/rim detector, temporal tracker,
+  time-series buffer, and experimental release/outcome/trajectory modules.
+- `physics/` remains experimental and is not on the production frame path.
+
+See [PHASE_6_BALL_AND_OUTCOME.md](PHASE_6_BALL_AND_OUTCOME.md) for the exact
+boundary between integrated Phase 6a and remaining Phase 6b–6d work.
 
 ### `config/`
 | File | Role |
@@ -131,6 +137,9 @@ class FrameResult:
     angles: Dict[str, AngleResult]
     features: KinematicFeatures
     analysis: AnalysisResult
+    ball: BallDetection | None
+    rim: RimDetection | None
+    ball_snapshot: BallSnapshot | None
     phase, phase_label, shooting_side
     shot_in_progress, shot_summary, capture_warning
     hud_display: HudDisplay          # smoothed for overlay
@@ -141,16 +150,11 @@ Any consumer (HUD, API, mobile) can use `FrameResult` without OpenCV.
 
 ---
 
-## Learning Roadmap
+## Learning order
 
-| Week | Focus |
-|------|-------|
-| 1–2 | [PIPELINE.md](PIPELINE.md) + trace `process_frame()` |
-| 3 | [ANGLES_3D.md](ANGLES_3D.md), [FILTERS.md](FILTERS.md), [VISIBILITY.md](VISIBILITY.md) |
-| 4 | [PHASE_DETECTION.md](PHASE_DETECTION.md) — tune `phases.yaml` on side-view video |
-| 5 | [BIOMECHANICS.md](BIOMECHANICS.md) + [BIOMECHANICS_RESEARCH.md](BIOMECHANICS_RESEARCH.md) |
-| 6 | [FEEDBACK_SCORING.md](FEEDBACK_SCORING.md) + [REPORTING.md](REPORTING.md) |
-| 7+ | [MANUAL_COMPLETION_GUIDE.md](MANUAL_COMPLETION_GUIDE.md) → implement Phase 6 |
+Use the canonical beginner sequence in [docs/README.md](README.md). Keeping the
+order in one file prevents architecture and product-status documentation from
+drifting apart.
 
 ---
 

@@ -26,7 +26,8 @@ flowchart LR
 | **4** | Biomechanical Rules | **Done** | *What* is good/bad form at each moment? |
 | **5** | Scoring & Feedback | **Done** | How do we score a rep and coach? |
 | **5b** | PDF Performance Reports | **Done** | How do we deliver actionable training plans? |
-| **6** | Ball & Outcome | **Stubs** | Did the player score? |
+| **6a** | Ball & Rim Detection | **Integrated** | Where are the ball and hoop? |
+| **6b–6d** | Release, Outcome & Trajectory | **In progress** | Did the player score? |
 
 ---
 
@@ -146,21 +147,25 @@ Camera
 
 ---
 
-# Phase 6 — Ball & Outcome ⚠ STUBS
+# Phase 6 — Ball & Outcome 🚧
 
 | Module | Status |
 |--------|--------|
-| `ball/detector.py` | TODO |
-| `ball/tracker.py` | TODO |
-| `ball/timeseries.py` | TODO |
-| `ball/release_sync.py` | TODO |
-| `ball/outcome.py` | TODO |
-| `ball/fusion.py` | TODO |
-| `physics/trajectory.py` | TODO (#11) |
+| `ball/yolo_model.py` | Integrated — custom model loading + GPU selection |
+| `ball/detector.py` | Integrated — ball + rim |
+| `ball/tracker.py` | Integrated — smoothing and short-gap interpolation |
+| `ball/timeseries.py` | Integrated into the frame pipeline |
+| `ball/release_sync.py` | Experimental — not production-fused |
+| `ball/outcome.py` | Experimental — requires real-world validation |
+| `ball/fusion.py` | Incomplete — not attached to production reports |
+| `physics/trajectory.py` | Experimental (#11) |
 
-**Plan:** [PHASE_6_BALL_AND_OUTCOME.md](PHASE_6_BALL_AND_OUTCOME.md)
+**Setup:** [GPU_YOLO_SETUP.md](GPU_YOLO_SETUP.md)
 
-**Next:** [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) — mobile app, datasets, team tasks.
+**Design:** [PHASE_6_BALL_AND_OUTCOME.md](PHASE_6_BALL_AND_OUTCOME.md)
+
+**Next:** fine-tune `yolo26n.pt` on phone footage, validate release/outcome,
+then attach `ShotOutcome` to reports.
 
 ---
 
@@ -202,7 +207,8 @@ All:      visualization/  tests/  assets/  docs/
 | 3 | Phase FSM | PHASE_DETECTION.md, tune phases.yaml |
 | 4 | Rules + research | BIOMECHANICS.md, BIOMECHANICS_RESEARCH.md |
 | 5 | Scoring + PDF reports | FEEDBACK_SCORING.md, REPORTING.md |
-| 6–8 | Phase 6 ball tracking | PHASE_6_BALL_AND_OUTCOME.md, MANUAL_COMPLETION_GUIDE.md |
+| 6 | Ball/rim + CUDA | GPU_YOLO_SETUP.md, PHASE_6_BALL_AND_OUTCOME.md |
+| 7–8 | Release/outcome validation | MANUAL_COMPLETION_GUIDE.md, PRODUCT_ROADMAP.md |
 
 ---
 

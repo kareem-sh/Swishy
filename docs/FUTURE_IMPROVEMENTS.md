@@ -313,15 +313,16 @@ This file is append-only. Each enhancement includes description, difficulty, exp
 2. **Phase 4:** Biomechanical rule engine — **done**
 3. **Phase 5:** Feedback + scoring — **done**
 4. **Phase 5b:** PDF session reports + performance plan — **done**
-5. **Phase 6:** Ball tracking + make/miss — **stubs in `ball/`** — [PHASE_6_BALL_AND_OUTCOME.md](PHASE_6_BALL_AND_OUTCOME.md)
-6. **#11 Physics trajectory** — **stubs in `physics/`**
-7. Release timing prediction (#7)
-8. Personalized player models (#5)
-9. Shot classification (#8) — use assets README to label dunk vs jump shot
-10. Kinematic chain optimization (#10)
-11. Coach dashboard (#16)
-12. Multi-camera (#1) / depth estimation (#14)
-13. ML-based phase detection (#2, #3)
-14. Edge deployment (#12)
+5. **Phase 6a:** Ball/rim detection + tracking — **integrated**
+6. **Phase 6b–6d:** Release sync + validated make/miss fusion — **in progress** — [PHASE_6_BALL_AND_OUTCOME.md](PHASE_6_BALL_AND_OUTCOME.md)
+7. **#11 Physics trajectory** — **experimental in `physics/`**
+8. Release timing prediction (#7)
+9. Personalized player models (#5)
+10. Shot classification (#8) — use assets README to label dunk vs jump shot
+11. Kinematic chain optimization (#10)
+12. Coach dashboard (#16)
+13. Multi-camera (#1) / depth estimation (#14)
+14. ML-based phase detection (#2, #3)
+15. Edge deployment (#12)
 
 **Study and complete manually:** [MANUAL_COMPLETION_GUIDE.md](MANUAL_COMPLETION_GUIDE.md) · **Product + team plan:** [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)

@@ -10,23 +10,27 @@ from ball.timeseries import BallTimeSeriesBuffer
 class ReleaseSync:
     """Fuse ball time-series with wrist landmarks and body phase."""
 
-    def __init__(self, config_path: str = "config/ball.yaml"):
+    def __init__(self, config_name: str = "ball.yaml"):
         """Initialize release sync with configuration."""
-        self.config = self._load_config(config_path)
-        self.max_frame_offset = self.config.get("release_max_offset", 5)
-        self.distance_threshold = self.config.get("wrist_distance_threshold", 50)
-        self.velocity_threshold = self.config.get("release_velocity_threshold", 100)
+        from utils.config_loader import load_yaml
 
-    def _load_config(self, config_path: str) -> dict:
-        """Load configuration from YAML file."""
-        try:
-            import yaml
-            with open(config_path, 'r') as f:
-                return yaml.safe_load(f) or {}
-        except FileNotFoundError:
-            print(f"Warning: Config file {config_path} not found. Using defaults.")
-            return {}
-
+        self.config = load_yaml(config_name)
+        sync = self.config.get("release_sync", {})
+        self.max_frame_offset = int(
+            sync.get(
+                "max_body_ball_frame_delta",
+                self.config.get("release_max_offset", 5),
+            )
+        )
+        self.distance_threshold = float(
+            sync.get(
+                "ball_wrist_release_distance_px",
+                self.config.get("wrist_distance_threshold", 50),
+            )
+        )
+        self.velocity_threshold = float(
+            self.config.get("release_velocity_threshold", 100)
+        )
     def find_release_frame(
         self,
         ball_buffer: BallTimeSeriesBuffer,

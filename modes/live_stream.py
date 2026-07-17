@@ -60,7 +60,9 @@ def run_live_stream():
             continue
 
         h, w, _ = frame.shape
-        frame_result = pipeline.process_frame(latest_result, w, h, timestamp_ms)
+        frame_result = pipeline.process_frame(
+            latest_result, w, h, timestamp_ms, bgr_frame=frame
+        )
 
         if frame_result.shot_summary:
             print_shot_summary(frame_result.shot_summary)

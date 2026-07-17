@@ -25,7 +25,9 @@ def run_image_mode(image_path: str):
     result = detector.detect_image(rgb_image)
 
     h, w, _ = image.shape
-    frame_result = pipeline.process_frame(result, w, h, timestamp_ms=0)
+    frame_result = pipeline.process_frame(
+        result, w, h, timestamp_ms=0, bgr_frame=image
+    )
 
     if frame_result.has_pose:
         print(f"Shooting side: {frame_result.shooting_side}")

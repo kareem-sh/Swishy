@@ -2,7 +2,9 @@
 
 **Goal:** Mobile app where a player films or uploads shots → gets form feedback, make/miss, stats, and coaching for **jump shot, layup, and fadeaway**.
 
-**Today:** Python prototype works (pose, phases, rules, PDF). **Next:** ball tracking, player stats, mobile app.
+**Today:** The Python prototype includes pose, phases, rules, PDF reports, and
+integrated ball/rim detection. **Next:** validated make/miss fusion, player
+stats, and a mobile app.
 
 **Also read:** [MANUAL_COMPLETION_GUIDE.md](MANUAL_COMPLETION_GUIDE.md) · [PHASE_6_BALL_AND_OUTCOME.md](PHASE_6_BALL_AND_OUTCOME.md)
 
@@ -60,7 +62,9 @@ Good form can miss. Bad form can still go in. The app must say both honestly.
 | **#3** | **Roboflow: basketball-yolo-dataset** | [Download](https://universe.roboflow.com/yolo-train-rqswv/basketball-yolo-dataset-hpwha) | Extra ball/hoop/player labels | ~321 images |
 | **#4** | **MediaPipe Pose** | [Docs](https://developers.google.com/edge/mediapipe/solutions/vision/pose_landmarker) | Pose on mobile (already in Swichy) | Built-in model |
 
-**Action:** Download Roboflow #2 + #3 → fine-tune YOLOv8n → then re-train on 200+ frames from **your phones**.
+**Action:** Benchmark the current E-BARD weights on labeled target-phone frames.
+If precision or recall is insufficient, combine Roboflow #2 + #3 with 200+
+frames from target phones and fine-tune `yolo26n.pt`.
 
 ---
 
@@ -344,7 +348,7 @@ Do **not** force layups into the jump-shot FSM. Separate files per type.
 | Who | Task |
 |-----|------|
 | **Everyone** | Read MANUAL_COMPLETION_GUIDE + record 10 phone clips |
-| **A** | Download Roboflow #2, train first YOLO |
+| **A** | Label target-phone frames and benchmark/fine-tune the current detector |
 | **B** | Tune jump-shot phases on `video_07_side_jump_shot.mp4` |
 | **C** | Create labeling spreadsheet |
 | **D** | Draft SQLite schema in `player/` |
@@ -366,4 +370,4 @@ Do **not** force layups into the jump-shot FSM. Separate files per type.
 
 ---
 
-*Swichy Phases 1–5b complete · Phase 6 stubs in `ball/` · Updated 2026*
+*Swichy Phases 1–5b complete · Phase 6a integrated · Phase 6b–6d in progress · Updated 2026*

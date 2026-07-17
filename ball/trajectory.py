@@ -8,8 +8,7 @@ try:
     from scipy.optimize import curve_fit
     SCIPY_AVAILABLE = True
 except ImportError:
-    SCIPY_AVAILABLE = False
-    print("Warning: scipy not available. Using manual trajectory fitting.")
+    SCIPY_AVAILABLE = False  # numpy.polyfit is enough for v1
 
 from ball.models import BallSnapshot, BallTrajectory
 from ball.timeseries import BallTimeSeriesBuffer
@@ -18,22 +17,13 @@ from ball.timeseries import BallTimeSeriesBuffer
 class TrajectoryAnalyzer:
     """Fit ball flight path and extract apex / entry angle proxy."""
 
-    def __init__(self, config_path: str = "config/ball.yaml"):
+    def __init__(self, config_name: str = "ball.yaml"):
         """Initialize trajectory analyzer with configuration."""
-        self.config = self._load_config(config_path)
+        from utils.config_loader import load_yaml
+
+        self.config = load_yaml(config_name)
         self.fit_quality_threshold = self.config.get("fit_quality_threshold", 0.7)
         self.min_snapshots_for_fit = self.config.get("min_snapshots_for_fit", 5)
-
-    def _load_config(self, config_path: str) -> dict:
-        """Load configuration from YAML file."""
-        try:
-            import yaml
-            with open(config_path, 'r') as f:
-                return yaml.safe_load(f) or {}
-        except FileNotFoundError:
-            print(f"Warning: Config file {config_path} not found. Using defaults.")
-            return {}
-
     def fit_trajectory(self, snapshots: List[BallSnapshot]) -> Optional[BallTrajectory]:
         """Fit parabolic arc to in-flight snapshots."""
         if len(snapshots) < self.min_snapshots_for_fit:

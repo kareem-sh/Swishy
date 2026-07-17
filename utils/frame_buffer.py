@@ -1,6 +1,7 @@
-from dataclasses import dataclass, field
+from collections import deque
+from dataclasses import dataclass
 
-from typing import Dict, List, Optional
+from typing import Deque, Dict, List, Optional
 
 
 
@@ -42,19 +43,15 @@ class FrameBuffer:
 
     def __init__(self, max_frames: int = 300):
 
-        self.max_frames = max_frames
+        self.max_frames = max(1, int(max_frames))
 
-        self._frames: List[FrameSnapshot] = []
+        self._frames: Deque[FrameSnapshot] = deque(maxlen=self.max_frames)
 
 
 
     def push(self, snapshot: FrameSnapshot):
 
         self._frames.append(snapshot)
-
-        if len(self._frames) > self.max_frames:
-
-            self._frames.pop(0)
 
 
 

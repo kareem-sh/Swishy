@@ -1,19 +1,44 @@
-# Phase 6 — ball detection and outcome settings (not wired yet)
+# Phase 6 — ball + rim detection (custom basketball YOLO)
 
-enabled: false
+enabled: true
 
 detector:
-  backend: color  # color | yolo
-  min_confidence: 0.5
-  min_radius_px: 8
-  max_radius_px: 80
+  backend: yolo
+  # Fine-tuned ball+hoop weights (E-BARD). Future retrain base: yolo26n.pt
+  model_path: models/basketball_yolov8n.pt
+  hf_repo: GabrieleGiudici/E-BARD-detection-models
+  hf_file: BODD_yolov8n_0001.pt
+
+  # Recall-oriented thresholds; temporal tracking filters short false hits.
+  min_confidence: 0.12
+  min_confidence_rim: 0.08
+  min_radius_px: 4
+  max_radius_px: 140
+
+  # E-BARD was trained at 704px. Alternate 704/512 while acquiring the rim.
+  imgsz: 704
+  fallback_imgsz: 512
+  # Tracker handles short ball gaps; reserve the costly second pass for rim lock.
+  fallback_on_ball_miss: false
+  fallback_until_rim_found: true
+  rim_search_retry_interval: 4  # bounded 704px retry before rim lock
+  device: auto             # auto | cpu | 0 (CUDA GPU 0)
+  frame_stride: 1
+  sticky_rim: true
+  # The hoop label includes the net; its physical rim is near the box top.
+  rim_center_y_fraction: 0.15
+  # Once found, reject detections that jump far from the static hoop.
+  rim_lock_max_shift_ratio: 0.75
 
 tracking:
-  max_missing_frames: 3
+  max_missing_frames: 4
+  position_alpha: 0.80
+  velocity_alpha: 0.50
 
 outcome:
   post_shot_capture_ms: 2000
   min_flight_frames: 3
+  rim_inner_scale: 0.72
 
 release_sync:
   max_body_ball_frame_delta: 3

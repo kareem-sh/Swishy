@@ -35,6 +35,11 @@ def _side_chains(side: str) -> Dict[str, JointChain]:
             vertex=f"{side}_knee",
             distal=f"{side}_ankle",
         ),
+        f"{side}_ankle_flexion": JointChain(
+            proximal=f"{side}_knee",
+            vertex=f"{side}_ankle",
+            distal=f"{side}_foot_index",
+        ),
         f"{side}_hip": JointChain(
             proximal=f"{side}_shoulder",
             vertex=f"{side}_hip",

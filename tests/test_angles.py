@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from geometry.vectors import angle_between_vectors, segment_vector
 from angles.calculator import AngleCalculator
+from angles.joint_chains import JOINT_CHAINS
 from pose.visibility import VisibilityGate
 
 
@@ -70,7 +71,6 @@ def test_visibility_gates_invalid_angle():
     }
     world = gate.apply(world)
 
-    from angles.joint_chains import JOINT_CHAINS
     result = calc.compute_joint_angle(world, JOINT_CHAINS["right_elbow"], "right_elbow")
     assert not result.is_valid
 
@@ -89,10 +89,50 @@ def test_presence_gates_high_visibility_low_presence():
     assert gated["right_knee"]["confidence"] < 0.5
 
 
+def test_shoe_tip_supports_visibility_gated_ankle_flexion():
+    gate = VisibilityGate(visibility_threshold=0.6, presence_threshold=0.5)
+    calc = AngleCalculator(gate)
+    world = {
+        "right_knee": {
+            "position": np.array([0.0, 1.0, 0.0]),
+            "visibility": 0.9,
+            "presence": 0.9,
+        },
+        "right_ankle": {
+            "position": np.array([0.0, 0.0, 0.0]),
+            "visibility": 0.9,
+            "presence": 0.9,
+        },
+        "right_foot_index": {
+            "position": np.array([1.0, 0.0, 0.0]),
+            "visibility": 0.9,
+            "presence": 0.9,
+        },
+    }
+    gated = gate.apply(world)
+
+    result = calc.compute_joint_angle(
+        gated,
+        JOINT_CHAINS["right_ankle_flexion"],
+        "right_ankle_flexion",
+    )
+    assert result.is_valid
+    assert abs(result.degrees - 90.0) < 0.01
+
+    gated["right_foot_index"]["is_reliable"] = False
+    invalid = calc.compute_joint_angle(
+        gated,
+        JOINT_CHAINS["right_ankle_flexion"],
+        "right_ankle_flexion",
+    )
+    assert not invalid.is_valid
+
+
 if __name__ == "__main__":
     test_right_angle()
     test_straight_line()
     test_rotation_invariance()
     test_visibility_gates_invalid_angle()
     test_presence_gates_high_visibility_low_presence()
+    test_shoe_tip_supports_visibility_gated_ankle_flexion()
     print("All tests passed.")

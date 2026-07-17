@@ -22,5 +22,14 @@ Thumbs.db
 .env
 .env.*
 
+# Large ML weights (auto-downloaded on first use)
+models/*.pt
+models/*.onnx
+!models/*.task
+yolov8*.pt
+yolo11*.pt
+*.pt
+!models/*.task
+
 # Jupyter
 .ipynb_checkpoints/

@@ -8,7 +8,7 @@ Free media for testing Swichy pose analysis. See also [MANUAL_COMPLETION_GUIDE.m
 
 | File | Source | Shot type / camera | Notes |
 |------|--------|-------------------|-------|
-| [`test.mp4`](../test.mp4) | [Mixkit #2280](https://mixkit.co/free-stock-video/couple-playing-basketball-2280/) | **Front-view jump shot** | Default video (~11s slow-mo outdoor three-pointer) |
+| [`test.mp4`](test.mp4) | [Mixkit #2280](https://mixkit.co/free-stock-video/couple-playing-basketball-2280/) | **Front-view jump shot** | Default video (~11s slow-mo outdoor three-pointer) |
 | [`video_01_free_throw.mp4`](videos/video_01_free_throw.mp4) | [Mixkit #2278](https://mixkit.co/free-stock-video/basketball-player-shot-at-goal-2278/) | Free throw (front) | Outdoor free-throw practice (~14s) |
 | [`video_02_one_on_one.mp4`](videos/video_02_one_on_one.mp4) | [Mixkit #44469](https://mixkit.co/free-stock-video/two-basketball-players-playing-one-on-one-44469/) | **Hook / layup** | Indoor one-on-one (~8s) |
 | [`video_03_expert_score.mp4`](videos/video_03_expert_score.mp4) | [Mixkit #44449](https://mixkit.co/free-stock-video/expert-basketball-player-scoring-a-basket-44449/) | **Dunk** | Indoor scoring move (~6s) |
@@ -45,7 +45,7 @@ Free media for testing Swichy pose analysis. See also [MANUAL_COMPLETION_GUIDE.m
 
 **License:** Creative Commons (see each file page on Wikimedia Commons).
 
-Default image for image mode: [`test.jpg`](../test.jpg) (copy of `image_01_durant_jumpshot.jpg`).
+Default image for image mode: [`test.jpg`](test.jpg) (copy of `image_01_durant_jumpshot.jpg`).
 
 ---
 

@@ -73,7 +73,14 @@ class AngleCalculator:
         """
         results: Dict[str, AngleResult] = {}
 
-        side_keys = ("elbow", "knee", "hip", "shoulder", "index_align")
+        side_keys = (
+            "elbow",
+            "knee",
+            "ankle_flexion",
+            "hip",
+            "shoulder",
+            "index_align",
+        )
         for key in side_keys:
             chain_name = f"{shooting_side}_{key}"
             results[chain_name] = self.compute_joint_angle(
