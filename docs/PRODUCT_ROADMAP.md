@@ -216,6 +216,12 @@ form = 40% rules + 40% ML model + 20% vs personal baseline
 
 Start 100% rules (today). Add ML after 500+ labeled shots.
 
+**Current form-first track (ready now):** Salah labels **form** (`class_id`) and trains
+the MLP under `ml/` while the live app still uses the rule engine. Make/miss and
+ball physics stay optional. See [`ml/docs/FORM_ML_AND_RULES.md`](../ml/docs/FORM_ML_AND_RULES.md).
+Do **not** auto-calibrate `biomechanics.yaml` until the form set is large and a
+holdout comparison shows the MLP beats rules.
+
 ---
 
 ### Step 8 — Mobile app (Week 14–20)

@@ -1,0 +1,5 @@
+video_path,shot_index,class_id,made,has_hoop,notes
+train/example_01.mp4,0,0,1,1,excellent form — hoop visible made
+train/example_01.mp4,1,3,,0,poor release — no hoop in frame (made blank OK)
+train/example_02.mp4,*,1,,,all shots share form class 1
+val/example_holdout.mp4,0,2,0,1,fair form but missed

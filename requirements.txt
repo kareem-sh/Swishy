@@ -9,3 +9,5 @@ huggingface_hub>=0.23.0
 #   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
 torch>=2.0.0
 torchvision>=0.15.0
+tensorboard>=2.14.0
+

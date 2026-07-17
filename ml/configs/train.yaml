@@ -1,0 +1,222 @@
+# =============================================================================
+# Swichy ML — Training Configuration
+# =============================================================================
+#
+# WHY THIS FILE EXISTS
+# --------------------
+# Every number that controls training lives HERE, not inside Python.
+# That means you can change learning rate, batch size, or epochs without
+# editing code, and you can later plug in hyperparameter search tools
+# (Optuna, Ray Tune, etc.) by reading/writing this same YAML.
+#
+# HOW PYTHON WILL USE IT (next files)
+# -----------------------------------
+#   config = load_train_config("ml/configs/train.yaml")
+#   model = ShotQualityMLP(hidden_size=config["model"]["hidden_size"], ...)
+#   optimizer = AdamW(model.parameters(), lr=config["optimizer"]["learning_rate"])
+#
+# TODO:
+# - After synthetic smoke test passes, clone this file to train_basketball.yaml
+#   with real feature_dim and num_classes from MediaPipe features.
+# - Add Optuna / Ray Tune search space section when starting HPO.
+# - Export a frozen "best_config.yaml" next to best_model.pt after tuning.
+# - Tune batch_size down to 32 if training on a 4 GB GPU (e.g. GTX 1650).
+#
+# HARDWARE NOTE
+# -------------
+# Defaults below target a small RTX 3070 (~8 GB VRAM).
+# Your Swichy YOLO work used a GTX 1650 (4 GB). For that card, prefer:
+#   batch_size: 32, num_workers: 0 or 2, mixed_precision: true
+# =============================================================================
+
+# --- Experiment identity -----------------------------------------------------
+experiment:
+  name: "form_mlp_v1"
+  # Short description written into TensorBoard / checkpoint metadata.
+  description: "Form-first MLP on exported pose features (rules stay fixed)"
+  # TODO: Rename per Salah dataset version when sharing checkpoints.
+
+# --- Reproducibility ---------------------------------------------------------
+reproducibility:
+  # Same seed => same weight init, same data shuffle, same dropout masks
+  # (as long as deterministic=true and the GPU ops support it).
+  random_seed: 42
+  # Forces cuDNN to use deterministic algorithms. Slightly slower; safer for
+  # debugging and scientific comparison.
+  deterministic: true
+  # TODO: Log git commit hash into checkpoints for full experiment tracking.
+
+# --- Device ------------------------------------------------------------------
+device:
+  # auto | cuda | mps | cpu
+  # "auto" = CUDA if available, else Apple MPS, else CPU.
+  preferred: "auto"
+  # Which CUDA GPU index to use when preferred is cuda/auto.
+  cuda_device_index: 0
+
+# --- Data --------------------------------------------------------------------
+# FORM-FIRST TRAINING (read this before training)
+# -----------------------------------------
+# Product data is basketball VIDEOS. Salah owns the archive + form labels.
+#
+#   videos/ + labels.csv (class_id = form quality REQUIRED)
+#       ->
+#   build_features_from_videos.py  (pose features; --with-ball is optional meta)
+#       ->
+#   train.npz  ->  ShotFeatureDataset  ->  Form MLP
+#
+# Live app still uses analysis/ + biomechanics.yaml. Training does NOT edit rules.
+# Make/miss columns are optional and ignored by this trainer.
+# Design: ml/docs/FORM_ML_AND_RULES.md
+#
+# TODO: Collect / label hundreds -> thousands of form-labeled shots (Salah).
+# TODO: Compare MLP vs rule score on holdout before soft-replacing coach UX.
+# TODO: Defer biomechanics.yaml auto-calibration and multi-task make/miss.
+data:
+  # synthetic | csv | npy | mediapipe
+  # "synthetic" = pipeline smoke test (no videos required).
+  # "csv" / "npy" = after Salah exports features from videos.
+  # "mediapipe" = future adapter that builds features on the fly.
+  source: "npy"
+  # Paths used ONLY when source is csv/npy (created on the training machine).
+  train_path: "ml/datasets/data/train.npz"
+  val_path: ""
+  # Must match features.shape[1] from build_features_from_videos.py.
+  feature_dim: 33
+  # TODO: Map classes to basketball labels from Salah's labeling scheme
+  #   e.g. 0=excellent, 1=good, 2=fair, 3=poor, 4=error_cluster
+  num_classes: 5
+  # How many fake samples for the smoke test (ignored for real data).
+  synthetic_num_samples: 1000
+  # Fraction of data held out for validation (if no separate val_path).
+  validation_split: 0.25
+  # Workers load batches in parallel. On Windows, start with 0.
+  # Linux + RTX 3070: 4 is a good default.
+  num_workers: 0
+  # Pin host memory for faster CPU->GPU copies when using CUDA.
+  pin_memory: true
+  # Shuffle training set each epoch so the model does not memorize order.
+  shuffle_train: true
+
+# --- Model (MLP v1) ----------------------------------------------------------
+model:
+  # Input size must match data.feature_dim.
+  input_size: 33
+  # Width of each hidden Linear layer.
+  # Smaller hidden size for the first real (tiny) export; grow later with more shots.
+  # TODO: Try 256 / 512 after collecting ~10k real shots.
+  hidden_size: 64
+  # Number of Linear->BN->ReLU->Dropout blocks before the final classifier.
+  # Architecture: Input -> [block] x num_hidden_layers -> Output
+  num_hidden_layers: 2
+  # Output units = number of shot-quality classes.
+  output_size: 5
+  # Probability of zeroing a hidden unit during training (regularization).
+  # 0.3 is a classic starting point for small MLPs.
+  # TODO: Sweep dropout in {0.1, 0.3, 0.5} during HPO.
+  dropout: 0.3
+  # TODO: Experiment with residual connections between hidden blocks.
+  # TODO: Try a deeper architecture (num_hidden_layers: 3 or 4).
+
+# --- Training loop -----------------------------------------------------------
+training:
+  # Full passes over the training set.
+  # Small real export: keep epochs modest; early stopping still applies.
+  # TODO: Use 50–100+ epochs for Salah's full labeled set.
+  epochs: 30
+  # Tiny datasets: keep batch small so each step sees different samples.
+  # TODO: Train with larger batch size (64/128) once you have hundreds of shots.
+  batch_size: 2
+  # Clip gradient L2 norm to this value before optimizer.step().
+  # Prevents rare exploding gradients from blowing up training.
+  gradient_clip: 1.0
+  # Automatic Mixed Precision (float16 compute, float32 master weights).
+  # Faster on NVIDIA Tensor Cores; lower memory. Safe for this MLP.
+  mixed_precision: true
+  # Stop if validation metric does not improve for N epochs.
+  early_stopping_patience: 10
+  # Which validation metric decides "best" model: accuracy | f1_macro | loss
+  # For loss, lower is better; for accuracy/f1, higher is better.
+  early_stopping_metric: "accuracy"
+  # Print / log every N training batches (1 = every batch; noisy for large sets).
+  log_every_n_steps: 1
+
+# --- Optimizer (AdamW) -------------------------------------------------------
+optimizer:
+  name: "adamw"
+  # Step size for weight updates. 1e-3 is the AdamW default and works well
+  # for small MLPs with BatchNorm.
+  # TODO: Sweep learning_rate in {1e-4, 3e-4, 1e-3, 3e-3}.
+  learning_rate: 0.001
+  # Decoupled weight decay (L2-style regularization on weights).
+  # Keeps weights from growing too large; helps generalization.
+  weight_decay: 0.0001
+  # Adam moment estimates. Leave at defaults unless you know why.
+  betas: [0.9, 0.999]
+  eps: 0.00000001
+
+# --- Learning-rate scheduler -------------------------------------------------
+scheduler:
+  # cosine | step | plateau | none
+  # Cosine annealing smoothly lowers LR from learning_rate -> eta_min.
+  # Good default for short and medium runs without hand-tuning step sizes.
+  name: "cosine"
+  # Minimum LR at the end of cosine schedule.
+  eta_min: 0.00001
+  # Only used if name=step: multiply LR by gamma every step_size epochs.
+  step_size: 10
+  gamma: 0.1
+  # Only used if name=plateau: reduce LR when val metric stalls.
+  plateau_factor: 0.5
+  plateau_patience: 3
+
+# --- Checkpointing -----------------------------------------------------------
+checkpoint:
+  # Directory for .pt files (relative to repo root).
+  dir: "ml/checkpoints"
+  # Always keep the best model by early_stopping_metric.
+  save_best: true
+  best_filename: "best_model.pt"
+  # Also keep the latest epoch for resume.
+  save_last: true
+  last_filename: "last_checkpoint.pt"
+  # If true, training/train.py loads last_checkpoint.pt and continues.
+  resume: false
+  # TODO: Export ONNX model from best_model.pt for mobile / C++ inference.
+
+# --- Logging -----------------------------------------------------------------
+logging:
+  tensorboard_dir: "ml/tensorboard"
+  # Flush TensorBoard events this often (seconds).
+  flush_secs: 10
+  # Also print a human-readable epoch summary to the terminal.
+  console: true
+
+# --- Evaluation (used by evaluation/evaluate.py) -----------------------------
+evaluation:
+  # Which checkpoint to load for eval / inference.
+  checkpoint_path: "ml/checkpoints/best_model.pt"
+  # Average strategy for precision/recall/f1: macro | weighted | micro
+  average: "macro"
+  # Save confusion matrix image / CSV here.
+  output_dir: "ml/evaluation/outputs"
+
+# --- Inference (used by inference/predict.py) --------------------------------
+inference:
+  checkpoint_path: "ml/checkpoints/best_model.pt"
+  # Softmax temperature. 1.0 = standard. >1 = softer probs; <1 = sharper.
+  temperature: 1.0
+  # TODO: Integrate into existing basketball pipeline (parallel to Rule Engine).
+
+# --- Future hyperparameter search (scaffold only) ----------------------------
+# TODO: Perform hyperparameter tuning with Optuna.
+# Suggested first search space (do not enable until smoke test passes):
+# hyperparameter_search:
+#   enabled: false
+#   n_trials: 30
+#   search_space:
+#     learning_rate: [0.0001, 0.0003, 0.001, 0.003]
+#     hidden_size: [64, 128, 256]
+#     dropout: [0.1, 0.3, 0.5]
+#     batch_size: [32, 64, 128]
+#     weight_decay: [0.0, 0.0001, 0.001]

@@ -89,7 +89,11 @@ class ShotAnalysisPipeline:
         9. Temporal buffer storage
     """
 
-    def __init__(self, shooting_hand: str = SHOOTING_HAND):
+    def __init__(
+        self,
+        shooting_hand: str = SHOOTING_HAND,
+        enable_ball: Optional[bool] = None,
+    ):
         filter_cfg = load_yaml("filter_config.yaml")
         phase_cfg = load_yaml("phases.yaml")
         scoring_cfg = load_yaml("scoring.yaml")
@@ -129,7 +133,11 @@ class ShotAnalysisPipeline:
         self._show_ball_overlay = bool(display_cfg.get("show_ball_overlay", True))
 
         # Phase 6 — custom basketball YOLO (ball + hoop)
-        self._ball_enabled = bool(ball_cfg.get("enabled", False))
+        # enable_ball=False skips YOLO load (used by ML feature export).
+        if enable_ball is None:
+            self._ball_enabled = bool(ball_cfg.get("enabled", False))
+        else:
+            self._ball_enabled = bool(enable_ball)
         self._ball_detector: Optional[BallDetector] = None
         tracking_cfg = ball_cfg.get("tracking", {})
         self._ball_tracker = BallTracker(

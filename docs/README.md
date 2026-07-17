@@ -8,7 +8,6 @@ this sequence instead of reading the folder alphabetically.
 
 | # | Document | What you will learn |
 |---:|----------|---------------------|
-|---|----------|---------------------|
 | 1 | [PHASES_OVERVIEW.md](PHASES_OVERVIEW.md) | What each product phase solves |
 | 2 | [ARCHITECTURE.md](ARCHITECTURE.md) | Module boundaries and ownership |
 | 3 | [PIPELINE.md](PIPELINE.md) | How one frame moves through the app |
@@ -23,14 +22,15 @@ this sequence instead of reading the folder alphabetically.
 | 12 | [REPORTING.md](REPORTING.md) | Reports and key-frame generation |
 | 13 | [GPU_YOLO_SETUP.md](GPU_YOLO_SETUP.md) | CUDA setup and YOLO26 vs custom weights |
 | 14 | [PHASE_6_BALL_AND_OUTCOME.md](PHASE_6_BALL_AND_OUTCOME.md) | Ball tracking, rim context, and outcomes |
-| 15 | [MANUAL_COMPLETION_GUIDE.md](MANUAL_COMPLETION_GUIDE.md) | Work through remaining tasks manually |
-| 16 | [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) | Datasets, mobile work, and milestones |
-| 17 | [FUTURE_IMPROVEMENTS.md](FUTURE_IMPROVEMENTS.md) | Later-stage product ideas |
+| 15 | [../ml/docs/FORM_ML_AND_RULES.md](../ml/docs/FORM_ML_AND_RULES.md) | Form MLP beside the rule engine; Salah training |
+| 16 | [../ml/docs/SALAH_MISSION.md](../ml/docs/SALAH_MISSION.md) | How Salah exports features and trains |
+| 17 | [MANUAL_COMPLETION_GUIDE.md](MANUAL_COMPLETION_GUIDE.md) | Work through remaining tasks manually |
+| 18 | [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) | Datasets, mobile work, and milestones |
+| 19 | [FUTURE_IMPROVEMENTS.md](FUTURE_IMPROVEMENTS.md) | Later-stage product ideas |
 
 ## Current implementation status
 
 | Phase | Status | Key modules |
-|-------|--------|-------------|
 |-------|--------|-------------|
 | 1 — Foundation | Done | `pose/`, `geometry/`, `angles/`, `pipeline.py` |
 | 2 — Filter + visibility | Done | `filters/`, `pose/visibility.py` |
@@ -41,6 +41,7 @@ this sequence instead of reading the folder alphabetically.
 | 6a — Ball + rim detection | Integrated | custom E-BARD YOLO, tracker, overlays |
 | 6b–6d — Release/outcome/trajectory | In progress | modules exist; shot-summary fusion remains |
 | Physics trajectory | Experimental | `physics/` |
+| Form MLP (offline) | Ready for Salah | `ml/` — trains beside rules; see FORM_ML_AND_RULES.md |
 
 Pose details:
 
@@ -57,10 +58,13 @@ Pose details:
 Video / camera / image
 ├─ BGR frame → basketball YOLO → ball + rim → ball tracker
 └─ RGB frame → MediaPipe pose → filter → visibility → 3D angles
-                                  → features → phase FSM → rules
+                                  → features → phase FSM → rules (live coach)
                                   → shot tracker → score/report
+                                  → (offline) Form MLP train on labeled form
 
 Both branches meet in pipeline.FrameResult → renderer/HUD/recorder
+Form MLP does not replace rules until holdout comparison wins
+(see ml/docs/FORM_ML_AND_RULES.md).
 ```
 
 Entry point: [`pipeline.py`](../pipeline.py) →

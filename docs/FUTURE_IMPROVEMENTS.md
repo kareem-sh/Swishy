@@ -307,6 +307,26 @@ This file is append-only. Each enhancement includes description, difficulty, exp
 
 ---
 
+## 18. Form MLP Beside Rules (then optional rule calibration)
+
+**Description:** Train a form-quality MLP on Salah’s labeled jump shots while keeping
+`analysis/` + `biomechanics.yaml` as the live coach. Wire MLP in parallel only after
+holdout comparison. Defer auto-tuning YAML thresholds and multi-task make/miss until
+the form set is large. See [`ml/docs/FORM_ML_AND_RULES.md`](../ml/docs/FORM_ML_AND_RULES.md).
+
+**Difficulty:** Medium (training ready; live fusion later)
+
+**Expected performance gain:** Adaptive form coaching that still works when hoop/ball
+are missing from the clip.
+
+**Required knowledge:** PyTorch MLP, labeling, MediaPipe feature export.
+
+**Prerequisites:** Phase 4–5 rule engine; `ml/` form export + train path.
+
+**Implementation order:** Now for offline training; live parallel after hundreds of labels.
+
+---
+
 ## Suggested Implementation Order (Summary)
 
 1. **Phase 3:** Temporal phase detection (FSM) — **done**
@@ -314,15 +334,16 @@ This file is append-only. Each enhancement includes description, difficulty, exp
 3. **Phase 5:** Feedback + scoring — **done**
 4. **Phase 5b:** PDF session reports + performance plan — **done**
 5. **Phase 6a:** Ball/rim detection + tracking — **integrated**
-6. **Phase 6b–6d:** Release sync + validated make/miss fusion — **in progress** — [PHASE_6_BALL_AND_OUTCOME.md](PHASE_6_BALL_AND_OUTCOME.md)
-7. **#11 Physics trajectory** — **experimental in `physics/`**
-8. Release timing prediction (#7)
-9. Personalized player models (#5)
-10. Shot classification (#8) — use assets README to label dunk vs jump shot
-11. Kinematic chain optimization (#10)
-12. Coach dashboard (#16)
-13. Multi-camera (#1) / depth estimation (#14)
-14. ML-based phase detection (#2, #3)
-15. Edge deployment (#12)
+6. **Form MLP offline (form-first)** — **ready for Salah** — [FORM_ML_AND_RULES.md](../ml/docs/FORM_ML_AND_RULES.md)
+7. **Phase 6b–6d:** Release sync + validated make/miss fusion — **in progress** — [PHASE_6_BALL_AND_OUTCOME.md](PHASE_6_BALL_AND_OUTCOME.md)
+8. **#11 Physics trajectory** — **experimental in `physics/`**
+9. Release timing prediction (#7)
+10. Personalized player models (#5)
+11. Shot classification (#8) — use assets README to label dunk vs jump shot
+12. Kinematic chain optimization (#10)
+13. Coach dashboard (#16)
+14. Multi-camera (#1) / depth estimation (#14)
+15. ML-based phase detection (#2, #3) / YAML rule calibration (#18 deferred)
+16. Edge deployment (#12)
 
 **Study and complete manually:** [MANUAL_COMPLETION_GUIDE.md](MANUAL_COMPLETION_GUIDE.md) · **Product + team plan:** [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)

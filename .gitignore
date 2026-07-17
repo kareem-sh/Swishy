@@ -33,3 +33,13 @@ yolo11*.pt
 
 # Jupyter
 .ipynb_checkpoints/
+
+# Swichy ML local artifacts (Salah trains these on his machine)
+ml/datasets/data/*.npz
+ml/datasets/data/*.npy
+ml/datasets/data/*.csv
+ml/tensorboard/**
+!ml/tensorboard/.gitkeep
+!ml/datasets/data/.gitkeep
+!ml/checkpoints/.gitkeep
+
