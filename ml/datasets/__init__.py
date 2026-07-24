@@ -15,15 +15,19 @@ from __future__ import annotations
 
 from ml.datasets.feature_dataset import (
     FeatureDataset,
+    fit_feature_normalization,
     load_feature_dataset,
     make_dataloaders,
+    normalize_features,
 )
 from ml.datasets.synthetic import SyntheticShotDataset, make_synthetic_arrays
 
 __all__ = [
     "FeatureDataset",
     "SyntheticShotDataset",
+    "fit_feature_normalization",
     "load_feature_dataset",
     "make_dataloaders",
     "make_synthetic_arrays",
+    "normalize_features",
 ]

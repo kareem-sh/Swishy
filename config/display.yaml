@@ -18,8 +18,8 @@ violation_max_items: 3
 summary_display_frames: 60
 
 # Video playback: 1.0 = real-time, 2.0 = 2x speed, 0 = as fast as CPU allows
-video_playback_sync: true
-video_playback_speed: 2.0
+video_playback_sync: false
+video_playback_speed: 1
 
 # Phase 6 — draw ball/rim boxes from custom basketball YOLO
 show_ball_overlay: true

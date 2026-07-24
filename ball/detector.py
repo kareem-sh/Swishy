@@ -67,7 +67,15 @@ class BallDetector:
         self.model_path = str(det.get("model_path") or DEFAULT_LOCAL.as_posix())
         self.hf_repo = str(det.get("hf_repo", DEFAULT_HF_REPO))
         self.hf_file = str(det.get("hf_file", DEFAULT_HF_FILE))
-
+        self.use_half = (
+            bool(det.get("half", True))
+            and self.model_path.lower().endswith(".pt")
+            and self.device != "cpu"
+        )
+        self.rim_refresh_frames = max(
+            1,
+            int(det.get("rim_refresh_frames", 30)),
+        )
         self._model = None
         self._ball_ids: List[int] = []
         self._rim_ids: List[int] = []
@@ -256,13 +264,26 @@ class BallDetector:
         imgsz: int,
     ) -> CourtDetections:
         """Run one YOLO pass at a specific input resolution."""
-        results = self._model.predict(
+        detect_rim_now = (
+            self._sticky_rim_det is None
+            or (self._frame_counter - 1) % self.rim_refresh_frames == 0
+        )
+        requested_classes = list(self._ball_ids)
+
+        if detect_rim_now:
+            requested_classes.extend(self._rim_ids)
+
+        predict_args = dict(
             source=bgr_image,
             conf=min(self.min_confidence, self.min_confidence_rim),
             imgsz=imgsz,
             device=self.device,
+            classes=requested_classes,
             verbose=False,
         )
+        if self.use_half:
+            predict_args["half"] = True
+        results = self._model.predict(**predict_args)
         if not results or results[0].boxes is None or len(results[0].boxes) == 0:
             return CourtDetections()
 

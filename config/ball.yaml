@@ -5,7 +5,7 @@ enabled: true
 detector:
   backend: yolo
   # Fine-tuned ball+hoop weights (E-BARD). Future retrain base: yolo26n.pt
-  model_path: models/basketball_yolov8n.pt
+  model_path: models/basketball_yolov8n.engine
   hf_repo: GabrieleGiudici/E-BARD-detection-models
   hf_file: BODD_yolov8n_0001.pt
 
@@ -16,19 +16,21 @@ detector:
   max_radius_px: 140
 
   # E-BARD was trained at 704px. Alternate 704/512 while acquiring the rim.
-  imgsz: 704
-  fallback_imgsz: 512
+  imgsz: 640
+  fallback_imgsz: 640
   # Tracker handles short ball gaps; reserve the costly second pass for rim lock.
   fallback_on_ball_miss: false
   fallback_until_rim_found: true
   rim_search_retry_interval: 4  # bounded 704px retry before rim lock
   device: auto             # auto | cpu | 0 (CUDA GPU 0)
-  frame_stride: 1
+  half: true               # FP16 for PyTorch .pt; exported engines use compiled precision
+  frame_stride: 2
   sticky_rim: true
   # The hoop label includes the net; its physical rim is near the box top.
   rim_center_y_fraction: 0.15
   # Once found, reject detections that jump far from the static hoop.
   rim_lock_max_shift_ratio: 0.75
+  rim_refresh_frames: 60
 
 tracking:
   max_missing_frames: 4

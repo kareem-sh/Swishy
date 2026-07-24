@@ -104,7 +104,7 @@ def load_basketball_yolo(
         ) from exc
 
     path = resolve_model_path(model_path, hf_repo=hf_repo, hf_file=hf_file)
-    model = YOLO(str(path))
+    model = YOLO(str(path), task="detect")
     names = {int(k): str(v).lower() for k, v in (model.names or {}).items()}
     ball_ids = [i for i, n in names.items() if n in _BALL_ALIASES]
     rim_ids = [i for i, n in names.items() if n in _RIM_ALIASES]

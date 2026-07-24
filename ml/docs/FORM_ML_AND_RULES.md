@@ -81,7 +81,7 @@ ml/tensorboard/<experiment_name>/
 
 ### Important properties
 
-- Target label = **player form** (`class_id` 0–4), not made/miss.
+- Target label = **binary player form** (`0` acceptable/correct, `1` needs improvement), not made/miss.
 - Player-only side views are valid training data.
 - Optional CSV columns `made`, `has_hoop` go into `.meta.json` only; the form trainer ignores them.
 - `--with-ball` can add ball side metrics to meta for later analysis; it does **not** change the MLP target.
@@ -138,7 +138,7 @@ flowchart LR
 ### Comparison protocol (before changing product UX)
 
 1. Hold out the same labeled shots (human `class_id`).
-2. Map rule score 0–100 → five form classes (same map as `score_to_class` in the exporter), **or** compare rank correlation of score vs class.
+2. Map rule score 0–100 to the binary threshold used by `score_to_class`, **or** compare rank correlation of score vs class.
 3. Report accuracy / macro-F1 for MLP vs rules on that holdout.
 4. Only then change what the player sees.
 
@@ -169,7 +169,7 @@ Required:
 |--------|---------|
 | `video_path` | Path relative to `ml/datasets/videos/`, repo root, or absolute |
 | `shot_index` | `0`, `1`, … or `*` for every shot in that file |
-| `class_id` | Form: `0` excellent, `1` good, `2` fair, `3` poor, `4` major error |
+| `class_id` | Form: `0` acceptable/correct, `1` needs improvement |
 
 Optional (blank = ignore):
 

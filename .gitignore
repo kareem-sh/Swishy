@@ -38,8 +38,26 @@ yolo11*.pt
 ml/datasets/data/*.npz
 ml/datasets/data/*.npy
 ml/datasets/data/*.csv
+
+# Local ML video datasets (keep labels, README files, and code tracked)
+ml/datasets/videos/**/*.mp4
+ml/datasets/videos/**/*.mov
+ml/datasets/videos/**/*.avi
+ml/datasets/videos/**/*.mkv
+ml/datasets/videos/**/*.m4v
+ml/datasets/videos/**/*.webm
+
 ml/tensorboard/**
 !ml/tensorboard/.gitkeep
 !ml/datasets/data/.gitkeep
 !ml/checkpoints/.gitkeep
 
+# Local video assets
+assets/videos/**/*.mp4
+assets/videos/**/*.mov
+assets/videos/**/*.avi
+assets/videos/**/*.mkv
+assets/videos/**/*.webm
+
+# Generated TensorRT models
+models/*.engine

@@ -5,9 +5,10 @@ PyYAML>=6.0
 fpdf2>=2.7.0
 ultralytics>=8.3.0
 huggingface_hub>=0.23.0
-# Install CUDA PyTorch separately (recommended for GPU):
-#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
-torch>=2.0.0
-torchvision>=0.15.0
+# Install this matching CUDA pair separately on the RTX training machine:
+#   pip install torch==2.6.0 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cu124
+# Torch and torchvision contain compiled operators and must stay version-matched.
+torch==2.6.0
+torchvision==0.21.0
 tensorboard>=2.14.0
 

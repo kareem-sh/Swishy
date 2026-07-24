@@ -31,9 +31,9 @@
 
 # --- Experiment identity -----------------------------------------------------
 experiment:
-  name: "form_mlp_v1"
+  name: "form_binary_v1"
   # Short description written into TensorBoard / checkpoint metadata.
-  description: "Form-first MLP on exported pose features (rules stay fixed)"
+  description: "Binary acceptable-vs-needs-improvement MLP (rules stay fixed)"
   # TODO: Rename per Salah dataset version when sharing checkpoints.
 
 # --- Reproducibility ---------------------------------------------------------
@@ -80,16 +80,22 @@ data:
   source: "npy"
   # Paths used ONLY when source is csv/npy (created on the training machine).
   train_path: "ml/datasets/data/train.npz"
-  val_path: ""
+  val_path: "ml/datasets/data/val.npz"
   # Must match features.shape[1] from build_features_from_videos.py.
   feature_dim: 33
-  # TODO: Map classes to basketball labels from Salah's labeling scheme
-  #   e.g. 0=excellent, 1=good, 2=fair, 3=poor, 4=error_cluster
-  num_classes: 5
+  # Binary form target: 0=acceptable/correct, 1=needs improvement.
+  # made/missed remains optional metadata and never defines this label.
+  num_classes: 2
   # How many fake samples for the smoke test (ignored for real data).
   synthetic_num_samples: 1000
   # Fraction of data held out for validation (if no separate val_path).
   validation_split: 0.25
+  # Keep every shot from one source video on one side of the split.
+  split_strategy: "group_by_video"
+  # Fit mean/std on training rows only; reuse them for val and inference.
+  normalize_features: true
+  # Automatic splitting needs enough examples for both sides.
+  min_samples_per_class: 2
   # Workers load batches in parallel. On Windows, start with 0.
   # Linux + RTX 3070: 4 is a good default.
   num_workers: 0
@@ -109,8 +115,8 @@ model:
   # Number of Linear->BN->ReLU->Dropout blocks before the final classifier.
   # Architecture: Input -> [block] x num_hidden_layers -> Output
   num_hidden_layers: 2
-  # Output units = number of shot-quality classes.
-  output_size: 5
+  # Output units: acceptable/correct vs needs improvement.
+  output_size: 2
   # Probability of zeroing a hidden unit during training (regularization).
   # 0.3 is a classic starting point for small MLPs.
   # TODO: Sweep dropout in {0.1, 0.3, 0.5} during HPO.
@@ -137,7 +143,9 @@ training:
   early_stopping_patience: 10
   # Which validation metric decides "best" model: accuracy | f1_macro | loss
   # For loss, lower is better; for accuracy/f1, higher is better.
-  early_stopping_metric: "accuracy"
+  early_stopping_metric: "f1_macro"
+  # Compensate for moderate residual imbalance; not a substitute for data.
+  class_weighting: "balanced"
   # Print / log every N training batches (1 = every batch; noisy for large sets).
   log_every_n_steps: 1
 
