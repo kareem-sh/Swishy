@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "swishy"
+version = "0.1.0"
+description = "AI basketball shooting form analysis"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "mediapipe>=0.10.9",
+    "opencv-python>=4.8.0",
+    "numpy>=1.24.0",
+    "PyYAML>=6.0",
+    "fpdf2>=2.7.0",
+    "ultralytics>=8.3.0",
+    "huggingface_hub>=0.23.0",
+]
+
+[project.scripts]
+swishy-analyze = "scripts.analyze_video:main"
+
+[tool.setuptools]
+py-modules = ["pipeline", "main"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = [
+    "analysis*",
+    "angles*",
+    "ball*",
+    "config*",
+    "feedback*",
+    "filters*",
+    "geometry*",
+    "modes*",
+    "phase_detection*",
+    "physics*",
+    "pose*",
+    "utils*",
+    "visualization*",
+]
+
+[tool.setuptools.package-data]
+config = ["*.yaml"]
+"*" = ["*.yaml"]

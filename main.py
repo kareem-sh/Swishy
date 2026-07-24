@@ -31,7 +31,7 @@ elif MODE == "image":
 
 elif MODE == "video":
 
-    result = run_video_mode("assets/videos/MikeDunnBasketballShooting2.mov")
+    result = run_video_mode("assets/videos/video_07_side_jump_shot.mp4")
     print(result)
 else:
 

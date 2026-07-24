@@ -54,6 +54,7 @@ def shot_summary_to_dict(
     shot_end_time_ms: int = 2500,
     shot_type: str = "jump_shot",
     court_location: str = "right_wing_three_point_line",
+    is_placeholder: bool = True,
 ) -> dict:
     """Convert one shot summary into a JSON-compatible dictionary."""
     saved_at = datetime.now()
@@ -91,7 +92,7 @@ def shot_summary_to_dict(
             "end_time_ms": shot_end_time_ms,
             "shot_type": shot_type,
             "court_location": court_location,
-            "is_placeholder": True,
+            "is_placeholder": is_placeholder,
         },
         "saved_at": saved_at.isoformat(timespec="milliseconds"),
     }
@@ -132,14 +133,26 @@ def save_shot_summary_json(
     return payload
 
 
+def detailed_shot_to_dict(
+    detailed_shot,
+    *,
+    shot_type: str = "jump_shot",
+    court_location: str = "right_wing_three_point_line",
+) -> dict:
+    """Convert a DetailedShotReport into a JSON-compatible shot dictionary."""
+    return shot_summary_to_dict(
+        summary=detailed_shot.summary,
+        shot_start_time_ms=detailed_shot.start_timestamp_ms,
+        shot_end_time_ms=detailed_shot.end_timestamp_ms,
+        shot_type=shot_type,
+        court_location=court_location,
+        is_placeholder=False,
+    )
+
+
 def session_report_to_dict(report) -> dict:
     """Convert a completed video/session report, including every shot, to JSON data."""
-    shots = [
-        shot_summary_to_dict(
-            summary=shot.summary,
-        )
-        for shot in report.shots
-    ]
+    shots = [detailed_shot_to_dict(shot) for shot in report.shots]
 
     return {
         "session_id": report.session_id,
@@ -156,3 +169,14 @@ def session_report_to_dict(report) -> dict:
         "session_notes": list(report.session_notes),
         "shots": shots,
     }
+
+
+def save_session_report_json(report, output_path: str | Path) -> Path:
+    """Persist a full session report as JSON."""
+    path = Path(output_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(session_report_to_dict(report), indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    return path
