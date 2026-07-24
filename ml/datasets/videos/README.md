@@ -22,16 +22,16 @@ ml/datasets/videos/
 ```csv
 video_path,shot_index,class_id,made,has_hoop,notes
 train/player_a_01.mp4,0,0,1,1,excellent form and made
-train/player_a_01.mp4,1,3,,0,poor release — no hoop in frame
-train/player_a_02.mp4,*,1,,,all shots in this clip share class 1
-assets/videos/video_07_side_jump_shot.mp4,*,1,,,repo path also works
+train/player_a_01.mp4,1,1,,0,poor release — no hoop in frame
+train/player_a_02.mp4,*,1,,,all shots in this clip need improvement
+assets/videos/video_07_side_jump_shot.mp4,*,0,,,repo path also works
 ```
 
 | Column | Required | Meaning |
 |--------|----------|---------|
 | `video_path` | yes | Relative to this folder, repo root, or absolute |
 | `shot_index` | yes | `0` = first shot, or `*` / `-1` = every shot |
-| `class_id` | yes | Form: 0 excellent … 4 major error |
+| `class_id` | yes | Binary form: `0` acceptable/correct, `1` needs improvement |
 | `made` | no | `1` / `0` / blank if unknown |
 | `has_hoop` | no | `1` / `0` / blank |
 | `notes` | no | Free text |
@@ -61,3 +61,4 @@ tensorboard --logdir ml/tensorboard
 2. Training target is **form** (`class_id`), not make/miss.
 3. Do **not** commit large `.mp4` files to git.
 4. The rule engine in `analysis/` is **not** modified by training.
+5. Keep each class in at least two different videos so grouped validation works.

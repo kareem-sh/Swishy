@@ -2,17 +2,26 @@
 
 from __future__ import annotations
 
+import json
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+import numpy as np
 import torch
 from torch import nn
 
-from ml.datasets import FeatureDataset, make_synthetic_arrays
+from ml.datasets import (
+    FeatureDataset,
+    fit_feature_normalization,
+    make_dataloaders,
+    make_synthetic_arrays,
+    normalize_features,
+)
 from ml.models import ShotQualityMLP, build_model_from_config
 from ml.training.checkpointing import load_checkpoint, save_checkpoint
 from ml.training.optim import build_optimizer
@@ -84,9 +93,11 @@ def test_checkpoint_roundtrip(tmp_path: Path | None = None) -> None:
         epoch=1,
         best_metric=0.5,
         config=config,
+        extra={"feature_normalization": {"mean": [0.0], "std": [1.0]}},
     )
     model2 = build_model_from_config(config)
-    load_checkpoint(out, model=model2, map_location="cpu")
+    checkpoint = load_checkpoint(out, model=model2, map_location="cpu")
+    assert checkpoint["feature_normalization"]["std"] == [1.0]
     for a, b in zip(model.parameters(), model2.parameters()):
         assert torch.allclose(a, b)
     out.unlink(missing_ok=True)
@@ -109,6 +120,46 @@ def test_inference_softmax() -> None:
     assert torch.allclose(probs.sum(dim=1), torch.ones(3), atol=1e-5)
 
 
+def test_feature_normalization_uses_training_statistics() -> None:
+    features = torch.tensor([[1.0, 10.0], [3.0, 14.0], [5.0, 18.0]])
+    stats = fit_feature_normalization(features)
+    normalized = normalize_features(features, stats)
+    assert torch.allclose(normalized.mean(dim=0), torch.zeros(2), atol=1e-6)
+    assert torch.allclose(
+        normalized.std(dim=0, unbiased=False),
+        torch.ones(2),
+        atol=1e-6,
+    )
+
+
+def test_grouped_split_has_no_video_leakage() -> None:
+    config = load_train_config()
+    rng = np.random.default_rng(4)
+    features = rng.normal(size=(16, 33)).astype(np.float32)
+    labels = np.asarray([0] * 4 + [1] * 4 + [0] * 4 + [1] * 4, dtype=np.int64)
+    videos = ["good_a.mp4"] * 4 + ["bad_a.mp4"] * 4
+    videos += ["good_b.mp4"] * 4 + ["bad_b.mp4"] * 4
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        path = Path(temp_dir) / "train.npz"
+        np.savez_compressed(path, features=features, labels=labels)
+        path.with_suffix(".meta.json").write_text(
+            json.dumps({"shots": [{"video": video} for video in videos]}),
+            encoding="utf-8",
+        )
+        config["data"]["source"] = "npy"
+        config["data"]["train_path"] = str(path)
+        config["data"]["val_path"] = ""
+        config["data"]["validation_split"] = 0.5
+        train_loader, val_loader, train_ds, val_ds = make_dataloaders(config)
+
+    assert set(train_ds.groups or ()).isdisjoint(set(val_ds.groups or ()))
+    assert set(train_ds.labels.tolist()) == {0, 1}
+    assert set(val_ds.labels.tolist()) == {0, 1}
+    assert getattr(train_loader, "normalization_stats") is not None
+    assert getattr(val_loader, "normalization_stats") is not None
+
+
 if __name__ == "__main__":
     test_config_loads_and_validates()
     test_synthetic_dataset_shapes()
@@ -117,4 +168,6 @@ if __name__ == "__main__":
     test_checkpoint_roundtrip()
     test_device_resolution()
     test_inference_softmax()
+    test_feature_normalization_uses_training_statistics()
+    test_grouped_split_has_no_video_leakage()
     print("All ml/tests/test_ml_core.py checks passed.")

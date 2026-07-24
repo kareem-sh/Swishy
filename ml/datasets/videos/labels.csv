@@ -1,5 +1,10 @@
 video_path,shot_index,class_id,made,has_hoop,notes
-assets/videos/video_07_side_jump_shot.mp4,*,1,,,side jump shot demo
-assets/videos/video_03_expert_score.mp4,*,0,,,expert score demo
-assets/videos/video_04_shooting_alone.mp4,*,2,,,shooting alone demo
-assets/videos/video_01_free_throw.mp4,*,1,,,free throw demo
+train/Darryn Peterson.mp4,*,1,1,1,excellent form — hoop visible made
+train/Stephen Curry.mp4,*,0,1,1,excellent form — hoop visible made
+train/MikeDunnBasketballShooting2.mov,*,0,1,1,excellent form — hoop visible made
+train/StephonCurryShooting.mov,*,0,1,1,excellent form — hoop visible made
+train/KevinDurantShooting.mov,*,0,1,1,excellent form — hoop visible made
+train/KevinDurantShooting2.mov,*,0,1,1,excellent form — hoop visible made
+train/one_score_one_miss.mp4,*,1,,1,fair form but missed
+train/two_score_three_miss.mp4,*,1,,1,fair form but missed
+train/two_score_two_miss.mp4,*,1,,1,fair form but missed

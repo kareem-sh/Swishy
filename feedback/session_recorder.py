@@ -7,7 +7,9 @@ from uuid import uuid4
 
 import numpy as np
 
+
 from feedback.console import print_shot_summary
+from feedback.console import save_shot_summary_json
 from feedback.frame_capture import KeyFrameCapture
 from feedback.models import ShotSummary
 from feedback.report_builder import build_detailed_shot_report, build_session_report
@@ -135,6 +137,7 @@ class SessionRecorder:
             orphan = pipeline.finalize_session()
             if orphan is not None:
                 print_shot_summary(orphan)
+                save_shot_summary_json(orphan)
                 self._finish_shot(orphan)
 
         report = build_session_report(

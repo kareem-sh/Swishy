@@ -33,6 +33,7 @@ from ml.evaluation.metrics import classification_scores
 from ml.models import build_model_from_config
 from ml.training.checkpointing import (
     load_checkpoint,
+    load_checkpoint_payload,
     resolve_checkpoint_dir,
     save_checkpoint,
 )
@@ -92,28 +93,54 @@ def main() -> int:
     print(format_device_report(info))
     device = info.device
 
-    train_loader, val_loader, _, _ = make_dataloaders(config)
+    ckpt_dir = resolve_checkpoint_dir(config)
+    best_path = ckpt_dir / str(config["checkpoint"]["best_filename"])
+    last_path = ckpt_dir / str(config["checkpoint"]["last_filename"])
+    resume_requested = bool(config["checkpoint"].get("resume", False))
+    resume_preview = (
+        load_checkpoint_payload(last_path, map_location="cpu")
+        if resume_requested and last_path.is_file()
+        else None
+    )
+    saved_normalization = (
+        resume_preview.get("feature_normalization")
+        if resume_preview is not None
+        else None
+    )
+
+    train_loader, val_loader, train_ds, _ = make_dataloaders(
+        config,
+        normalization_stats=saved_normalization,
+    )
     model = build_model_from_config(config).to(device)
     print(format_parameter_report(model))
     print(model)
 
-    criterion = nn.CrossEntropyLoss()
+    num_classes = int(config["data"]["num_classes"])
+    weighting = str(config["training"].get("class_weighting", "none")).lower()
+    if weighting == "balanced":
+        counts = torch.bincount(train_ds.labels, minlength=num_classes).float()
+        weights = counts.sum() / (num_classes * counts)
+        weights = weights.to(device)
+        print(f"Class counts:  {[int(value) for value in counts.tolist()]}")
+        print(f"Class weights: {[round(float(value), 4) for value in weights.tolist()]}")
+        criterion = nn.CrossEntropyLoss(weight=weights)
+    elif weighting in {"none", "off", ""}:
+        criterion = nn.CrossEntropyLoss()
+    else:
+        raise ValueError("training.class_weighting must be balanced or none")
     optimizer = build_optimizer(model, config)
     scheduler, scheduler_name = build_scheduler(optimizer, config)
 
     use_amp = bool(config["training"]["mixed_precision"]) and device.type == "cuda"
     scaler = GradScaler("cuda", enabled=use_amp)
 
-    ckpt_dir = resolve_checkpoint_dir(config)
-    best_path = ckpt_dir / str(config["checkpoint"]["best_filename"])
-    last_path = ckpt_dir / str(config["checkpoint"]["last_filename"])
-
     start_epoch = 1
     early_metric_name = str(config["training"]["early_stopping_metric"])
     best_metric = float("inf") if early_metric_name == "loss" else float("-inf")
     epochs_without_improve = 0
 
-    if bool(config["checkpoint"].get("resume", False)) and last_path.is_file():
+    if resume_requested and last_path.is_file():
         print(f"Resuming from {last_path}")
         ckpt = load_checkpoint(
             last_path,
@@ -139,7 +166,7 @@ def main() -> int:
     patience = int(config["training"]["early_stopping_patience"])
     grad_clip = float(config["training"]["gradient_clip"])
     log_every = int(config["training"].get("log_every_n_steps", 10))
-    num_classes = int(config["data"]["num_classes"])
+    normalization_stats = getattr(train_loader, "normalization_stats", None)
 
     for epoch in range(start_epoch, max_epochs + 1):
         print(f"\nEpoch {epoch}/{max_epochs}")
@@ -165,9 +192,11 @@ def main() -> int:
         scores = classification_scores(val_labels, val_preds, num_classes)
         f1_macro = float(scores["f1_macro"])
 
+        candidate = _metric_value(early_metric_name, val_metrics, f1_macro)
+
         if scheduler is not None:
             if scheduler_name == "plateau":
-                scheduler.step(scores["accuracy"])
+                scheduler.step(candidate)
             else:
                 scheduler.step()
 
@@ -185,7 +214,6 @@ def main() -> int:
         writer.add_scalar("f1/val_macro", f1_macro, epoch)
         writer.add_scalar("lr", lr, epoch)
 
-        candidate = _metric_value(early_metric_name, val_metrics, f1_macro)
         improved = _is_improvement(early_metric_name, candidate, best_metric)
 
         if bool(config["checkpoint"].get("save_last", True)):
@@ -198,6 +226,7 @@ def main() -> int:
                 best_metric=best_metric if not improved else candidate,
                 config=config,
                 scaler=scaler,
+                extra={"feature_normalization": normalization_stats},
             )
 
         if improved:
@@ -213,6 +242,7 @@ def main() -> int:
                     best_metric=best_metric,
                     config=config,
                     scaler=scaler,
+                    extra={"feature_normalization": normalization_stats},
                 )
                 print(f"  saved best checkpoint -> {best_path}")
         else:

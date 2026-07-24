@@ -281,6 +281,23 @@ def validate_train_config(
             f"data.validation_split must be in [0.0, 1.0), got {split}."
         )
 
+    split_strategy = str(data.get("split_strategy", "random")).lower()
+    if split_strategy not in {"random", "group_by_video"}:
+        raise ValueError(
+            "data.split_strategy must be random | group_by_video, "
+            f"got '{split_strategy}'."
+        )
+
+    if int(data.get("min_samples_per_class", 2)) < 1:
+        raise ValueError("data.min_samples_per_class must be >= 1.")
+
+    weighting = str(training.get("class_weighting", "none")).lower()
+    if weighting not in {"none", "off", "", "balanced"}:
+        raise ValueError(
+            "training.class_weighting must be balanced | none, "
+            f"got '{weighting}'."
+        )
+
     metric = str(training["early_stopping_metric"]).lower()
     if metric not in {"accuracy", "f1_macro", "loss"}:
         raise ValueError(
@@ -342,6 +359,10 @@ def summarize_config(config: Mapping[str, Any]) -> str:
         f"dropout:        {config['model']['dropout']}",
         f"epochs:         {config['training']['epochs']}",
         f"batch_size:     {config['training']['batch_size']}",
+        f"split:          {config['data'].get('split_strategy', 'random')}",
+        f"normalize:      {config['data'].get('normalize_features', True)}",
+        f"early metric:   {config['training']['early_stopping_metric']}",
+        f"class weights:  {config['training'].get('class_weighting', 'none')}",
         f"lr:             {config['optimizer']['learning_rate']}",
         f"weight_decay:   {config['optimizer']['weight_decay']}",
         f"scheduler:      {config['scheduler']['name']}",

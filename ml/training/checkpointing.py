@@ -84,11 +84,7 @@ def load_checkpoint(
 
     ``map_location`` lets Salah load a CUDA-trained checkpoint on CPU.
     """
-    path = Path(path)
-    if not path.is_file():
-        raise FileNotFoundError(f"Checkpoint not found: {path}")
-
-    checkpoint = torch.load(path, map_location=map_location, weights_only=False)
+    checkpoint = load_checkpoint_payload(path, map_location=map_location)
     model.load_state_dict(checkpoint["model_state_dict"])
 
     if optimizer is not None and checkpoint.get("optimizer_state_dict") is not None:
@@ -98,4 +94,19 @@ def load_checkpoint(
     if scaler is not None and checkpoint.get("scaler_state_dict") is not None:
         scaler.load_state_dict(checkpoint["scaler_state_dict"])
 
+    return checkpoint
+
+
+def load_checkpoint_payload(
+    path: str | Path,
+    *,
+    map_location: str | torch.device = "cpu",
+) -> dict[str, Any]:
+    """Read checkpoint metadata/state without constructing a model."""
+    path = Path(path)
+    if not path.is_file():
+        raise FileNotFoundError(f"Checkpoint not found: {path}")
+    checkpoint = torch.load(path, map_location=map_location, weights_only=False)
+    if not isinstance(checkpoint, dict):
+        raise ValueError(f"Checkpoint payload must be a dictionary: {path}")
     return checkpoint

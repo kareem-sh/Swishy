@@ -1,7 +1,7 @@
 # Detailed report generation settings
 
 max_key_frames_per_shot: 12
-store_frame_images_during_shot: true
+store_frame_images_during_shot: false
 
 # Phases that always get a key frame captured (first occurrence)
 priority_phases:

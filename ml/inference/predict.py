@@ -35,6 +35,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
+from ml.datasets.feature_dataset import normalize_features
 from ml.models import ShotQualityMLP, build_model_from_config
 from ml.training.checkpointing import load_checkpoint
 from ml.utils.config import get_repo_root, load_train_config
@@ -56,7 +57,8 @@ def load_model_for_inference(
     path = Path(ckpt)
     if not path.is_absolute():
         path = get_repo_root() / path
-    load_checkpoint(path, model=model, map_location=device)
+    checkpoint = load_checkpoint(path, model=model, map_location=device)
+    model.feature_normalization = checkpoint.get("feature_normalization")
     model.eval()
     temperature = float(config["inference"].get("temperature", 1.0))
     if temperature <= 0:
@@ -90,6 +92,10 @@ def predict_proba(
         tensor = tensor.unsqueeze(0)  # (F,) → (1, F)
     if tensor.ndim != 2:
         raise ValueError(f"features must be (F,) or (B, F), got {tuple(tensor.shape)}")
+
+    normalization = getattr(model, "feature_normalization", None)
+    if normalization is not None:
+        tensor = normalize_features(tensor, normalization)
 
     tensor = tensor.to(device)
     logits = model(tensor) / temperature

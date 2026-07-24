@@ -64,10 +64,11 @@ def build_scheduler(
             "step",
         )
     if name == "plateau":
+        metric_name = str(config["training"].get("early_stopping_metric", "accuracy")).lower()
         return (
             ReduceLROnPlateau(
                 optimizer,
-                mode="max",
+                mode="min" if metric_name == "loss" else "max",
                 factor=float(sch_cfg.get("plateau_factor", 0.5)),
                 patience=int(sch_cfg.get("plateau_patience", 3)),
             ),

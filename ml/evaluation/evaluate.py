@@ -52,7 +52,6 @@ def main() -> int:
     print(format_device_report(info))
     device = info.device
 
-    _, val_loader, _, _ = make_dataloaders(config)
     model = build_model_from_config(config).to(device)
 
     ckpt = args.checkpoint or config["evaluation"]["checkpoint_path"]
@@ -60,8 +59,13 @@ def main() -> int:
     if not ckpt_path.is_absolute():
         ckpt_path = get_repo_root() / ckpt_path
 
-    load_checkpoint(ckpt_path, model=model, map_location=device)
+    checkpoint = load_checkpoint(ckpt_path, model=model, map_location=device)
     print(f"Loaded checkpoint: {ckpt_path}")
+
+    _, val_loader, _, _ = make_dataloaders(
+        config,
+        normalization_stats=checkpoint.get("feature_normalization"),
+    )
 
     criterion = nn.CrossEntropyLoss()
     use_amp = bool(config["training"]["mixed_precision"]) and device.type == "cuda"

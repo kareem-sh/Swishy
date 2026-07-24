@@ -35,7 +35,7 @@ tensorboard --logdir ml/tensorboard
 You will:
 
 1. Put jump-shot videos under `ml/datasets/videos/train/` (hoop **not** required).
-2. Label **form quality** in `labels.csv` (`class_id` 0–4). Optional: `made`, `has_hoop`.
+2. Label **form quality** in `labels.csv` (`0` acceptable/correct, `1` needs improvement). Optional: `made`, `has_hoop`.
 3. Export features → `train.npz`.
 4. Train the form MLP (`python -m ml.training.train`).
 5. Watch TensorBoard; later Karim compares MLP vs rule engine on a holdout set.
@@ -169,18 +169,15 @@ Absolute paths on an external drive are fine in `labels.csv`.
 |--------|-----------|---------|
 | `video_path` | yes | Path to MP4 |
 | `shot_index` | yes | `0`, `1`, … or `*` = all shots in file |
-| `class_id` | yes | Form quality 0–4 |
+| `class_id` | yes | Binary form quality: 0 or 1 |
 | `made` | no | `1` / `0` if you can see make/miss |
 | `has_hoop` | no | `1` / `0` |
 | `notes` | no | Free text |
 
 | class_id | meaning |
 |----------|---------|
-| 0 | excellent |
-| 1 | good |
-| 2 | fair |
-| 3 | poor |
-| 4 | major error / incomplete capture |
+| 0 | acceptable/correct form |
+| 1 | form needs improvement |
 
 ---
 
@@ -218,10 +215,10 @@ data:
   source: npy
   train_path: ml/datasets/data/train.npz
   feature_dim: 33
-  num_classes: 5
+  num_classes: 2
 model:
   input_size: 33
-  output_size: 5
+  output_size: 2
 ```
 
 After export, confirm `feature_dim` matches the printed `feature_dim` (should be 33).

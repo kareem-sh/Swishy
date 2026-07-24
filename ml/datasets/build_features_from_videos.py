@@ -195,11 +195,17 @@ def load_labels(labels_path: Path) -> List[LabelRow]:
             video_path = (row.get("video_path") or "").strip()
             if not video_path or video_path.startswith("#"):
                 continue
+            class_id = int(row["class_id"])
+            if class_id not in (0, 1):
+                raise ValueError(
+                    f"Binary form training requires class_id 0 or 1, got "
+                    f"{class_id} on CSV line {reader.line_num}."
+                )
             rows.append(
                 LabelRow(
                     video_path=video_path,
                     shot_index=_parse_shot_index(row.get("shot_index", "*")),
-                    class_id=int(row["class_id"]),
+                    class_id=class_id,
                     notes=(row.get("notes") or "").strip(),
                     made=_parse_optional_01(row.get("made")),
                     has_hoop=_parse_optional_01(row.get("has_hoop")),
@@ -218,18 +224,8 @@ def group_labels_by_video(rows: Sequence[LabelRow]) -> Dict[str, List[LabelRow]]
 
 
 def score_to_class(score: Optional[int]) -> int:
-    """Bootstrap labels from the rule-engine score (0-100)."""
-    if score is None:
-        return 4
-    if score >= 85:
-        return 0
-    if score >= 70:
-        return 1
-    if score >= 55:
-        return 2
-    if score >= 40:
-        return 3
-    return 4
+    """Bootstrap binary labels from rule score (human review is preferred)."""
+    return 0 if score is not None and score >= 70 else 1
 
 
 def _angle_degrees(angles: dict, name: str) -> float:

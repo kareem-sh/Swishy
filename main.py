@@ -1,6 +1,7 @@
 from modes.live_stream import run_live_stream
 from modes.image_mode import run_image_mode
 from modes.video_mode import run_video_mode
+import pipeline
 
 
 # ==================================
@@ -30,8 +31,8 @@ elif MODE == "image":
 
 elif MODE == "video":
 
-    run_video_mode("assets/videos/video_07_side_jump_shot.mp4")
-
+    result = run_video_mode("assets/videos/MikeDunnBasketballShooting2.mov")
+    print(result)
 else:
 
     print("Invalid mode selected.")
