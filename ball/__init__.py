@@ -12,6 +12,12 @@ from ball.models import (
 )
 from ball.outcome import OutcomeClassifier
 from ball.release_sync import ReleaseSync
+from ball.shot_state_machine import (
+    BallShotState,
+    BallShotStateMachine,
+    BallStateUpdate,
+    BallTrackingStatus,
+)
 from ball.timeseries import BallTimeSeriesBuffer
 from ball.tracker import BallTracker
 from ball.trajectory import TrajectoryAnalyzer
@@ -21,6 +27,10 @@ __all__ = [
     "BallDetection",
     "BallDetector",
     "BallSnapshot",
+    "BallShotState",
+    "BallShotStateMachine",
+    "BallStateUpdate",
+    "BallTrackingStatus",
     "BallTimeSeriesBuffer",
     "BallTracker",
     "BallTrajectory",

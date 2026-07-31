@@ -1,9 +1,14 @@
 """Shot scoring and coaching feedback data models."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 
 from analysis.models import RuleResult
+
+if TYPE_CHECKING:
+    from ball.models import ShotOutcome
 
 
 @dataclass
@@ -26,6 +31,7 @@ class ShotSummary:
     next_rep_focus: List[str] = field(default_factory=list)
     practice_drills: List[str] = field(default_factory=list)
     performance_actions: List[str] = field(default_factory=list)
+    outcome: Optional["ShotOutcome"] = None
 
     @property
     def grade(self) -> str:

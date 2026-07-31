@@ -86,7 +86,6 @@ def run_video_mode(video_path: str) -> dict | None:
 
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         timestamp_ms = frame_timestamp_ms(frame_index, fps)
-
         result = detector.detect_video_frame(rgb_frame, timestamp_ms)
         h, w, _ = frame.shape
         frame_result = pipeline.process_frame(

@@ -1,0 +1,4 @@
+# MediaPipe pose acceleration.
+# auto tries the GPU delegate first and falls back to CPU when the installed
+# MediaPipe package was not compiled with GPU support.
+device: auto  # auto | cpu | gpu

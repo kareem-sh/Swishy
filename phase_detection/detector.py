@@ -91,7 +91,7 @@ class ShotPhaseDetector:
 
     def _evaluate_transition(self, f: KinematicFeatures) -> Optional[str]:
         t = self._t
-
+    
         if self.phase == "ready_stance":
             wrist_below_shoulder = f.wrist_y < f.shoulder_y + t("loading_wrist_below_shoulder", 0.05)
             wrist_at_chest = f.wrist_y < f.hip_y_avg + t("loading_wrist_chest_offset", 0.35)

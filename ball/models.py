@@ -104,6 +104,7 @@ class ShotOutcome:
     release_frame: Optional[int] = None
     release_timestamp_ms: Optional[int] = None
     entry_frame: Optional[int] = None
+    outcome_timestamp_ms: Optional[int] = None
     trajectory_apex_frame: Optional[int] = None
     evidence: List[str] = field(default_factory=list)
     timeseries_summary: Dict = field(default_factory=dict)

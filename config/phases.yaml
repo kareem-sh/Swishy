@@ -1,8 +1,8 @@
 # Phase detection thresholds for jump-shot FSM.
 # Tune these per camera distance and frame rate.
 
-hysteresis_frames: 5  # consecutive frames required to confirm a phase change
-min_dwell_frames: 3   # minimum frames to hold a phase before allowing exit
+hysteresis_frames: 2  # consecutive frames required to confirm a phase change
+min_dwell_frames: 2   # minimum frames to hold a phase before allowing exit
 
 thresholds:
   # ready_stance -> loading
@@ -39,7 +39,7 @@ thresholds:
 
   # follow_through -> landing
   landing_ankle_tolerance: 0.04
-  landing_ankle_velocity_max: 0.01
+  landing_ankle_velocity_max: 0.03
 
   # landing -> ready_stance
-  ready_max_velocity: 0.15             # m/s avg landmark speed
+  ready_max_velocity: 0.2            # m/s avg landmark speed

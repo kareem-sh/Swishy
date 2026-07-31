@@ -66,7 +66,7 @@ class AngleCalculator:
         world_landmarks: Dict[str, dict],
         shooting_side: str = "right",
     ) -> Dict[str, AngleResult]:
-        """
+        """ 
         Compute all joint angles for the given shooting side plus trunk.
 
         shooting_side: 'left' or 'right' — determines which limb chain to prioritize.

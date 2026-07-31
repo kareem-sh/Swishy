@@ -14,6 +14,11 @@ def print_shot_summary(summary: ShotSummary):
     print("=" * 50)
     print(f"  Rules: {summary.passed_count}/{summary.total_count} passed")
 
+    if summary.outcome is not None:
+        result = summary.outcome.result.upper()
+        confidence = summary.outcome.confidence
+        print(f"  Basket: {result} ({confidence:.0%} confidence)")
+
     if summary.capture_note:
         print(f"\n  Capture: {summary.capture_note}")
 
@@ -54,9 +59,11 @@ def shot_summary_to_dict(
     shot_end_time_ms: int = 2500,
     shot_type: str = "jump_shot",
     court_location: str = "right_wing_three_point_line",
+    is_placeholder: bool = True,
 ) -> dict:
     """Convert one shot summary into a JSON-compatible dictionary."""
     saved_at = datetime.now()
+    outcome = summary.outcome
     return {
         "shot_number": summary.shot_number,
         "grade": summary.grade,
@@ -86,12 +93,35 @@ def shot_summary_to_dict(
         ],
         "practice_drills": list(summary.practice_drills),
         "coaching_tips": list(summary.coaching_tips),
+        "outcome": {
+            "result": outcome.result,
+            "is_basket": outcome.result == "made",
+            "confidence": outcome.confidence,
+            "release_frame": outcome.release_frame,
+            "release_timestamp_ms": outcome.release_timestamp_ms,
+            "entry_frame": outcome.entry_frame,
+            "outcome_timestamp_ms": outcome.outcome_timestamp_ms,
+            "trajectory_apex_frame": outcome.trajectory_apex_frame,
+            "evidence": list(outcome.evidence),
+            "timeseries_summary": dict(outcome.timeseries_summary),
+        } if outcome is not None else {
+            "result": "unknown",
+            "is_basket": False,
+            "confidence": 0.0,
+            "release_frame": None,
+            "release_timestamp_ms": None,
+            "entry_frame": None,
+            "outcome_timestamp_ms": None,
+            "trajectory_apex_frame": None,
+            "evidence": ["No ball outcome available"],
+            "timeseries_summary": {},
+        },
         "shot_metadata": {
             "start_time_ms": shot_start_time_ms,
             "end_time_ms": shot_end_time_ms,
             "shot_type": shot_type,
             "court_location": court_location,
-            "is_placeholder": True,
+            "is_placeholder": is_placeholder,
         },
         "saved_at": saved_at.isoformat(timespec="milliseconds"),
     }
@@ -132,14 +162,26 @@ def save_shot_summary_json(
     return payload
 
 
+def detailed_shot_to_dict(
+    detailed_shot,
+    *,
+    shot_type: str = "jump_shot",
+    court_location: str = "right_wing_three_point_line",
+) -> dict:
+    """Convert a DetailedShotReport into a JSON-compatible shot dictionary."""
+    return shot_summary_to_dict(
+        summary=detailed_shot.summary,
+        shot_start_time_ms=detailed_shot.start_timestamp_ms,
+        shot_end_time_ms=detailed_shot.end_timestamp_ms,
+        shot_type=shot_type,
+        court_location=court_location,
+        is_placeholder=False,
+    )
+
+
 def session_report_to_dict(report) -> dict:
     """Convert a completed video/session report, including every shot, to JSON data."""
-    shots = [
-        shot_summary_to_dict(
-            summary=shot.summary,
-        )
-        for shot in report.shots
-    ]
+    shots = [detailed_shot_to_dict(shot) for shot in report.shots]
 
     return {
         "session_id": report.session_id,
@@ -156,3 +198,14 @@ def session_report_to_dict(report) -> dict:
         "session_notes": list(report.session_notes),
         "shots": shots,
     }
+
+
+def save_session_report_json(report, output_path: str | Path) -> Path:
+    """Persist a full session report as JSON."""
+    path = Path(output_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(session_report_to_dict(report), indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    return path

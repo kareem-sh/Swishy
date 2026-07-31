@@ -28,7 +28,9 @@ POSE_CONNECTIONS = [
 
 # BGR colors on an RGB canvas (OpenCV draw calls before RGB→BGR convert in modes)
 _BALL_COLOR = (255, 140, 0)   # orange-ish in RGB
+_PREDICTED_BALL_COLOR = (255, 220, 0)
 _RIM_COLOR = (0, 220, 80)     # green in RGB
+_RIM_GEOMETRY_COLOR = (70, 150, 255)
 _SHOW_BALL_OVERLAY = bool(load_yaml("display.yaml").get("show_ball_overlay", True))
 
 
@@ -66,6 +68,54 @@ def _draw_ball_rim(annotated: np.ndarray, frame_result: FrameResult) -> None:
             cv2.LINE_AA,
         )
 
+    rim_center = frame_result.stabilized_rim_center_xy
+    rim_radius = frame_result.stabilized_rim_inner_radius
+    if rim_center is not None and rim_radius is not None:
+        rim_x, rim_y = map(int, rim_center)
+        radius = max(1, int(rim_radius))
+        cv2.line(
+            annotated,
+            (rim_x - radius, rim_y),
+            (rim_x + radius, rim_y),
+            _RIM_GEOMETRY_COLOR,
+            2,
+            cv2.LINE_AA,
+        )
+        cv2.circle(
+            annotated,
+            (rim_x, rim_y),
+            3,
+            _RIM_GEOMETRY_COLOR,
+            -1,
+            cv2.LINE_AA,
+        )
+
+    if frame_result.rim_crossing_xy is not None:
+        crossing = tuple(map(int, frame_result.rim_crossing_xy))
+        crossing_color = (
+            (0, 230, 80)
+            if frame_result.ball_state in ("crossed_inside", "made")
+            else (255, 70, 70)
+        )
+        cv2.circle(annotated, crossing, 7, crossing_color, 2, cv2.LINE_AA)
+
+    state_text = (
+        f"Ball: {frame_result.ball_state.upper()} | "
+        f"{frame_result.ball_tracking_status.upper()}"
+    )
+    if frame_result.shot_outcome is not None:
+        state_text += f" | {frame_result.shot_outcome.result.upper()}"
+    cv2.putText(
+        annotated,
+        state_text,
+        (10, 94),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.52,
+        (255, 255, 255),
+        1,
+        cv2.LINE_AA,
+    )
+
     # Prefer smoothed track center when available
     ball = frame_result.ball
     snap = frame_result.ball_snapshot
@@ -83,7 +133,12 @@ def _draw_ball_rim(annotated: np.ndarray, frame_result: FrameResult) -> None:
 
     cx = int(snap.x) if snap is not None else int(ball.x)
     cy = int(snap.y) if snap is not None else int(ball.y)
-    cv2.circle(annotated, (cx, cy), 5, _BALL_COLOR, -1, cv2.LINE_AA)
+    center_color = (
+        _PREDICTED_BALL_COLOR
+        if frame_result.ball_tracking_status == "predicted"
+        else _BALL_COLOR
+    )
+    cv2.circle(annotated, (cx, cy), 5, center_color, -1, cv2.LINE_AA)
     cv2.putText(
         annotated,
         f"ball {conf:.2f}",

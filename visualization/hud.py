@@ -168,7 +168,7 @@ def _draw_coaching_strip(image, frame_result: FrameResult, w: int, h: int, hud_d
 
 def _draw_shot_summary_card(image, summary: ShotSummary, w: int, h: int):
     card_w = min(460, w - 40)
-    card_h = min(200, 80 + len(summary.coaching_tips[:3]) * 22)
+    card_h = min(230, 102 + len(summary.coaching_tips[:3]) * 22)
     x1 = (w - card_w) // 2
     y1 = h - card_h - 24
     _blend_panel(image, x1, y1, x1 + card_w, y1 + card_h, alpha=0.9)
@@ -186,8 +186,26 @@ def _draw_shot_summary_card(image, summary: ShotSummary, w: int, h: int):
         1,
     )
 
-    _put_line(image, "Coach says:", x1 + 16, y1 + 76, 0.46, (255, 200, 60), 1)
-    y = y1 + 98
+    outcome_text = "UNKNOWN"
+    if summary.outcome is not None:
+        outcome_text = summary.outcome.result.upper()
+    outcome_color = (
+        (80, 220, 120)
+        if outcome_text == "MADE"
+        else (80, 80, 255) if outcome_text == "MISSED" else (0, 180, 255)
+    )
+    _put_line(
+        image,
+        f"Basket: {outcome_text}",
+        x1 + 16,
+        y1 + 76,
+        0.48,
+        outcome_color,
+        1,
+    )
+
+    _put_line(image, "Coach says:", x1 + 16, y1 + 100, 0.46, (255, 200, 60), 1)
+    y = y1 + 122
     for tip in summary.coaching_tips[:3]:
         tip_text = tip if len(tip) <= 58 else tip[:55] + "..."
         _put_line(image, f"- {tip_text}", x1 + 16, y, 0.44, (230, 230, 230), 1)
