@@ -4,8 +4,8 @@ enabled: true
 
 detector:
   backend: yolo
-  # Fine-tuned ball+hoop weights (E-BARD). Future retrain base: yolo26n.pt
-  model_path: models/BODD_yolov8n_0001.engine
+  # Fine-tuned ball+hoop weights (E-BARD). Use .pt on CPU/VPS; .engine needs NVIDIA+TensorRT.
+  model_path: models/BODD_yolov8n_0001.pt
   hf_repo: GabrieleGiudici/E-BARD-detection-models
   hf_file: BODD_yolov8n_0001.pt
 

@@ -12,7 +12,7 @@ import pipeline
 # MODE = "live"
 
 # MODE = "image"
-MODE = "video"   # uses assets/test.mp4 (Mixkit jump-shot clip)
+MODE = "video"   # uses assets/videos/video_07_side_jump_shot.mp4
 
 
 # ==================================
@@ -31,7 +31,7 @@ elif MODE == "image":
 
 elif MODE == "video":
 
-    result = run_video_mode("assets/videos/MikeDunnBasketballShooting2.mov")
+    result = run_video_mode("assets/videos/video_07_side_jump_shot.mp4")
     print(result)
 else:
 

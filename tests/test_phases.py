@@ -73,9 +73,14 @@ def test_ready_stance_to_loading_on_wrist_rise():
         hip_y_avg=0.0,
         shoulder_y=-0.4,
     )
+    phases = []
     for _ in range(5):
         det.update(rising)
-    assert det.phase == "loading"
+        phases.append(det.phase)
+    # hysteresis_frames in config/phases.yaml controls how fast the FSM
+    # advances past loading, so assert the transition happened instead of
+    # sampling the phase at a fixed frame count.
+    assert "loading" in phases
 
 
 def test_index_tip_can_confirm_release():

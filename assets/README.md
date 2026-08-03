@@ -8,7 +8,7 @@ Free media for testing Swichy pose analysis. See also [MANUAL_COMPLETION_GUIDE.m
 
 | File | Source | Shot type / camera | Notes |
 |------|--------|-------------------|-------|
-| [`test.mp4`](test.mp4) | [Mixkit #2280](https://mixkit.co/free-stock-video/couple-playing-basketball-2280/) | **Front-view jump shot** | Default video (~11s slow-mo outdoor three-pointer) |
+| `test.mp4` | [Mixkit #2280](https://mixkit.co/free-stock-video/couple-playing-basketball-2280/) | **Front-view jump shot** | Not bundled — fetch via [Re-download everything](#re-download-everything) (~11s slow-mo outdoor three-pointer) |
 | [`video_01_free_throw.mp4`](videos/video_01_free_throw.mp4) | [Mixkit #2278](https://mixkit.co/free-stock-video/basketball-player-shot-at-goal-2278/) | Free throw (front) | Outdoor free-throw practice (~14s) |
 | [`video_02_one_on_one.mp4`](videos/video_02_one_on_one.mp4) | [Mixkit #44469](https://mixkit.co/free-stock-video/two-basketball-players-playing-one-on-one-44469/) | **Hook / layup** | Indoor one-on-one (~8s) |
 | [`video_03_expert_score.mp4`](videos/video_03_expert_score.mp4) | [Mixkit #44449](https://mixkit.co/free-stock-video/expert-basketball-player-scoring-a-basket-44449/) | **Dunk** | Indoor scoring move (~6s) |
@@ -62,10 +62,10 @@ MODE = "video"
 Examples:
 
 ```python
-# Side-view jump shot (best for biomechanics)
+# Side-view jump shot (default, best for biomechanics)
 run_video_mode("assets/videos/video_07_side_jump_shot.mp4")
 
-# Front-view jump shot (default)
+# Front-view jump shot (requires downloading test.mp4 first)
 run_video_mode("assets/test.mp4")
 ```
 
