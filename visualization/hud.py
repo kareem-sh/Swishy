@@ -1,6 +1,6 @@
 """Organized on-screen HUD panels for live/video overlay."""
 
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 
 import cv2
 import numpy as np

@@ -61,3 +61,7 @@ assets/videos/**/*.webm
 
 # Generated TensorRT models
 models/*.engine
+# Python build artifacts
+*.egg-info/
+build/
+dist/

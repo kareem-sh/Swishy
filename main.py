@@ -1,7 +1,6 @@
 from modes.live_stream import run_live_stream
 from modes.image_mode import run_image_mode
 from modes.video_mode import run_video_mode
-import pipeline
 
 
 # ==================================

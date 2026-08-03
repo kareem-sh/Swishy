@@ -5,7 +5,7 @@ Rules are defined in config/biomechanics.yaml and evaluated only
 during their relevant shot phases.
 """
 
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from analysis.models import AnalysisResult, RuleResult
 from phase_detection.features import KinematicFeatures

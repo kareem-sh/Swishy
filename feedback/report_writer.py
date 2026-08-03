@@ -6,7 +6,7 @@ from typing import Dict
 import cv2
 import numpy as np
 
-from feedback.report_models import DetailedShotReport, SessionReport
+from feedback.report_models import SessionReport
 from feedback.report_pdf import write_session_pdf
 from utils.config_loader import load_yaml
 from visualization.report_frame import annotate_key_frame
@@ -53,8 +53,8 @@ def _render_markdown(report: SessionReport) -> str:
         "",
         "## Session Overview",
         "",
-        f"| Field | Value |",
-        f"|-------|-------|",
+        "| Field | Value |",
+        "|-------|-------|",
         f"| Source | `{report.source_name}` |",
         f"| Type | {report.source_type} |",
         f"| Session ID | `{report.session_id}` |",

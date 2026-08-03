@@ -8,7 +8,6 @@
 | [`angles/calculator.py`](../angles/calculator.py) | **New** — `AngleCalculator` computes joint angles from world landmarks |
 | [`angles/joint_chains.py`](../angles/joint_chains.py) | **New** — Named joint definitions (elbow, knee, hip, shoulder, trunk) |
 | [`pose/landmarks.py`](../pose/landmarks.py) | **New** — `extract_world_landmarks()` reads `pose_world_landmarks` from MediaPipe |
-| [`core/angles.py`](../core/angles.py) | **Deprecated** — old 2D `arctan2` method kept for reference only |
 
 ---
 
@@ -168,7 +167,7 @@ class AngleResult:
 
 1. **Linear algebra refresh:** dot product, vector magnitude, normalization (Khan Academy / 3Blue1Brown)
 2. **Implement by hand:** compute angle between two 3D vectors on paper, verify with `tests/test_angles.py`
-3. **Compare 2D vs 3D:** run old `core/angles.calculate_angle` and new `AngleCalculator` on the same frame — observe the difference at different camera angles
+3. **Compare 2D vs 3D:** contrast an image-plane `arctan2` angle with `AngleCalculator` on the same frame — observe the difference at different camera angles
 4. **Read:** MediaPipe Pose Landmarker documentation for world landmark coordinate system
 5. **Next:** Study `FILTERS.md` — smoothing before angle computation reduces noise amplification
 

@@ -162,8 +162,8 @@ class PhysicsTrajectoryEstimator:
         y_at_hoop = estimate.y0 + estimate.vy0 * t_hoop
         
         # Distance from hoop center
+        # Assumes we are aligned with the hoop on x.
         y_error = abs(y_at_hoop - hoop_y)
-        x_error = 0  # Assumes we're aligned with hoop x
         
         # Entry angle at hoop
         vy_at_hoop = estimate.vy0  # Constant acceleration not fully modeled here

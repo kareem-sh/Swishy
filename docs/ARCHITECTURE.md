@@ -162,5 +162,3 @@ drifting apart.
 
 - [MANUAL_COMPLETION_GUIDE.md](MANUAL_COMPLETION_GUIDE.md) — file map + completion checklist
 - [FUTURE_IMPROVEMENTS.md](FUTURE_IMPROVEMENTS.md) — roadmap after Phase 6
-
-The legacy `core/` package contains thin deprecation shims pointing to new modules.

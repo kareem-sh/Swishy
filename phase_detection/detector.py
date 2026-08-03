@@ -5,7 +5,7 @@ Uses kinematic features + hysteresis to avoid phase flicker.
 Thresholds loaded from config/phases.yaml.
 """
 
-from typing import Dict, Optional
+from typing import Optional
 
 from phase_detection.features import KinematicFeatures
 from phase_detection.phases import PHASE_LABELS, TRANSITIONS

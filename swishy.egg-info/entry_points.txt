@@ -1,2 +1,0 @@
-[console_scripts]
-swishy-analyze = scripts.analyze_video:main

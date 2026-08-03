@@ -14,6 +14,7 @@ from feedback.frame_capture import KeyFrameCapture
 from feedback.models import ShotSummary
 from feedback.report_builder import build_detailed_shot_report, build_session_report
 from feedback.report_models import DetailedShotReport, SessionReport
+from feedback.report_writer import write_session_report
 from feedback.visibility_gaps import VisibilityGapTracker
 from pipeline import FrameResult
 from utils.config_loader import load_yaml
