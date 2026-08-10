@@ -1,4 +1,7 @@
+import logging
 import sys
+
+import utils.quiet  # noqa: F401  — must precede mediapipe; silences native logs
 
 import mediapipe as mp
 
@@ -13,6 +16,11 @@ from config.settings import (
 )
 from utils.config_loader import load_yaml
 
+# Which delegate was selected is diagnostic, not something the player needs to
+# read. It goes to the logger so `-v` can surface it without it living in the
+# coaching output.
+log = logging.getLogger(__name__)
+
 
 class PoseDetector:
     """MediaPipe Pose Landmarker wrapper for image, video, and live stream."""
@@ -21,9 +29,8 @@ class PoseDetector:
         pose_cfg = load_yaml("pose.yaml")
         requested_device = str(pose_cfg.get("device", "auto")).strip().lower()
         if requested_device not in {"auto", "cpu", "gpu"}:
-            print(
-                f"Warning: unknown MediaPipe pose device {requested_device!r}; "
-                "using auto"
+            log.warning(
+                "unknown MediaPipe pose device %r; using auto", requested_device
             )
             requested_device = "auto"
 
@@ -39,12 +46,12 @@ class PoseDetector:
                     python.BaseOptions.Delegate.GPU,
                 )
                 self.device = "gpu"
-                print("MediaPipe pose device: GPU")
+                log.info("MediaPipe pose device: GPU")
                 return
             except (RuntimeError, ValueError, NotImplementedError) as exc:
                 reason = str(exc).splitlines()[0] or type(exc).__name__
-                print(
-                    f"MediaPipe pose GPU unavailable ({reason}); falling back to CPU"
+                log.info(
+                    "MediaPipe pose GPU unavailable (%s); falling back to CPU", reason
                 )
 
         self.landmarker = self._create_landmarker(
@@ -52,7 +59,7 @@ class PoseDetector:
             result_callback,
             python.BaseOptions.Delegate.CPU,
         )
-        print("MediaPipe pose device: CPU")
+        log.info("MediaPipe pose device: CPU")
 
     @staticmethod
     def _create_landmarker(running_mode, result_callback, delegate):

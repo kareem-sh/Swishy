@@ -54,6 +54,14 @@ class _Candidate:
     wrist_min_y: float = float("inf")
     wrist_max_y: float = float("-inf")
     wrist_above_shoulder_max: float = float("-inf")
+    # Image-space equivalents, in body heights. Used when MediaPipe's
+    # visibility gate rejects the world wrist -- in which case `wrist_y` reads
+    # a fabricated 0.0 and the world figures below are all zero, so a real
+    # shot looks like a wrist that never moved.
+    wrist_ratio_min: float = float("inf")
+    wrist_ratio_max: float = float("-inf")
+    wrist_ratio_shoulder_max: float = float("-inf")
+    wrist_world_seen: bool = False
     vertical_displacement_max: float = 0.0
     hip_x_min: float = float("inf")
     hip_x_max: float = float("-inf")
@@ -68,11 +76,20 @@ class _Candidate:
         if f is None:
             return
 
-        self.wrist_min_y = min(self.wrist_min_y, f.wrist_y)
-        self.wrist_max_y = max(self.wrist_max_y, f.wrist_y)
-        self.wrist_above_shoulder_max = max(
-            self.wrist_above_shoulder_max, f.wrist_y - f.shoulder_y
-        )
+        if f.wrist_world_valid:
+            self.wrist_world_seen = True
+            self.wrist_min_y = min(self.wrist_min_y, f.wrist_y)
+            self.wrist_max_y = max(self.wrist_max_y, f.wrist_y)
+            self.wrist_above_shoulder_max = max(
+                self.wrist_above_shoulder_max, f.wrist_y - f.shoulder_y
+            )
+        if f.wrist_height_ratio is not None:
+            self.wrist_ratio_min = min(self.wrist_ratio_min, f.wrist_height_ratio)
+            self.wrist_ratio_max = max(self.wrist_ratio_max, f.wrist_height_ratio)
+        if f.wrist_above_shoulder_ratio is not None:
+            self.wrist_ratio_shoulder_max = max(
+                self.wrist_ratio_shoulder_max, f.wrist_above_shoulder_ratio
+            )
         self.hip_x_min = min(self.hip_x_min, f.hip_x_ratio)
         self.hip_x_max = max(self.hip_x_max, f.hip_x_ratio)
 
@@ -94,6 +111,13 @@ class _Candidate:
         if self.wrist_max_y == float("-inf") or self.wrist_min_y == float("inf"):
             return 0.0
         return self.wrist_max_y - self.wrist_min_y
+
+    @property
+    def wrist_rise_ratio(self) -> float:
+        """How far the wrist travelled, in body heights (image space)."""
+        if self.wrist_ratio_max == float("-inf") or self.wrist_ratio_min == float("inf"):
+            return 0.0
+        return self.wrist_ratio_max - self.wrist_ratio_min
 
     @property
     def horizontal_travel_m(self) -> float:
@@ -127,6 +151,10 @@ class ShotTracker:
         self._min_wrist_rise_m = float(confirm.get("min_wrist_rise_m", 0.18))
         self._min_wrist_above_shoulder_m = float(
             confirm.get("min_wrist_above_shoulder_m", -0.12)
+        )
+        self._min_wrist_rise_ratio = float(confirm.get("min_wrist_rise_ratio", 0.20))
+        self._min_wrist_above_shoulder_ratio = float(
+            confirm.get("min_wrist_above_shoulder_ratio", -0.08)
         )
         self._min_duration_s = float(confirm.get("min_duration_s", 0.20))
         self._max_duration_s = float(confirm.get("max_duration_s", 12.0))
@@ -280,19 +308,41 @@ class ShotTracker:
         self._ball_outcome = None
         self._ball_outcome_timestamp_ms = None
 
-    def _is_credible(self, c: _Candidate) -> bool:
-        """Does this candidate show a real shooting event?"""
+    def _is_credible(self, c: _Candidate, require_landing: bool = True) -> bool:
+        """Does this candidate show a real shooting event?
+
+        `require_landing` is relaxed only when the recording stopped before the
+        player came back to rest. Every other condition still applies.
+        """
         if self._require_release and not c.reached_release:
             return False
         if c.duration_s < self._min_duration_s:
             return False
         if c.duration_s > self._max_duration_s:
             return False
-        if c.wrist_rise_m < self._min_wrist_rise_m:
-            return False
-        if c.wrist_above_shoulder_max < self._min_wrist_above_shoulder_m:
-            return False
-        return True
+        return self._wrist_travelled(c)
+
+    def _wrist_travelled(self, c: _Candidate) -> bool:
+        """Did the shooting hand actually make a shooting motion?
+
+        Measured in world metres when the wrist was genuinely observed, and in
+        body heights otherwise. Without the fallback, footage where MediaPipe's
+        visibility gate rejects the wrist -- filming from behind does it
+        routinely -- reports zero wrist travel and every real shot is thrown
+        away as preparation.
+        """
+        by_world = c.wrist_world_seen and (
+            c.wrist_rise_m >= self._min_wrist_rise_m
+            and c.wrist_above_shoulder_max >= self._min_wrist_above_shoulder_m
+        )
+        by_image = c.wrist_ratio_max != float("-inf") and (
+            c.wrist_rise_ratio >= self._min_wrist_rise_ratio
+            and c.wrist_ratio_shoulder_max >= self._min_wrist_above_shoulder_ratio
+        )
+        # Either measurement is sufficient. They disagree only when one of them
+        # is blind, never when the wrist genuinely stayed still: a hand that
+        # did not move produces a small number in both spaces.
+        return by_world or by_image
 
     def _accept_ball_outcome(self, outcome, timestamp_ms: int) -> None:
         if self._candidate is None or outcome is None or self._ball_outcome is not None:
@@ -328,10 +378,11 @@ class ShotTracker:
         # genuinely spans up to this moment.
         c.last_ms = max(c.last_ms, now_ms)
 
-        if not force and not self._is_credible(c):
-            self._discard()
-            return None
-        if force and not c.reached_release:
+        # `force` (the video ended mid-attempt) relaxes only the requirement
+        # that the body was seen to land. It must NOT relax the evidence that
+        # a shot happened at all -- a clip that stops during a stray movement
+        # would otherwise be closed out as a scored shot.
+        if not self._is_credible(c, require_landing=not force):
             self._discard()
             return None
 

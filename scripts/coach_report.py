@@ -16,21 +16,26 @@ from __future__ import annotations
 
 import argparse
 import sys
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Callable, List, Optional
 
 import cv2
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from utils.quiet import quiet_native_stderr  # noqa: E402  — must precede mediapipe
+
 from mediapipe.tasks.python import vision  # noqa: E402
 
 from feedback.models import ShotSummary  # noqa: E402
 from pipeline import ShotAnalysisPipeline  # noqa: E402
-from player.profile import build_player_profile  # noqa: E402
+from player.profile import PlayerProfile, build_player_profile  # noqa: E402
 from pose.detector import PoseDetector  # noqa: E402
 from shots.types import RejectionReason, describe  # noqa: E402
-from utils.video_meta import probe_video  # noqa: E402
+from utils.progress import ProgressReporter  # noqa: E402
+from utils.video_meta import VideoMetadata, probe_video  # noqa: E402
 
 BAR_WIDTH = 20
 
@@ -50,6 +55,151 @@ REJECTION_TEXT = {
         "This shot was recognised, but Swichy does not analyse this shot type yet."
     ),
 }
+
+
+# ---------------------------------------------------------------------------
+# ANALYSIS — "what happened in this video?"
+#
+# Kept free of printing so the acceptance tests can drive the exact same
+# production path the CLI drives. `main` below is presentation only: it calls
+# `analyze_video` and formats the result. Nothing here is test-only.
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class AnalysisRun:
+    """Everything one video produced. The CLI prints it; tests assert on it."""
+
+    video: Path
+    fps: float
+    shots: List[ShotSummary] = field(default_factory=list)
+    pose_share: float = 0.0
+    discarded_candidates: int = 0
+    frames_read: int = 0
+    rejection: Optional[RejectionReason] = None
+    rejection_detail: str = ""
+
+    @property
+    def is_rejected(self) -> bool:
+        """True when the whole video was rejected, not merely a single shot."""
+        return self.rejection is not None
+
+    @property
+    def scored_shots(self) -> List[ShotSummary]:
+        return [s for s in self.shots if not s.is_rejected]
+
+
+def _decode_and_analyse(video_path, fps, pipe, progress):
+    """Feed every frame through the pipeline.
+
+    Every frame is read with a blocking read and none are skipped, and each
+    frame's timestamp comes from its INDEX and the source frame rate -- never
+    from the clock. Analysis is therefore identical whether the machine keeps
+    up with real time or not; only the wait is longer.
+    """
+    shots: List[ShotSummary] = []
+    index = 0
+    pose_frames = 0
+
+    with quiet_native_stderr():
+        cap = cv2.VideoCapture(str(video_path))
+        detector = PoseDetector(vision.RunningMode.VIDEO)
+        while True:
+            ok, frame = cap.read()
+            if not ok:
+                break
+            timestamp_ms = int(index * 1000.0 / fps)
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            result = pipe.process_frame(
+                detector.detect_video_frame(rgb, timestamp_ms),
+                frame.shape[1],
+                frame.shape[0],
+                timestamp_ms,
+                frame,
+            )
+            if result.has_pose:
+                pose_frames += 1
+            if result.shot_summary is not None:
+                shots.append(result.shot_summary)
+            index += 1
+            if progress is not None:
+                progress.advance(
+                    note=f"{len(shots)} shot(s) found" if shots else ""
+                )
+        cap.release()
+    return shots, pose_frames, index
+
+
+def analyze_video(
+    video_path,
+    height_cm: Optional[float] = None,
+    shooting_hand: str = "auto",
+    on_start: Optional[Callable[[VideoMetadata, PlayerProfile], None]] = None,
+    progress_factory: Optional[Callable[[VideoMetadata], ProgressReporter]] = None,
+) -> AnalysisRun:
+    """Run one video through the real pipeline and return what was found.
+
+    `on_start` and `progress_factory` are presentation hooks for the CLI.
+    Neither affects analysis: every frame is read and processed either way.
+    """
+    video_path = Path(video_path)
+
+    # Validate metadata before anything temporal depends on it.
+    meta = probe_video(video_path)
+    if not meta.is_valid:
+        return AnalysisRun(
+            video=video_path,
+            fps=0.0,
+            rejection=RejectionReason.INVALID_VIDEO,
+            rejection_detail=meta.error or "",
+        )
+
+    profile = build_player_profile(height_cm=height_cm, shooting_hand=shooting_hand)
+    if on_start is not None:
+        on_start(meta, profile)
+
+    fps = meta.fps
+    pipe = ShotAnalysisPipeline(enable_ball=False, player=profile)
+    pipe.set_fps(fps)
+
+    progress = progress_factory(meta) if progress_factory is not None else None
+    shots, pose_frames, index = _decode_and_analyse(video_path, fps, pipe, progress)
+    if progress is not None:
+        progress.finish(f"Analysed {index} frames in {progress.elapsed_s:.0f}s.")
+
+    trailing = pipe.finalize_session()
+    if trailing is not None:
+        shots.append(trailing)
+
+    pose_share = pose_frames / max(index, 1)
+    run = AnalysisRun(
+        video=video_path,
+        fps=fps,
+        shots=shots,
+        pose_share=pose_share,
+        discarded_candidates=pipe.shot_tracker.discarded_candidates,
+        frames_read=index,
+    )
+
+    # No person in frame => this is not footage of someone shooting.
+    if pose_share < MIN_POSE_FRAME_SHARE:
+        run.rejection = RejectionReason.NO_PERSON_DETECTED
+        run.rejection_detail = (
+            f"A person was visible in only {pose_share * 100:.0f}% of frames "
+            f"(needs at least {MIN_POSE_FRAME_SHARE * 100:.0f}%)."
+        )
+    elif not shots:
+        run.rejection = RejectionReason.NO_SHOOTING_EVENT
+        run.rejection_detail = (
+            f"{run.discarded_candidates} candidate movement(s) were examined "
+            "and none contained a release."
+        )
+    return run
+
+
+# ---------------------------------------------------------------------------
+# PRESENTATION — "how do we tell the player?"
+# ---------------------------------------------------------------------------
 
 
 def print_rejection(reason: RejectionReason, detail: str = "") -> None:
@@ -145,6 +295,29 @@ def print_session_summary(shots, discarded: int) -> None:
     print("=" * 72)
 
 
+EXIT_CODES = {
+    RejectionReason.INVALID_VIDEO: 2,
+    RejectionReason.NO_PERSON_DETECTED: 3,
+    RejectionReason.NO_SHOOTING_EVENT: 4,
+}
+
+
+def _make_reporter(meta: VideoMetadata) -> ProgressReporter:
+    return ProgressReporter(total_frames=meta.frame_count)
+
+
+def _print_header(meta: VideoMetadata, profile: PlayerProfile) -> None:
+    if meta.warning:
+        print(f"Note: {meta.warning}")
+    print(f"\n  Video        : {meta.path.name}")
+    print(f"  Length       : {meta.duration_s:.1f}s, "
+          f"{meta.frame_count} frames at {meta.fps:.0f} fps")
+    print(f"  Player height: {profile.describe_height()}")
+    if not profile.has_height:
+        print("                 (height-relative metrics will be skipped)")
+    print()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("video", help="path to a video file")
@@ -155,82 +328,31 @@ def main() -> int:
         help="player height in centimetres (optional, user-provided only)",
     )
     parser.add_argument("--hand", default="auto", choices=["auto", "left", "right"])
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="suppress the progress bar (the report is unchanged)",
+    )
     args = parser.parse_args()
 
-    video_path = Path(args.video)
+    run = analyze_video(
+        args.video,
+        height_cm=args.height_cm,
+        shooting_hand=args.hand,
+        on_start=_print_header,
+        # The frame total is only known after probing, so the reporter is
+        # built by analysis and owned by presentation.
+        progress_factory=None if args.quiet else _make_reporter,
+    )
 
-    # Phase 1 — validate metadata before anything temporal depends on it.
-    meta = probe_video(video_path)
-    if not meta.is_valid:
-        print_rejection(RejectionReason.INVALID_VIDEO, meta.error or "")
-        return 2
-    if meta.warning:
-        print(f"Note: {meta.warning}")
+    if run.is_rejected:
+        print_rejection(run.rejection, run.rejection_detail)
+        return EXIT_CODES.get(run.rejection, 1)
 
-    profile = build_player_profile(height_cm=args.height_cm, shooting_hand=args.hand)
-
-    cap = cv2.VideoCapture(str(video_path))
-    fps = meta.fps
-
-    detector = PoseDetector(vision.RunningMode.VIDEO)
-    pipe = ShotAnalysisPipeline(enable_ball=False, player=profile)
-    pipe.set_fps(fps)
-
-    print(f"\nVideo        : {video_path.name}  ({fps:.2f} fps)")
-    print(f"Player height: {profile.describe_height()}")
-    if not profile.has_height:
-        print("               -> height-relative metrics will be skipped")
-
-    shots = []
-    index = 0
-    pose_frames = 0
-    while True:
-        ok, frame = cap.read()
-        if not ok:
-            break
-        timestamp_ms = int(index * 1000.0 / fps)
-        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        result = pipe.process_frame(
-            detector.detect_video_frame(rgb, timestamp_ms),
-            frame.shape[1],
-            frame.shape[0],
-            timestamp_ms,
-            frame,
-        )
-        if result.has_pose:
-            pose_frames += 1
-        if result.shot_summary is not None:
-            shots.append(result.shot_summary)
-        index += 1
-    cap.release()
-
-    trailing = pipe.finalize_session()
-    if trailing is not None:
-        shots.append(trailing)
-
-    pose_share = pose_frames / max(index, 1)
-
-    # No person in frame => this is not footage of someone shooting.
-    if pose_share < MIN_POSE_FRAME_SHARE:
-        print_rejection(
-            RejectionReason.NO_PERSON_DETECTED,
-            f"A person was visible in only {pose_share * 100:.0f}% of frames "
-            f"(needs at least {MIN_POSE_FRAME_SHARE * 100:.0f}%).",
-        )
-        return 3
-
-    if not shots:
-        print_rejection(
-            RejectionReason.NO_SHOOTING_EVENT,
-            f"{pipe.shot_tracker.discarded_candidates} candidate movement(s) were "
-            "examined and none contained a release.",
-        )
-        return 4
-
-    for summary in shots:
+    for summary in run.shots:
         print_shot(summary)
 
-    print_session_summary(shots, pipe.shot_tracker.discarded_candidates)
+    print_session_summary(run.shots, run.discarded_candidates)
     return 0
 
 

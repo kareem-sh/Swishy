@@ -28,14 +28,38 @@ def _make_features(**kwargs) -> KinematicFeatures:
 
 
 def test_phase_transitions():
+    """A dip with the ball in the carry position enters `loading`.
+
+    The dip is expressed as knee flexion, not as hip velocity. World landmarks
+    are hip-centred -- the hip midpoint IS the origin -- so `hip_velocity_y` is
+    identically zero on every real frame, and the transition that this test
+    used to drive with `hip_velocity_y=-0.05` could never fire outside a
+    synthetic fixture.
+    """
     det = ShotPhaseDetector()
     assert det.phase == "ready_stance"
 
-    # Need hysteresis_frames (5) consecutive loading signals + min_dwell in ready_stance
-    loading = _make_features(hip_velocity_y=-0.05, wrist_y=0.4, shoulder_y=0.8)
+    # hip_y_avg defaults to 0.6, so the ball has to be carried at or above
+    # that to be in a position it could be shot from. wrist_y=0.4 put the
+    # hands two-tenths BELOW the hips, which is a player standing at rest.
+    loading = _make_features(knee_angle_delta=-3.0, wrist_y=0.7, shoulder_y=0.8)
     for _ in range(5):
         det.update(loading)
     assert det.phase == "loading"
+
+
+def test_hip_velocity_alone_cannot_start_a_shot():
+    """Guards the bug above: hip velocity is a dead signal, not a weak one.
+
+    If this ever passes, someone has reintroduced a condition that reads
+    whole-body motion out of hip-centred coordinates, where it does not exist.
+    """
+    det = ShotPhaseDetector()
+    hip_only = _make_features(hip_velocity_y=-0.05, knee_angle_delta=0.0,
+                              wrist_y=0.7, shoulder_y=0.8)
+    for _ in range(8):
+        det.update(hip_only)
+    assert det.phase == "ready_stance"
 
 
 def test_biomechanics_knee_rule():
@@ -60,9 +84,21 @@ def test_phase_order_complete():
     assert PHASE_ORDER[-1] == "landing"
 
 
-def test_ready_stance_to_loading_on_wrist_rise():
+def test_ready_stance_to_ball_lift_on_wrist_rise():
+    """A rising wrist from the carry position starts the ball lift.
+
+    Two things changed here. The shoulder now sits ABOVE the hips
+    (`shoulder_y=0.4`, not `-0.4`): after the Y-axis correction, up is
+    positive, so the old fixture described an anatomically impossible body and
+    the carry window could never contain the wrist.
+
+    And a rising wrist now goes straight to `ball_lift` rather than `loading`.
+    A wrist travelling upward IS the lift; routing it through `loading` first
+    described a dip that is not happening.
+    """
     det = ShotPhaseDetector()
-    still = _make_features(total_velocity=0.05, wrist_y=0.02, hip_y_avg=0.0, shoulder_y=-0.4)
+    still = _make_features(total_velocity=0.05, wrist_y=0.02, hip_y_avg=0.0,
+                           shoulder_y=0.4)
     for _ in range(3):
         det.update(still)
 
@@ -71,16 +107,23 @@ def test_ready_stance_to_loading_on_wrist_rise():
         wrist_y=0.03,
         wrist_velocity_y=0.05,
         hip_y_avg=0.0,
-        shoulder_y=-0.4,
+        shoulder_y=0.4,
     )
     phases = []
     for _ in range(5):
         det.update(rising)
         phases.append(det.phase)
-    # hysteresis_frames in config/phases.yaml controls how fast the FSM
-    # advances past loading, so assert the transition happened instead of
-    # sampling the phase at a fixed frame count.
-    assert "loading" in phases
+    assert "ball_lift" in phases
+
+
+def test_wrist_outside_carry_window_does_not_start_a_shot():
+    """A hand hanging far below the hips is not a shot about to happen."""
+    det = ShotPhaseDetector()
+    hanging = _make_features(wrist_y=-0.60, hip_y_avg=0.0, shoulder_y=0.4,
+                             wrist_velocity_y=0.05, knee_angle_delta=-3.0)
+    for _ in range(8):
+        det.update(hanging)
+    assert det.phase == "ready_stance"
 
 
 def test_index_tip_can_confirm_release():

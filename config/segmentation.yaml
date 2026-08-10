@@ -22,6 +22,15 @@ confirmation:
   # set-shot releases valid while excluding a ball held at the waist.
   min_wrist_above_shoulder_m: -0.12
 
+  # The same two tests in body heights, used when MediaPipe's visibility gate
+  # rejects the world-space wrist and the metric figures above are therefore
+  # all zero. Filming from behind triggers that on every frame, which used to
+  # throw away every real shot in such a clip as "preparation".
+  # Shoulders sit about 0.30 body heights above the hips; a shot lifts the
+  # wrist from roughly hip level to overhead.
+  min_wrist_rise_ratio: 0.20
+  min_wrist_above_shoulder_ratio: -0.08
+
   # An attempt shorter than this is noise; longer than this is not one motion.
   # The upper bound is generous so genuine slow-motion footage still passes.
   min_duration_s: 0.20
@@ -39,7 +48,19 @@ candidate_timeout_s: 6.0
 # Caps that stop a phase becoming a sink. On expiry the FSM is nudged onward
 # rather than left stuck. Generous on purpose: slow-motion capture stretches
 # real durations, and a false timeout is worse than a late one.
+#
+# EVERY non-terminal phase needs one. Previously only jump/release/
+# follow_through/landing were covered, and the gap was not theoretical:
+# `knee_flexion` has a single exit condition and no timeout, so on real
+# footage it swallowed 4 of 13 shots outright -- the FSM entered it, the exit
+# never fired, and the attempt was lost with no score and no feedback.
+#
+# `ready_stance` is deliberately absent: it is the resting state and has
+# nowhere to be nudged to.
 phase_timeouts_s:
+  loading: 2.5
+  knee_flexion: 1.5
+  ball_lift: 2.0
   jump: 2.5
   release: 2.0
   follow_through: 3.0

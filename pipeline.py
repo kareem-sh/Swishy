@@ -147,6 +147,7 @@ class ShotAnalysisPipeline:
         self._fps = DEFAULT_FPS
         self._prev_timestamp_ms: Optional[int] = None
         self._prev_world: Optional[dict] = None
+        self._prev_image: Optional[dict] = None
         self._ankle_baseline_y = 0.0
         self._ankle_image_baseline = 0.0
         self._still_threshold = float(
@@ -406,7 +407,9 @@ class ShotAnalysisPipeline:
             ankle_baseline_y=self._ankle_baseline_y,
             image_landmarks=raw["image"],
             ankle_image_baseline=self._ankle_image_baseline,
+            prev_image_landmarks=self._prev_image,
         )
+        self._prev_image = raw["image"]
 
         self._ankle_baseline_y = update_ankle_baseline(
             self._ankle_baseline_y,
@@ -559,6 +562,7 @@ class ShotAnalysisPipeline:
         self._frame_buffer.clear()
         self._frame_index = 0
         self._prev_world = None
+        self._prev_image = None
         self._prev_timestamp_ms = None
         self._ankle_baseline_y = 0.0
         self._ankle_image_baseline = 0.0
