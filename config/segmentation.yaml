@@ -1,0 +1,46 @@
+# Shot segmentation — when a burst of phase transitions counts as one attempt.
+#
+# ALL VALUES ARE IN SECONDS, never frame counts. Sample material spans 12-30 fps
+# and includes slow motion; a frame count means a different duration in each.
+#
+# EMPIRICAL / PROJECT-CALIBRATED. These are engineering choices about movement
+# plausibility, not published biomechanical norms. They are derived from what a
+# human shooting motion can physically do, not fitted to any particular clip.
+
+# A candidate attempt only becomes a CONFIRMED shot if it shows a credible
+# shooting event. Every condition below must hold.
+confirmation:
+  # The ball has to actually leave the hand.
+  require_release: true
+
+  # The shooting wrist must travel this far vertically. Settling on the toes
+  # or re-gripping moves the wrist a few centimetres; a shot moves it far more.
+  min_wrist_rise_m: 0.18
+
+  # The wrist must reach at least this height relative to the shoulder.
+  # Negative means "may stay slightly below the shoulder", which keeps low
+  # set-shot releases valid while excluding a ball held at the waist.
+  min_wrist_above_shoulder_m: -0.12
+
+  # An attempt shorter than this is noise; longer than this is not one motion.
+  # The upper bound is generous so genuine slow-motion footage still passes.
+  min_duration_s: 0.20
+  max_duration_s: 12.0
+
+# After a confirmed shot, ignore new starts for this long. Prevents the
+# recovery/re-settle immediately after a shot from opening a second attempt.
+refractory_s: 0.60
+
+# A candidate that never reaches release within this window is abandoned.
+# This is what discards toe-jiggling: the player bends and re-settles, no
+# release ever arrives, the candidate is dropped without becoming a shot.
+candidate_timeout_s: 6.0
+
+# Caps that stop a phase becoming a sink. On expiry the FSM is nudged onward
+# rather than left stuck. Generous on purpose: slow-motion capture stretches
+# real durations, and a false timeout is worse than a late one.
+phase_timeouts_s:
+  jump: 2.5
+  release: 2.0
+  follow_through: 3.0
+  landing: 3.0

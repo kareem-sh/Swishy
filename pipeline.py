@@ -38,6 +38,7 @@ from phase_detection.features import (
     _avg_y,
     extract_features,
     update_ankle_baseline,
+    update_ankle_image_baseline,
 )
 from phase_detection.phases import PHASE_LABELS
 from player.profile import PlayerProfile, load_player_profile
@@ -147,6 +148,7 @@ class ShotAnalysisPipeline:
         self._prev_timestamp_ms: Optional[int] = None
         self._prev_world: Optional[dict] = None
         self._ankle_baseline_y = 0.0
+        self._ankle_image_baseline = 0.0
         self._still_threshold = float(
             phase_cfg.get("thresholds", {}).get("ready_max_velocity", 0.15)
         )
@@ -402,6 +404,8 @@ class ShotAnalysisPipeline:
             prev_angles=prev_snapshot.angles if prev_snapshot else None,
             dt_s=dt_s,
             ankle_baseline_y=self._ankle_baseline_y,
+            image_landmarks=raw["image"],
+            ankle_image_baseline=self._ankle_image_baseline,
         )
 
         self._ankle_baseline_y = update_ankle_baseline(
@@ -410,9 +414,15 @@ class ShotAnalysisPipeline:
             features.total_velocity,
             self._still_threshold,
         )
+        self._ankle_image_baseline = update_ankle_image_baseline(
+            self._ankle_image_baseline,
+            raw["image"],
+            features.total_velocity,
+            self._still_threshold,
+        )
         features.ankle_baseline_y = self._ankle_baseline_y
 
-        phase = self._phase_detector.update(features)
+        phase = self._phase_detector.update(features, timestamp_ms=timestamp_ms)
         phase_label = PHASE_LABELS.get(phase, phase)
         analysis = self._biomechanics.evaluate(phase, angles, features, shooting_side)
 
@@ -551,6 +561,7 @@ class ShotAnalysisPipeline:
         self._prev_world = None
         self._prev_timestamp_ms = None
         self._ankle_baseline_y = 0.0
+        self._ankle_image_baseline = 0.0
         self._ball_tracker.reset()
         self._ball_buffer.clear()
         self._ball_shot_fsm.reset()

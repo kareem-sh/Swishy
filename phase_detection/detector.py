@@ -15,6 +15,17 @@ from utils.config_loader import load_yaml
 class ShotPhaseDetector:
     """Detect current shot phase from per-frame kinematic features."""
 
+    # Where each phase is forced to go if it overstays its timeout. Without
+    # this, follow_through and landing act as sinks: their exit conditions may
+    # never arrive once the player walks off or leaves frame, and one clip
+    # spent 53% of its length in follow_through.
+    _TIMEOUT_TARGET = {
+        "jump": "release",
+        "release": "follow_through",
+        "follow_through": "landing",
+        "landing": "ready_stance",
+    }
+
     def __init__(self):
         cfg = load_yaml("phases.yaml")
         self._cfg = cfg
@@ -22,28 +33,66 @@ class ShotPhaseDetector:
         self._min_dwell_frames = cfg.get("min_dwell_frames", 3)
         self._thresholds = cfg.get("thresholds", {})
 
+        seg_cfg = load_yaml("segmentation.yaml")
+        self._phase_timeouts_s = seg_cfg.get("phase_timeouts_s", {}) or {}
+
         self.phase = "ready_stance"
         self._pending_phase: Optional[str] = None
         self._pending_count = 0
         self._frames_in_phase = 0
+        self._phase_entered_ms: Optional[int] = None
         self._wrist_peak_y = 0.0
         self._knee_min_angle = 180.0
         self._in_shot = False
+        self.timed_out_last_update = False
 
     def reset(self):
         self.phase = "ready_stance"
         self._pending_phase = None
         self._pending_count = 0
         self._frames_in_phase = 0
+        self._phase_entered_ms = None
         self._wrist_peak_y = 0.0
         self._knee_min_angle = 180.0
         self._in_shot = False
+        self.timed_out_last_update = False
+
+    def _check_timeout(self, timestamp_ms: Optional[int]) -> Optional[str]:
+        """Return the phase to force into, if the current one has overstayed."""
+        if timestamp_ms is None or self._phase_entered_ms is None:
+            return None
+        limit_s = self._phase_timeouts_s.get(self.phase)
+        if limit_s is None:
+            return None
+        elapsed_s = (timestamp_ms - self._phase_entered_ms) / 1000.0
+        if elapsed_s < float(limit_s):
+            return None
+        return self._TIMEOUT_TARGET.get(self.phase)
 
     @property
     def phase_label(self) -> str:
         return PHASE_LABELS.get(self.phase, self.phase)
 
-    def update(self, features: KinematicFeatures) -> str:
+    def update(
+        self,
+        features: KinematicFeatures,
+        timestamp_ms: Optional[int] = None,
+    ) -> str:
+        if self._phase_entered_ms is None and timestamp_ms is not None:
+            self._phase_entered_ms = timestamp_ms
+
+        self.timed_out_last_update = False
+        forced = self._check_timeout(timestamp_ms)
+        if forced is not None:
+            self.phase = forced
+            self._phase_entered_ms = timestamp_ms
+            self._frames_in_phase = 0
+            self._pending_phase = None
+            self._pending_count = 0
+            self.timed_out_last_update = True
+            self._track_shot_metrics(features)
+            return self.phase
+
         candidate = self._evaluate_transition(features)
         if candidate and candidate != self.phase:
             if candidate == self._pending_phase:
@@ -57,6 +106,7 @@ class ShotPhaseDetector:
                 if self._is_valid_transition(self.phase, candidate):
                     self.phase = candidate
                     self._frames_in_phase = 0
+                    self._phase_entered_ms = timestamp_ms
                 self._pending_phase = None
                 self._pending_count = 0
         elif candidate == self.phase:

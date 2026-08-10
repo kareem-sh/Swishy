@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional, TYPE_CHECKING
 
 from analysis.models import RuleResult
+from shots.types import RejectionReason, ShotClassification, ShotType
 
 if TYPE_CHECKING:
     from ball.models import ShotOutcome
@@ -52,9 +53,14 @@ class ShotSummary:
     """Aggregated evaluation for one completed shot attempt."""
 
     shot_number: int
-    score: int  # 0-100
+    # None means REJECTED. A rejection is not a score of zero: it carries no
+    # phase scores and no coaching feedback, because no analyser ran.
+    score: Optional[int]
     passed_count: int
     total_count: int
+    shot_type: Optional[ShotType] = None
+    classification: Optional[ShotClassification] = None
+    rejection: Optional[RejectionReason] = None
     passed_rules: List[RuleResult] = field(default_factory=list)
     violations: List[RuleResult] = field(default_factory=list)
     phase_scores: List["PhaseScore"] = field(default_factory=list)
@@ -71,7 +77,13 @@ class ShotSummary:
     outcome: Optional["ShotOutcome"] = None
 
     @property
+    def is_rejected(self) -> bool:
+        return self.rejection is not None or self.score is None
+
+    @property
     def grade(self) -> str:
+        if self.score is None:
+            return "Not Scored"
         if self.score >= 90:
             return "Excellent"
         if self.score >= 75:

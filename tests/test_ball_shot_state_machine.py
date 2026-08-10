@@ -162,12 +162,22 @@ def test_ball_flight_continues_when_pose_is_missing() -> None:
     assert made.state == BallShotState.MADE
 
 
-def _body_snapshot(timestamp_ms: int, phase: str) -> FrameSnapshot:
+def _body_snapshot(timestamp_ms: int, phase: str, wrist_y: float = 1.0) -> FrameSnapshot:
+    from phase_detection.features import KinematicFeatures
+
     return FrameSnapshot(
         timestamp_ms=timestamp_ms,
         angles={},
         shooting_side="right",
         phase=phase,
+        features=KinematicFeatures(
+            wrist_y=wrist_y,
+            shoulder_y=1.40,
+            hip_y_avg=0.95,
+            nose_y=1.60,
+            ankle_y_avg=0.10,
+            ankle_baseline_y=0.10,
+        ),
     )
 
 
@@ -175,9 +185,13 @@ def test_shot_tracker_waits_for_ball_after_body_finishes() -> None:
     tracker = ShotTracker()
     tracker.configure_ball_outcome(required=True, body_grace_ms=500)
 
-    assert tracker.update("loading", _body_snapshot(0, "loading")) is None
-    assert tracker.update("landing", _body_snapshot(100, "landing")) is None
-    assert tracker.update("ready_stance", _body_snapshot(200, "ready_stance")) is None
+    # A credible motion: the wrist must actually travel and the ball must be
+    # released, otherwise the candidate is discarded as a posture change.
+    assert tracker.update("loading", _body_snapshot(0, "loading", 1.00)) is None
+    assert tracker.update("ball_lift", _body_snapshot(60, "ball_lift", 1.20)) is None
+    assert tracker.update("release", _body_snapshot(120, "release", 1.48)) is None
+    assert tracker.update("landing", _body_snapshot(180, "landing", 1.05)) is None
+    assert tracker.update("ready_stance", _body_snapshot(240, "ready_stance", 1.00)) is None
     assert tracker.shot_in_progress
     assert not tracker.capture_in_progress
 
@@ -201,7 +215,9 @@ def test_shot_tracker_waits_for_ball_after_body_finishes() -> None:
 def test_ball_outcome_can_finish_after_body_grace_when_pose_never_lands() -> None:
     tracker = ShotTracker()
     tracker.configure_ball_outcome(required=True, body_grace_ms=500)
-    tracker.update("loading", _body_snapshot(0, "loading"))
+    tracker.update("loading", _body_snapshot(0, "loading", 1.00))
+    tracker.update("ball_lift", _body_snapshot(30, "ball_lift", 1.20))
+    tracker.update("release", _body_snapshot(60, "release", 1.48))
 
     outcome = ShotOutcome(
         result="missed",

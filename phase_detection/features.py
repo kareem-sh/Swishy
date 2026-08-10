@@ -10,6 +10,11 @@ from typing import Dict, Optional
 
 import numpy as np
 
+# Guards for the image-space whole-body signals. Both are protection against
+# tracking artefacts and camera cuts, not tuning knobs.
+MIN_BODY_PIXEL_HEIGHT = 0.10   # player must fill >=10% of frame height
+MAX_BODY_RISE_RATIO = 0.50     # nobody jumps half their own height
+
 _MOTION_LANDMARKS = (
     "nose",
     "left_shoulder",
@@ -51,6 +56,23 @@ class KinematicFeatures:
     nose_velocity_y: float = 0.0
     total_velocity: float = 0.0
     shooting_side: str = "right"
+    # ---------------- IMAGE-SPACE signals (whole-body translation) ----------
+    #
+    # World landmarks are HIP-CENTRED: the origin is the hip midpoint. That
+    # makes them ideal for joint angles and useless for whole-body motion --
+    # when a player jumps, hips and ankles rise together, so nothing changes
+    # in hip-relative coordinates. Measured consequence: a real jump shot
+    # showed only 0.030 m of "ankle rise" in world space.
+    #
+    # Whole-body translation therefore has to come from image space. Both
+    # signals below are divided by the player's own on-screen height, so they
+    # are fractions of body height and survive changes in zoom and distance.
+    #
+    # body_rise_ratio: positive means the body moved UP the frame.
+    # hip_x_ratio:     horizontal hip position, for stationary-vs-driving.
+    body_rise_ratio: float = 0.0
+    hip_x_ratio: float = 0.0
+    body_pixel_height: float = 0.0
 
 
 def _lm_y(world: Dict[str, dict], name: str) -> Optional[float]:
@@ -66,6 +88,38 @@ def _avg_y(world: Dict[str, dict], names: tuple) -> Optional[float]:
     if not valid:
         return None
     return float(np.mean(valid))
+
+
+def _image_metrics(image_landmarks: Optional[Dict[str, dict]]) -> tuple:
+    """Return (ankle_y_norm, hip_x_norm, body_height_norm) from image space.
+
+    Image y grows DOWNWARD, so callers must invert it to express "up".
+    body_height_norm is nose-to-ankle in normalized units; dividing by it makes
+    the other two invariant to zoom and camera distance.
+    """
+    if not image_landmarks:
+        return None, None, 0.0
+
+    def norm(name, axis):
+        lm = image_landmarks.get(name)
+        if lm is None:
+            return None
+        if float(lm.get("visibility", 0.0)) < 0.5:
+            return None
+        return float(lm["x_norm"] if axis == 0 else lm["y_norm"])
+
+    ankles = [v for v in (norm("left_ankle", 1), norm("right_ankle", 1)) if v is not None]
+    hips_x = [v for v in (norm("left_hip", 0), norm("right_hip", 0)) if v is not None]
+    nose_y = norm("nose", 1)
+
+    ankle_y = float(np.mean(ankles)) if ankles else None
+    hip_x = float(np.mean(hips_x)) if hips_x else None
+
+    body_height = 0.0
+    if ankle_y is not None and nose_y is not None:
+        body_height = abs(ankle_y - nose_y)
+
+    return ankle_y, hip_x, body_height
 
 
 def _landmark_speed(world: Dict[str, dict], prev_world: Dict[str, dict], dt_s: float) -> float:
@@ -99,6 +153,8 @@ def extract_features(
     prev_angles: Optional[dict] = None,
     dt_s: float = 1 / 30.0,
     ankle_baseline_y: float = 0.0,
+    image_landmarks: Optional[Dict[str, dict]] = None,
+    ankle_image_baseline: float = 0.0,
 ) -> KinematicFeatures:
     """Build kinematic features for the current frame."""
     wrist_key = f"{shooting_side}_wrist"
@@ -154,6 +210,27 @@ def extract_features(
 
     total_vel = _landmark_speed(world_landmarks, prev_world, dt_s) if prev_world else 0.0
 
+    # Whole-body vertical translation, from image space, as a fraction of the
+    # player's own on-screen height. Image y grows downward, so a body moving
+    # UP produces a SMALLER ankle y -- hence baseline minus current.
+    ankle_img_y, hip_x_norm, body_height_norm = _image_metrics(image_landmarks)
+    body_rise_ratio = 0.0
+    if (
+        ankle_img_y is not None
+        and ankle_image_baseline > 0.0
+        # A player occupying less than a tenth of the frame height is either
+        # mis-detected or too far away to measure. Without this guard the
+        # division blows up: an observed value of 98.2 body-heights came from a
+        # near-zero denominator.
+        and body_height_norm >= MIN_BODY_PIXEL_HEIGHT
+    ):
+        raw_ratio = (ankle_image_baseline - ankle_img_y) / body_height_norm
+        # Nobody jumps their own height. Anything beyond this is a tracking
+        # artefact or a camera cut, not motion, so it is clamped rather than
+        # trusted.
+        body_rise_ratio = max(-MAX_BODY_RISE_RATIO, min(MAX_BODY_RISE_RATIO, raw_ratio))
+    hip_x_ratio = hip_x_norm if hip_x_norm is not None else 0.0
+
     return KinematicFeatures(
         wrist_y=wrist_y,
         wrist_velocity_y=wrist_vel,
@@ -173,7 +250,32 @@ def extract_features(
         nose_velocity_y=nose_vel,
         total_velocity=total_vel,
         shooting_side=shooting_side,
+        body_rise_ratio=body_rise_ratio,
+        hip_x_ratio=hip_x_ratio,
+        body_pixel_height=body_height_norm,
     )
+
+
+def update_ankle_image_baseline(
+    current_baseline: float,
+    image_landmarks: Optional[Dict[str, dict]],
+    total_velocity: float,
+    still_threshold: float,
+) -> float:
+    """Track where the feet sit on screen while the player is standing still.
+
+    This is the ground reference for whole-body vertical motion. It is only
+    updated while the player is relatively still, so a jump cannot drag the
+    baseline up with it.
+    """
+    ankle_y, _, _ = _image_metrics(image_landmarks)
+    if ankle_y is None:
+        return current_baseline
+    if total_velocity >= still_threshold:
+        return current_baseline
+    if current_baseline <= 0.0:
+        return ankle_y
+    return 0.9 * current_baseline + 0.1 * ankle_y
 
 
 def update_ankle_baseline(current_baseline: float, ankle_y: float, total_velocity: float, still_threshold: float) -> float:
