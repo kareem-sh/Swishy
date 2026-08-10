@@ -1,136 +1,309 @@
-# Biomechanical rules for basketball jump-shot analysis.
-# Ranges informed by peer-reviewed shooting kinematics literature.
-# See docs/BIOMECHANICS_RESEARCH.md for sources and rationale.
+# Biomechanical rules for basketball shooting practice.
+#
+# ---------------------------------------------------------------------------
+# HOW A RULE IS EVALUATED  (three tiers, not pass/fail)
+# ---------------------------------------------------------------------------
+#   outside min..max        -> NEEDS WORK  : message_low / message_high
+#   inside  min..max        -> GOOD        : refine_low / refine_high
+#   inside  ideal_min..max  -> EXCELLENT   : message_excellent
+#
+# The GOOD tier is directional on purpose: a value under the ideal band needs
+# the opposite correction from one over it, so a single "refine this" message
+# would be useless or actively wrong.
+#
+# ---------------------------------------------------------------------------
+# HOW MESSAGES ARE WRITTEN  (external focus)
+# ---------------------------------------------------------------------------
+# Messages point at the EFFECT of the movement or an external target (the rim,
+# the floor, the ball), not at body parts. Focusing attention externally
+# produces better motor learning and retention than focusing on the limb
+# itself -- one of the most replicated findings in motor learning, tested on
+# basketball free throws specifically (constrained-action hypothesis; see
+# resources.md Part C).
+#
+#   internal (weaker):  "Bend your knees deeper"
+#   external (better):  "Drive the floor away as you rise"
+#
+# Keep them formal, short and plain. No slang. A player who has never had
+# coaching should understand every word.
+#
+# ---------------------------------------------------------------------------
+# EVIDENCE LABELS
+# ---------------------------------------------------------------------------
+# Every rule carries `evidence:` naming its class, per resources.md Part E:
+#   DIRECTLY SUPPORTED / SUPPORTED WITH LIMITATIONS / INFERRED /
+#   ENGINEERING DECISION / NOT SUPPORTED
+# Thresholds labelled ENGINEERING DECISION are our choices, NOT published
+# biomechanical norms. Do not present them as science.
+#
+# `scored: false` means the metric is measured and shown to the player but
+# deliberately excluded from the score, because the evidence or the
+# measurement quality does not justify penalising anyone for it.
+#
+# Angle convention: INTERNAL angles. A SMALLER knee/elbow number means MORE
+# bend. All angles in degrees unless `unit` says otherwise.
 
 rules:
+
+  # ---------------------------------------------------------------- loading
   knee_flexion_loading:
-    name: "Knee Flexion (Load)"
+    name: "Leg Load"
     metric: knee
     phases: [loading, knee_flexion]
-    min: 70
-    max: 125
-    severity: warning
-    message_pass: "Solid knee bend — you're loading the legs for power"
-    message_fail: "Bend knees deeper in the load (aim ~90-110°) — leg drive creates lift and range"
-    rationale: "Adequate knee flexion stores elastic energy; made shots show greater knee/hip flexion before release (Knudson 1993; MDPI Biomechanics 2022)"
+    min: 80
+    max: 145
+    ideal_min: 100
+    ideal_max: 128
+    severity: info
+    scored: true
+    message_excellent: "Your leg load is in a strong range. The power for this shot is coming from the floor."
+    refine_low: "Your legs are loading well. Sink slightly less so you can rise in one smooth motion."
+    refine_high: "Your leg load is good. Sit a little deeper before you rise to build more lift."
+    message_low: "You are sinking very deep. Come up a little higher so you can rise without a pause."
+    message_high: "Load the legs more before you rise — press the floor away to send the ball up, rather than pushing it with the arm."
+    evidence: >
+      NOT SUPPORTED as a proficiency discriminator. Four findings, three
+      directions: proficient shooters loaded deeper at 3-point range
+      (p<0.001), showed no difference at 2-point range, showed no
+      significance after Bonferroni at the free-throw line, and one report
+      associates LOWER preparatory flexion with success. Band is an
+      ENGINEERING DECISION spanning published values (94-122 deg), kept at
+      `info` severity so it informs without penalising. resources.md D3.
 
   hip_hinge_loading:
-    name: "Hip Hinge"
+    name: "Hip Drive"
     metric: hip
     phases: [loading, knee_flexion]
-    min: 145
-    max: 175
+    min: 110
+    max: 168
+    ideal_min: 125
+    ideal_max: 152
     severity: info
-    message_pass: "Hip hinge looks athletic — hips back, chest tall"
-    message_fail: "Hinge at the hips slightly — stay tall through the chest, not folded or bolt upright"
-    rationale: "Hip-shoulder-knee chain transfers force proximally to distally; proficient shooters sequence hip then knee then elbow (ISBS 2023)"
+    scored: true
+    message_excellent: "Your hips are set well — chest tall and weight balanced over your feet."
+    refine_low: "Your hip position is good. Open the hips slightly so your chest lifts toward the rim."
+    refine_high: "Your hips are good. Send them back a little further to load more power."
+    message_low: "You are folding forward at the waist. Keep your chest up toward the rim as you sink."
+    message_high: "You are standing too upright to build power. Send your hips back as you lower, as if sitting onto a high stool."
+    evidence: >
+      SUPPORTED WITH LIMITATIONS. Hip flexion deepens with distance across
+      two samples, and separated proficiency at 3-point range (143.1 vs
+      155.9 deg, p<0.001). Single research group. resources.md A1, A3.
 
+  # -------------------------------------------------------------- ball lift
   elbow_slot_ball_lift:
-    name: "Elbow Position (Lift)"
+    name: "Ball Set Position"
     metric: elbow
     phases: [ball_lift]
-    min: 75
-    max: 115
+    min: 60
+    max: 118
+    ideal_min: 74
+    ideal_max: 98
     severity: warning
-    message_pass: "Elbow stays in the slot under the ball"
-    message_fail: "Tuck elbow under the ball — avoid chicken wing or wide elbow flare"
-    rationale: "Higher elbow relative to stature and elbow-under-ball alignment differentiate made vs missed shots (MDPI Biomechanics 2022)"
+    scored: true
+    message_excellent: "The ball is set in a strong position to launch from."
+    refine_low: "Good set position. Let the ball sit a touch further from your chest before you lift."
+    refine_high: "Good set position. Bring the ball slightly closer in before you lift."
+    message_low: "The ball is set too close in. Give it room so it can travel straight up toward the rim."
+    message_high: "The ball is set too far out, which makes it swing on the way up. Bring it in so it can rise on a straight line to the rim."
+    evidence: >
+      ENGINEERING DECISION informed by thin evidence. Published set-point
+      values do not vary systematically with distance or skill, but that
+      rests on non-significant results (p=0.471, p=0.706) from samples of
+      10-34 in one laboratory — which is low statistical power, NOT
+      demonstrated invariance. Treated as a tunable prior. resources.md D2.
 
   shoulder_alignment_lift:
     name: "Shoulder Elevation"
     metric: shoulder
     phases: [ball_lift, jump]
-    min: 65
-    max: 125
+    min: 55
+    max: 135
     severity: info
-    message_pass: "Shoulder elevation supports a high release window"
-    message_fail: "Lift the shooting shoulder higher through the drive — steeper arc starts here"
-    rationale: "Greater shoulder flexion at release correlates with made mid-range shots (J. Sports Biomech. 2025)"
+    scored: false          # measured and displayed, never scored
+    message_excellent: "Shoulder elevation recorded."
+    message_low: "Shoulder elevation recorded (low)."
+    message_high: "Shoulder elevation recorded (high)."
+    evidence: >
+      NOT SUPPORTED for scoring — measurement, not biomechanics. Single-camera
+      shoulder angle carries a bias of -16 to -26 deg and RMSE of 24-36 deg
+      depending on camera azimuth, which is larger than any coaching effect we
+      could claim. Displayed for observability only. resources.md D4.
 
   trunk_posture:
-    name: "Trunk Posture"
+    name: "Upper Body Posture"
     metric: trunk
     phases: [ready_stance, loading, ball_lift, jump, release]
-    min: 5
-    max: 22
+    min: 0
+    max: 25
+    ideal_min: 0
+    ideal_max: 13
     severity: warning
-    message_pass: "Torso stays relatively erect — good balance"
-    message_fail: "Stay taller through the torso — excessive lean shifts aim and blocks leg power"
-    rationale: "More erect torso during preparatory phase differentiates made three-point attempts (MDPI Biomechanics 2022)"
+    scored: true
+    message_excellent: "Your upper body stays tall and square through the shot."
+    refine_high: "Your posture is good. Stay a little taller through the top of the shot to keep the ball on line."
+    message_high: "You are leaning through the shot, which pulls the ball off line. Keep your chest facing the rim from start to finish."
+    evidence: >
+      SUPPORTED WITH LIMITATIONS. Reduced forward trunk lean at release
+      distinguished proficient free-throw shooters. Trunk lean is measured
+      against a fixed vertical axis, so it depends on the coordinate
+      convention — see docs/ACCEPTANCE_Y_AXIS.md. resources.md A2.
 
   head_stability:
-    name: "Head Stability"
+    name: "Eyes and Head"
     metric: head_velocity
     phases: [loading, ball_lift, jump, release]
-    min: null
     max: 0.08
+    ideal_max: 0.05
+    unit: "m/s"
     severity: info
-    message_pass: "Head stays still — eyes can stay on target"
-    message_fail: "Keep head quiet through the shot — minimize bobbing or pulling away early"
-    rationale: "Head movement disrupts visual aim and timing of the kinematic sequence"
+    scored: true
+    message_excellent: "Your head stays still, so your eyes stay on the target."
+    refine_high: "Head control is good. Hold your eyes on the rim a moment longer after the ball leaves."
+    message_high: "Your head moves during the shot, which pulls your aim off. Keep your eyes fixed on the front of the rim until the ball lands."
+    evidence: >
+      ENGINEERING DECISION. No published threshold for head movement during
+      shooting was found. Retained because a stable gaze is standard coaching
+      practice and the measurement is reliable. Threshold is ours.
 
-  index_alignment_release:
-    name: "Index Finger Alignment (Release)"
-    metric: index_align
-    phases: [release]
-    min: 155
-    max: 180
-    severity: warning
-    message_pass: "Index finger drives through the ball at release"
-    message_fail: "Extend through the index finger at release — snap, don't push flat-handed"
-    rationale: "Elbow and wrist extend abruptly just before release; low variation in wrist/elbow at release implies consistent finger-through-ball mechanics (ISBS set-shot model)"
-
+  # ---------------------------------------------------------------- release
   elbow_extension_release:
-    name: "Elbow Extension (Release)"
+    name: "Reach at Release"
     metric: elbow
     phases: [release]
-    min: 158
+    min: 142
     max: 180
+    ideal_min: 152
+    ideal_max: 175
     severity: warning
-    message_pass: "Full elbow extension at release — good arc potential"
-    message_fail: "Extend the elbow fully at release — short extension flattens arc"
-    rationale: "Near-full elbow extension at release maximizes release height and arc (MDPI Sports 2023)"
+    scored: true
+    message_excellent: "You reach fully toward the rim at release."
+    refine_low: "Good reach. Extend a little further toward the rim to lift the arc."
+    refine_high: "Good reach. Ease off the very end of the extension so the release stays smooth."
+    message_low: "The arm is still bent when the ball leaves, which flattens the arc. Reach the ball up toward the rim at the top of the shot."
+    message_high: "The arm locks out hard at release. Reach toward the rim and let the arm finish softly."
+    evidence: >
+      SUPPORTED WITH LIMITATIONS. Measured elbow extension at release is
+      158.8-159.3 deg — near full extension but NOT 180 deg. Band set around
+      that. Note single-camera elbow error is roughly 17 deg RMSD in a
+      basketball-throwing validation, so treat the number as directional.
+      resources.md A3, D4.
+
+  index_alignment_release:
+    name: "Finger Direction"
+    metric: index_align
+    phases: [release]
+    min: 148
+    max: 180
+    ideal_min: 160
+    ideal_max: 180
+    severity: warning
+    scored: true
+    message_excellent: "The ball leaves cleanly off your fingertips."
+    refine_low: "Good release. Push a little further through the fingertips to add backspin."
+    message_low: "The ball is leaving off a flat hand. Send it out over your fingertips, as if reaching into the rim."
+    evidence: >
+      ENGINEERING DECISION. No published norm for an elbow-wrist-index
+      alignment angle was found; this is a Swichy-defined proxy for a clean
+      fingertip release. Thresholds are ours.
 
   release_height:
     name: "Release Height"
     metric: release_height
     phases: [release]
-    min: 0.18
-    max: 0.55
-    severity: info
-    message_pass: "Release height is in a strong range"
-    message_fail: "Release higher — wrist above eye line relative to head protects the shot"
-    rationale: "Greater release height and vertical displacement improve make probability on jump shots (MDPI Biomechanics 2022)"
+    min: 0.06
+    max: 0.62
+    ideal_min: 0.16
+    ideal_max: 0.46
+    unit: "m"
+    severity: warning
+    scored: true
+    message_excellent: "You release the ball high, which protects the shot and steepens the arc."
+    refine_low: "Release point is good. Let the ball go slightly higher to steepen the arc."
+    refine_high: "Release point is good and high. Keep it there without over-reaching."
+    message_low: "The ball is leaving from too low, which flattens the arc. Release it at the top of your rise, not on the way up."
+    message_high: "You are over-reaching at release, which costs you control. Let the ball go a little earlier."
+    evidence: >
+      SUPPORTED WITH LIMITATIONS. Release height was the only variable that
+      separated proficient from non-proficient free-throw shooters (p=0.010),
+      while release ANGLE did not (p=0.179); independently replicated. This
+      metric is measured relative to the head, so it is scale-free and works
+      without a recorded player height. resources.md A2, A6.
 
+  release_height_ratio:
+    name: "Release Height (relative to your height)"
+    metric: release_height_ratio
+    phases: [release]
+    min: 1.02
+    max: 1.58
+    ideal_min: 1.14
+    ideal_max: 1.46
+    unit: ""
+    severity: info
+    scored: true
+    message_excellent: "Your release height is strong for your build."
+    refine_low: "Good release height for your build. A little more lift would steepen the arc further."
+    refine_high: "Your release is high for your build. Keep it repeatable rather than pushing higher."
+    message_low: "Your release is low relative to your height. Release at the top of your rise to gain arc."
+    message_high: "Your release is unusually high relative to your height — check that your whole body is in the frame."
+    evidence: >
+      SUPPORTED WITH LIMITATIONS. Published release heights are reported ONLY
+      as a ratio of body height (1.12 non-proficient vs 1.17 proficient,
+      p=0.010), which is why this rule exists alongside the head-relative one.
+      SKIPPED ENTIRELY when no player height is provided — never estimated
+      from the camera. resources.md A2, B2, B3.
+
+  # --------------------------------------------------------- follow-through
   follow_through_elbow:
-    name: "Follow-Through (Elbow)"
+    name: "Follow-Through"
     metric: elbow
     phases: [follow_through]
-    min: 155
+    min: 145
     max: 180
+    ideal_min: 155
+    ideal_max: 180
     severity: warning
-    message_pass: "Elbow stays extended in follow-through"
-    message_fail: "Hold the follow-through — keep elbow extended after release"
-    rationale: "Follow-through confirms complete proximal-to-distal sequencing through the arm"
+    scored: true
+    message_excellent: "You hold your finish well after the ball leaves."
+    refine_low: "Good finish. Hold the reach toward the rim a moment longer."
+    message_low: "Your arm drops as soon as the ball leaves. Hold the reach toward the rim until the ball reaches the basket."
+    evidence: >
+      ENGINEERING DECISION. Holding the follow-through is standard coaching
+      practice; no published angular threshold was found. Thresholds are ours.
 
   follow_through_index:
-    name: "Follow-Through (Index Finger)"
+    name: "Finish Position"
     metric: index_align
     phases: [follow_through]
-    min: 160
+    min: 150
     max: 180
+    ideal_min: 162
+    ideal_max: 180
     severity: warning
-    message_pass: "Gooseneck finish — index finger pointing down through the rim"
-    message_fail: "Finish with index finger pointing at the floor (gooseneck) — hold 1 second"
-    rationale: "Wrist and index extension after release impart backspin and consistent arc"
+    scored: true
+    message_excellent: "Your hand finishes pointing into the rim. Hold it there."
+    refine_low: "Good finish. Let the fingers relax further down toward the floor."
+    message_low: "Your hand stops flat after release. Finish with your fingers pointing down into the front of the rim, and hold for one second."
+    evidence: >
+      ENGINEERING DECISION. Same basis as follow_through_elbow. Thresholds are ours.
 
+  # ---------------------------------------------------------------- landing
   landing_balance:
-    name: "Landing Balance"
+    name: "Landing"
     metric: ankle_rise
     phases: [landing]
-    min: null
+    min: -0.06
     max: 0.06
+    ideal_min: -0.03
+    ideal_max: 0.03
+    unit: "m"
     severity: info
-    message_pass: "Soft, balanced landing"
-    message_fail: "Land under control — drifting left/right often traces back to uneven leg drive"
-    rationale: "Controlled landing reflects symmetric force production through the shot"
+    scored: true
+    message_excellent: "You land balanced on the spot you took off from."
+    refine_low: "Balanced landing. Aim to finish even closer to your take-off spot."
+    refine_high: "Balanced landing. Aim to finish even closer to your take-off spot."
+    message_low: "You are drifting on the landing. Land on the same spot you took off from."
+    message_high: "You are drifting on the landing. Land on the same spot you took off from."
+    evidence: >
+      ENGINEERING DECISION. Landing on the take-off spot is standard coaching
+      practice; no published threshold was found. Thresholds are ours.

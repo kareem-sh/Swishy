@@ -40,6 +40,7 @@ from phase_detection.features import (
     update_ankle_baseline,
 )
 from phase_detection.phases import PHASE_LABELS
+from player.profile import PlayerProfile, load_player_profile
 from pose.landmarks import extract_all_landmarks
 from pose.visibility import VisibilityGate
 from utils.config_loader import load_yaml
@@ -100,9 +101,14 @@ class ShotAnalysisPipeline:
 
     def __init__(
         self,
-        shooting_hand: str = SHOOTING_HAND,
+        shooting_hand: Optional[str] = None,
         enable_ball: Optional[bool] = None,
+        player: Optional[PlayerProfile] = None,
     ):
+        # Player context is session-level and optional. A profile without a
+        # height is a first-class state: height-independent analysis still runs.
+        self._player = player if player is not None else load_player_profile()
+
         filter_cfg = load_yaml("filter_config.yaml")
         phase_cfg = load_yaml("phases.yaml")
         scoring_cfg = load_yaml("scoring.yaml")
@@ -122,10 +128,19 @@ class ShotAnalysisPipeline:
         )
         self._angle_calculator = AngleCalculator(self._visibility)
         self._phase_detector = ShotPhaseDetector()
-        self._biomechanics = BiomechanicsEngine()
+        self._biomechanics = BiomechanicsEngine(self._player)
         self._shot_tracker = ShotTracker()
         self._frame_buffer = FrameBuffer(max_frames=FRAME_BUFFER_SIZE)
-        self._shooting_hand = shooting_hand
+        # Explicit argument wins, then the player profile, then settings.py.
+        self._shooting_hand = (
+            shooting_hand
+            if shooting_hand is not None
+            else (
+                self._player.shooting_hand
+                if self._player.shooting_hand != "auto"
+                else SHOOTING_HAND
+            )
+        )
         self._resolved_side = "right"
         self._frame_index = 0
         self._fps = DEFAULT_FPS
@@ -545,6 +560,11 @@ class ShotAnalysisPipeline:
             self._nano_ball_tracker.reset()
         if self._ball_detector is not None:
             self._ball_detector.reset()
+
+    @property
+    def player(self) -> PlayerProfile:
+        """Session-level player context (height, handedness)."""
+        return self._player
 
     @property
     def frame_buffer(self) -> FrameBuffer:
