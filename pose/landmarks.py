@@ -3,11 +3,34 @@ Landmark extraction from MediaPipe Pose Landmarker results.
 
 Provides both image-space landmarks (for drawing) and world-space landmarks
 (for 3D angle computation).
+
+Coordinate conventions
+----------------------
+MediaPipe emits BOTH representations with +Y pointing DOWN (screen convention).
+Swichy's canonical internal convention for world space is **+Y UP**, so world
+landmarks are flipped exactly once, here, at the only boundary where raw
+MediaPipe data enters the system.  See ``MEDIAPIPE_TO_SWICHY`` below.
+
+Image landmarks are left in MediaPipe's native +Y-down orientation because they
+are consumed only by drawing code, which expects screen coordinates.
 """
 
 from typing import Dict, Optional
 
 import numpy as np
+
+# Axis correction applied to world landmarks only.
+#
+# Measured directly from the model (pose_landmarker_full on assets/test.jpg and
+# 1821 frames of assets/videos/*.mp4): nose.y = -0.45, hip_mid.y = 0.00,
+# ankle_mid.y = +0.47.  Larger Y therefore meant *lower* in space, the opposite
+# of what every consumer in this codebase assumes.
+#
+# Google's Pose Landmarker documentation does not state axis directions for
+# world landmarks, so this measurement is our reference. See
+# tests/test_coordinates.py, which re-derives it from the live model and fails
+# if MediaPipe ever changes the convention.
+MEDIAPIPE_TO_SWICHY = np.array([1.0, -1.0, 1.0], dtype=np.float64)
 
 POSE_LANDMARKS = {
     "nose": 0,
@@ -94,10 +117,14 @@ def extract_image_landmarks(detection_result, width: int, height: int) -> Option
 
 def extract_world_landmarks(detection_result) -> Optional[Dict[str, dict]]:
     """
-    Extract world-space landmarks in meters (MediaPipe body-centric frame).
+    Extract world-space landmarks in meters, in Swichy canonical coordinates.
 
     Origin: midpoint between hips.
-    +Y: up, +X: subject's right, +Z: toward camera.
+    +Y: UP (toward the head), +X: subject's right, +Z: toward camera.
+
+    MediaPipe's own world landmarks are +Y DOWN; this function applies
+    ``MEDIAPIPE_TO_SWICHY`` so that every downstream consumer can rely on
+    "larger Y means physically higher".
     """
     if not detection_result.pose_world_landmarks:
         return None
@@ -108,7 +135,9 @@ def extract_world_landmarks(detection_result) -> Optional[Dict[str, dict]]:
     for name, idx in BASKETBALL_LANDMARKS.items():
         landmark = pose[idx]
         data[name] = {
-            "position": np.array([landmark.x, landmark.y, landmark.z], dtype=np.float64),
+            "position": np.array(
+                [landmark.x, landmark.y, landmark.z], dtype=np.float64
+            ) * MEDIAPIPE_TO_SWICHY,
             "visibility": landmark.visibility,
             "presence": landmark.presence,
             "is_stable": True,

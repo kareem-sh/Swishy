@@ -61,9 +61,12 @@ def _side_chains(side: str) -> Dict[str, JointChain]:
 JOINT_CHAINS: Dict[str, JointChain] = {
     **_side_chains("left"),
     **_side_chains("right"),
-    "trunk": JointChain(
-        proximal="mid_hip",
-        vertex="mid_shoulder",
-        distal="nose",
-    ),
 }
+
+# Trunk lean is deliberately NOT a JointChain.
+#
+# The other angles are enclosed by three landmarks, which makes them invariant
+# to a flipped coordinate frame. Trunk lean is measured against a FIXED world
+# axis (vertical), so it needs different handling and different landmarks
+# ("mid_hip"/"mid_shoulder" are derived midpoints, not MediaPipe landmarks).
+# It is computed by AngleCalculator._compute_trunk_angle instead.
