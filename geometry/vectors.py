@@ -55,9 +55,17 @@ def angle_between_vectors(v1: np.ndarray, v2: np.ndarray) -> float:
 
 def angle_from_vertical(segment: np.ndarray) -> float:
     """
-    Angle between a body segment and the world-up axis (negative Y in MediaPipe).
+    Angle between a body segment and the world-up axis, in degrees.
 
-    MediaPipe world coordinates: +Y is up, +X is right, +Z is toward the camera.
+    Expects Swichy canonical world coordinates (+Y UP, +X subject's right,
+    +Z toward the camera) as produced by
+    ``pose.landmarks.extract_world_landmarks``.
+
+    A perfectly upright segment returns 0 deg; a horizontal one returns 90 deg.
+
+    NOTE: unlike ``angle_between_vectors``, this function compares against a
+    FIXED world axis, so it is NOT invariant to a flipped coordinate frame.
+    Passing raw MediaPipe (+Y down) landmarks here returns ``180 - true_angle``.
     """
     up = np.array([0.0, 1.0, 0.0], dtype=np.float64)
     return angle_between_vectors(segment, up)

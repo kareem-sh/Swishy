@@ -13,7 +13,7 @@ from typing import Optional, Tuple
 import cv2
 import numpy as np
 
-from ball.models import BallDetection
+from ball.models import BallDetection, RimDetection
 
 
 class NanoBallTracker:
@@ -284,3 +284,36 @@ class NanoBallTracker:
 
         aspect_ratio = width / max(height, 1e-6)
         return self.minimum_aspect_ratio <= aspect_ratio <= self.maximum_aspect_ratio
+
+
+class NanoRimTracker(NanoBallTracker):
+    """Use the same lightweight visual tracker for a YOLO-acquired rim."""
+
+    def __init__(self, *args, center_y_fraction: float = 0.50, **kwargs) -> None:
+        self.center_y_fraction = min(max(float(center_y_fraction), 0.0), 1.0)
+        super().__init__(*args, **kwargs)
+
+    def initialize(self, frame: np.ndarray, detection: RimDetection) -> bool:
+        return super().initialize(frame, detection)  # type: ignore[arg-type]
+
+    def update(
+        self,
+        frame: np.ndarray,
+        frame_index: int,
+        timestamp_ms: int,
+    ) -> Optional[RimDetection]:
+        tracked = super().update(frame, frame_index, timestamp_ms)
+        if tracked is None:
+            return None
+
+        x1, y1, x2, y2 = tracked.bbox_xyxy
+        return RimDetection(
+            center_xy=(
+                (x1 + x2) / 2.0,
+                y1 + (y2 - y1) * self.center_y_fraction,
+            ),
+            bbox_xyxy=tracked.bbox_xyxy,
+            confidence=tracked.confidence,
+            frame_index=tracked.frame_index,
+            timestamp_ms=tracked.timestamp_ms,
+        )

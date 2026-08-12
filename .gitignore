@@ -52,6 +52,9 @@ ml/tensorboard/**
 !ml/datasets/data/.gitkeep
 !ml/checkpoints/.gitkeep
 
+mlRingBall/datasets
+mlRingBall/datasets/runs/basketball_rim_training/basketball_and_rim/weights
+
 # Local video assets
 assets/videos/**/*.mp4
 assets/videos/**/*.mov

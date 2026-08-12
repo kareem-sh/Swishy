@@ -87,7 +87,7 @@ def _release(machine: BallShotStateMachine) -> None:
         0,
         0,
         (0, 0),
-        pose_phase="ball_lift",
+        pose_phase="rise",
         wrist_xy=(100, 500),
     )
     result = _update(
@@ -133,6 +133,55 @@ def test_outside_crossing_becomes_missed() -> None:
     assert missed.outcome.result == "missed"
 
 
+def test_front_rim_contact_can_deflect_in_and_become_made() -> None:
+    machine = BallShotStateMachine()
+    _release(machine)
+
+    _update(machine, 530, 245, 2, 200, (100, -180))
+    _update(machine, 530, 280, 3, 300, (0, 180))
+    contact = _update(machine, 530, 315, 4, 400, (0, 350))
+    made = _update(machine, 512, 338, 5, 500, (-180, 230))
+
+    assert contact.state == BallShotState.RIM_CONTACT
+    assert contact.crossed_rim_this_frame
+    assert made.state == BallShotState.MADE
+    assert made.outcome is not None
+    assert made.outcome.result == "made"
+    assert "after rim contact" in made.outcome.evidence[-1]
+
+
+def test_back_rim_contact_can_deflect_in_and_become_made() -> None:
+    machine = BallShotStateMachine()
+    _release(machine)
+
+    _update(machine, 470, 245, 2, 200, (-100, -180))
+    _update(machine, 470, 280, 3, 300, (0, 180))
+    contact = _update(machine, 470, 315, 4, 400, (0, 350))
+    made = _update(machine, 488, 338, 5, 500, (180, 230))
+
+    assert contact.state == BallShotState.RIM_CONTACT
+    assert made.state == BallShotState.MADE
+    assert made.outcome is not None
+    assert made.outcome.result == "made"
+
+
+def test_rim_contact_that_bounces_away_becomes_missed() -> None:
+    machine = BallShotStateMachine()
+    _release(machine)
+
+    _update(machine, 530, 245, 2, 200, (100, -180))
+    _update(machine, 530, 280, 3, 300, (0, 180))
+    contact = _update(machine, 530, 315, 4, 400, (0, 350))
+    first_bounce = _update(machine, 548, 285, 5, 500, (180, -300))
+    missed = _update(machine, 568, 260, 6, 600, (200, -250))
+
+    assert contact.state == BallShotState.RIM_CONTACT
+    assert first_bounce.state == BallShotState.RIM_CONTACT
+    assert missed.state == BallShotState.MISSED
+    assert missed.outcome is not None
+    assert missed.outcome.result == "missed"
+
+
 def test_predicted_points_cannot_confirm_a_make() -> None:
     machine = BallShotStateMachine()
     _release(machine)
@@ -162,12 +211,96 @@ def test_ball_flight_continues_when_pose_is_missing() -> None:
     assert made.state == BallShotState.MADE
 
 
+<<<<<<< HEAD
+def test_moving_camera_uses_ball_position_relative_to_rim() -> None:
+    machine = BallShotStateMachine()
+
+    def moving_update(
+        base_ball_xy,
+        camera_offset,
+        frame,
+        timestamp_ms,
+        velocity,
+        pose_phase=None,
+        wrist_base_xy=None,
+    ):
+        offset_x, offset_y = camera_offset
+        ball_x = base_ball_xy[0] + offset_x
+        ball_y = base_ball_xy[1] + offset_y
+        detection, snapshot = _ball(
+            ball_x,
+            ball_y,
+            frame,
+            timestamp_ms,
+            velocity,
+        )
+        wrist_xy = None
+        if wrist_base_xy is not None:
+            wrist_xy = (
+                wrist_base_xy[0] + offset_x,
+                wrist_base_xy[1] + offset_y,
+            )
+        rim = RimDetection(
+            center_xy=(500.0 + offset_x, 300.0 + offset_y),
+            bbox_xyxy=(
+                450.0 + offset_x,
+                300.0 + offset_y,
+                550.0 + offset_x,
+                430.0 + offset_y,
+            ),
+            confidence=0.9,
+            frame_index=frame,
+            timestamp_ms=timestamp_ms,
+        )
+        return machine.update(
+            ball_detection=detection,
+            ball_snapshot=snapshot,
+            rim_detection=rim,
+            wrist_xy=wrist_xy,
+            pose_phase=pose_phase,
+            timestamp_ms=timestamp_ms,
+        )
+
+    moving_update(
+        (100, 500), (0, 0), 0, 0, (0, 0),
+        pose_phase="ball_lift", wrist_base_xy=(100, 500),
+    )
+    released = moving_update(
+        (200, 400), (20, 10), 1, 100, (700, -400),
+        pose_phase="release", wrist_base_xy=(100, 500),
+    )
+    assert released.state == BallShotState.ASCENDING
+
+    moving_update((500, 240), (40, 20), 2, 200, (300, -100))
+    moving_update((500, 280), (60, 30), 3, 300, (200, 300))
+    crossing = moving_update((500, 315), (80, 40), 4, 400, (200, 450))
+    made = moving_update((502, 335), (100, 50), 5, 500, (220, 300))
+
+    assert crossing.crossed_rim_this_frame
+    assert made.state == BallShotState.MADE
+    assert made.outcome is not None
+    assert made.outcome.result == "made"
+
+
 def _body_snapshot(timestamp_ms: int, phase: str) -> FrameSnapshot:
+=======
+def _body_snapshot(timestamp_ms: int, phase: str, wrist_y: float = 1.0) -> FrameSnapshot:
+    from phase_detection.features import KinematicFeatures
+
+>>>>>>> pose-edits
     return FrameSnapshot(
         timestamp_ms=timestamp_ms,
         angles={},
         shooting_side="right",
         phase=phase,
+        features=KinematicFeatures(
+            wrist_y=wrist_y,
+            shoulder_y=1.40,
+            hip_y_avg=0.95,
+            nose_y=1.60,
+            ankle_y_avg=0.10,
+            ankle_baseline_y=0.10,
+        ),
     )
 
 
@@ -175,9 +308,13 @@ def test_shot_tracker_waits_for_ball_after_body_finishes() -> None:
     tracker = ShotTracker()
     tracker.configure_ball_outcome(required=True, body_grace_ms=500)
 
-    assert tracker.update("loading", _body_snapshot(0, "loading")) is None
-    assert tracker.update("landing", _body_snapshot(100, "landing")) is None
-    assert tracker.update("ready_stance", _body_snapshot(200, "ready_stance")) is None
+    # A credible motion: the wrist must actually travel and the ball must be
+    # released, otherwise the candidate is discarded as a posture change.
+    assert tracker.update("rise", _body_snapshot(0, "rise", 1.00)) is None
+    assert tracker.update("rise", _body_snapshot(60, "rise", 1.20)) is None
+    assert tracker.update("release", _body_snapshot(120, "release", 1.48)) is None
+    assert tracker.update("recovery", _body_snapshot(180, "recovery", 1.05)) is None
+    assert tracker.update("ready", _body_snapshot(240, "ready", 1.00)) is None
     assert tracker.shot_in_progress
     assert not tracker.capture_in_progress
 
@@ -201,7 +338,9 @@ def test_shot_tracker_waits_for_ball_after_body_finishes() -> None:
 def test_ball_outcome_can_finish_after_body_grace_when_pose_never_lands() -> None:
     tracker = ShotTracker()
     tracker.configure_ball_outcome(required=True, body_grace_ms=500)
-    tracker.update("loading", _body_snapshot(0, "loading"))
+    tracker.update("rise", _body_snapshot(0, "rise", 1.00))
+    tracker.update("rise", _body_snapshot(30, "rise", 1.20))
+    tracker.update("release", _body_snapshot(60, "release", 1.48))
 
     outcome = ShotOutcome(
         result="missed",
@@ -220,8 +359,12 @@ def test_ball_outcome_can_finish_after_body_grace_when_pose_never_lands() -> Non
 if __name__ == "__main__":
     test_clean_inside_crossing_becomes_made()
     test_outside_crossing_becomes_missed()
+    test_front_rim_contact_can_deflect_in_and_become_made()
+    test_back_rim_contact_can_deflect_in_and_become_made()
+    test_rim_contact_that_bounces_away_becomes_missed()
     test_predicted_points_cannot_confirm_a_make()
     test_ball_flight_continues_when_pose_is_missing()
+    test_moving_camera_uses_ball_position_relative_to_rim()
     test_shot_tracker_waits_for_ball_after_body_finishes()
     test_ball_outcome_can_finish_after_body_grace_when_pose_never_lands()
     print("All ball shot state-machine tests passed.")

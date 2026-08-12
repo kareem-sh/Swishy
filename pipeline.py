@@ -3,7 +3,7 @@ Central analysis pipeline: detect -> filter -> gate -> angles -> phases -> rules
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -12,10 +12,12 @@ from analysis.models import AnalysisResult
 from angles.calculator import AngleCalculator, AngleResult
 from ball.detector import BallDetector
 from ball.models import BallDetection, BallSnapshot, RimDetection, ShotOutcome
-from ball.nano_tracker import NanoBallTracker
+from ball.nano_tracker import NanoBallTracker, NanoRimTracker
+from ball.rim_tracker import RimMotionSmoother, is_plausible_rim_correction
 from ball.shot_state_machine import BallShotStateMachine, BallStateUpdate
 from ball.timeseries import BallTimeSeriesBuffer
 from ball.tracker import BallTracker
+from ball.trajectory_overlay import ObservedTrajectoryRecorder
 from config.settings import (
     DEFAULT_FPS,
     FILTER_BETA,
@@ -38,8 +40,10 @@ from phase_detection.features import (
     _avg_y,
     extract_features,
     update_ankle_baseline,
+    update_ankle_image_baseline,
 )
 from phase_detection.phases import PHASE_LABELS
+from player.profile import PlayerProfile, load_player_profile
 from pose.landmarks import extract_all_landmarks
 from pose.visibility import VisibilityGate
 from utils.config_loader import load_yaml
@@ -79,6 +83,12 @@ class FrameResult:
     stabilized_rim_center_xy: Optional[Tuple[float, float]] = None
     stabilized_rim_inner_radius: Optional[float] = None
     rim_crossing_xy: Optional[Tuple[float, float]] = None
+    observed_ball_path_segments: List[List[Tuple[float, float]]] = field(
+        default_factory=list
+    )
+    fitted_observed_ball_path: List[Tuple[float, float]] = field(
+        default_factory=list
+    )
 
 
 class ShotAnalysisPipeline:
@@ -100,9 +110,14 @@ class ShotAnalysisPipeline:
 
     def __init__(
         self,
-        shooting_hand: str = SHOOTING_HAND,
+        shooting_hand: Optional[str] = None,
         enable_ball: Optional[bool] = None,
+        player: Optional[PlayerProfile] = None,
     ):
+        # Player context is session-level and optional. A profile without a
+        # height is a first-class state: height-independent analysis still runs.
+        self._player = player if player is not None else load_player_profile()
+
         filter_cfg = load_yaml("filter_config.yaml")
         phase_cfg = load_yaml("phases.yaml")
         scoring_cfg = load_yaml("scoring.yaml")
@@ -122,16 +137,33 @@ class ShotAnalysisPipeline:
         )
         self._angle_calculator = AngleCalculator(self._visibility)
         self._phase_detector = ShotPhaseDetector()
-        self._biomechanics = BiomechanicsEngine()
+        self._biomechanics = BiomechanicsEngine(self._player)
         self._shot_tracker = ShotTracker()
         self._frame_buffer = FrameBuffer(max_frames=FRAME_BUFFER_SIZE)
-        self._shooting_hand = shooting_hand
+        # The tracker opens shots BACKWARDS from a detected release, so it needs
+        # the recent past, and it re-scores the captured frames against the
+        # refined coaching phases, so it needs this engine rather than one of
+        # its own (which could carry a different player profile).
+        self._shot_tracker.attach_history(self._frame_buffer)
+        self._shot_tracker.attach_analyzer(self._biomechanics)
+        # Explicit argument wins, then the player profile, then settings.py.
+        self._shooting_hand = (
+            shooting_hand
+            if shooting_hand is not None
+            else (
+                self._player.shooting_hand
+                if self._player.shooting_hand != "auto"
+                else SHOOTING_HAND
+            )
+        )
         self._resolved_side = "right"
         self._frame_index = 0
         self._fps = DEFAULT_FPS
         self._prev_timestamp_ms: Optional[int] = None
         self._prev_world: Optional[dict] = None
+        self._prev_image: Optional[dict] = None
         self._ankle_baseline_y = 0.0
+        self._ankle_image_baseline = 0.0
         self._still_threshold = float(
             phase_cfg.get("thresholds", {}).get("ready_max_velocity", 0.15)
         )
@@ -140,6 +172,20 @@ class ShotAnalysisPipeline:
         )
         self._hud_display = HudDisplaySmoother()
         self._show_ball_overlay = bool(display_cfg.get("show_ball_overlay", True))
+        trajectory_display_cfg = display_cfg.get("trajectory_overlay", {})
+        self._observed_trajectory = ObservedTrajectoryRecorder(
+            max_points=int(trajectory_display_cfg.get("observed_max_points", 120)),
+            maximum_jump_rim_radii=float(
+                trajectory_display_cfg.get("maximum_jump_rim_radii", 5.0)
+            ),
+            fit_min_points=int(trajectory_display_cfg.get("fit_min_points", 5)),
+            fit_samples=int(trajectory_display_cfg.get("fit_samples", 60)),
+            fit_outlier_threshold_rim_radii=float(
+                trajectory_display_cfg.get(
+                    "fit_outlier_threshold_rim_radii", 0.75
+                )
+            ),
+        )
 
         # Phase 6 — custom basketball YOLO (ball + hoop)
         # enable_ball=False skips YOLO load (used by ML feature export).
@@ -206,6 +252,87 @@ class ShotAnalysisPipeline:
                 print(f"Warning: NanoTrack disabled ({exc})")
                 self._visual_tracking_enabled = False
 
+        rim_tracking_cfg = ball_cfg.get("rim_tracking", {})
+        self._rim_tracking_enabled = bool(
+            self._ball_enabled and rim_tracking_cfg.get("enabled", False)
+        )
+        self._rim_yolo_correction_interval = max(
+            1, int(rim_tracking_cfg.get("yolo_correction_interval", 10))
+        )
+        self._rim_yolo_min_confidence = float(
+            rim_tracking_cfg.get("yolo_reinitialize_confidence", 0.15)
+        )
+        self._rim_tracking_min_confidence = float(
+            rim_tracking_cfg.get("minimum_tracking_confidence", 0.10)
+        )
+        self._rim_max_correction_distance_px = float(
+            rim_tracking_cfg.get("yolo_max_correction_distance_px", 120.0)
+        )
+        self._rim_max_correction_distance_scale = float(
+            rim_tracking_cfg.get("yolo_max_correction_distance_scale", 1.5)
+        )
+        self._rim_max_width_change_ratio = float(
+            rim_tracking_cfg.get("maximum_width_change_ratio", 1.5)
+        )
+        rim_center_y_fraction = float(
+            ball_cfg.get("detector", {}).get("rim_center_y_fraction", 0.5)
+        )
+        self._rim_smoother = RimMotionSmoother(
+            position_alpha=float(rim_tracking_cfg.get("position_alpha", 0.75)),
+            size_alpha=float(rim_tracking_cfg.get("size_alpha", 0.50)),
+            center_y_fraction=rim_center_y_fraction,
+        )
+        self._nano_rim_tracker: Optional[NanoRimTracker] = None
+        self._last_rim_yolo_frame = -self._rim_yolo_correction_interval
+
+        if self._rim_tracking_enabled:
+            backbone_path = PROJECT_ROOT / rim_tracking_cfg.get(
+                "backbone_path",
+                visual_tracking_cfg.get(
+                    "backbone_path",
+                    "models/nanotrack/nanotrack_backbone_sim.onnx",
+                ),
+            )
+            neckhead_path = PROJECT_ROOT / rim_tracking_cfg.get(
+                "neckhead_path",
+                visual_tracking_cfg.get(
+                    "neckhead_path",
+                    "models/nanotrack/nanotrack_head_sim.onnx",
+                ),
+            )
+            try:
+                self._nano_rim_tracker = NanoRimTracker(
+                    backbone_path=backbone_path,
+                    neckhead_path=neckhead_path,
+                    minimum_box_size_px=float(
+                        rim_tracking_cfg.get("minimum_box_size_px", 16)
+                    ),
+                    maximum_center_jump_px=float(
+                        rim_tracking_cfg.get("maximum_center_jump_px", 220)
+                    ),
+                    initial_box_scale=float(
+                        rim_tracking_cfg.get("initial_box_scale", 1.0)
+                    ),
+                    minimum_size_ratio=float(
+                        rim_tracking_cfg.get("minimum_frame_size_ratio", 0.65)
+                    ),
+                    maximum_size_ratio=float(
+                        rim_tracking_cfg.get("maximum_frame_size_ratio", 1.55)
+                    ),
+                    minimum_aspect_ratio=float(
+                        rim_tracking_cfg.get("minimum_aspect_ratio", 0.35)
+                    ),
+                    maximum_aspect_ratio=float(
+                        rim_tracking_cfg.get("maximum_aspect_ratio", 8.0)
+                    ),
+                    center_y_fraction=rim_center_y_fraction,
+                    device=str(rim_tracking_cfg.get("device", "auto")),
+                    cuda_fp16=bool(rim_tracking_cfg.get("cuda_fp16", False)),
+                )
+            except Exception as exc:
+                # Keep periodic YOLO rim updates active as the fallback.
+                print(f"Warning: NanoTrack rim tracking unavailable ({exc})")
+
         if self._ball_enabled:
             try:
                 detector = BallDetector("ball.yaml")
@@ -238,10 +365,11 @@ class ShotAnalysisPipeline:
         if self._ball_detector is None or bgr_frame is None:
             return None, self._last_rim, None
 
-        # NanoTrack supplies the cheap per-frame measurement. YOLO acquires the
-        # ball, corrects drift periodically, and reacquires it after a loss.
+        # NanoTrack supplies cheap per-frame ball and rim measurements. YOLO
+        # periodically corrects both trackers and reacquires either after loss.
         ball: Optional[BallDetection] = None
         rim = self._last_rim
+        tracked_rim: Optional[RimDetection] = None
         if (
             self._visual_tracking_enabled
             and self._nano_ball_tracker is not None
@@ -253,11 +381,27 @@ class ShotAnalysisPipeline:
                 timestamp_ms=timestamp_ms,
             )
 
+        if self._nano_rim_tracker is not None and self._nano_rim_tracker.active:
+            tracked_rim = self._nano_rim_tracker.update(
+                frame=bgr_frame,
+                frame_index=self._frame_index,
+                timestamp_ms=timestamp_ms,
+            )
+            if tracked_rim is not None:
+                rim = self._rim_smoother.update(tracked_rim)
+                self._last_rim = rim
+
         frames_since_yolo = self._frame_index - self._last_yolo_frame
+        rim_frames_since_yolo = self._frame_index - self._last_rim_yolo_frame
+        rim_correction_due = (
+            self._rim_tracking_enabled
+            and rim_frames_since_yolo >= self._rim_yolo_correction_interval
+        )
         run_yolo = (
             not self._visual_tracking_enabled
             or ball is None
             or frames_since_yolo >= self._yolo_correction_interval
+            or rim_correction_due
         )
 
         if run_yolo:
@@ -267,10 +411,47 @@ class ShotAnalysisPipeline:
                 timestamp_ms,
             )
             self._last_yolo_frame = self._frame_index
+            self._last_rim_yolo_frame = self._frame_index
 
-            if court.rim is not None:
-                rim = court.rim
-                self._last_rim = court.rim
+            if (
+                court.rim is not None
+                and court.rim.confidence >= self._rim_yolo_min_confidence
+            ):
+                rim_reference = tracked_rim or self._last_rim
+                weak_or_reacquiring = (
+                    tracked_rim is None
+                    or tracked_rim.confidence < self._rim_tracking_min_confidence
+                )
+                accept_rim = (
+                    rim_reference is None
+                    or is_plausible_rim_correction(
+                        court.rim,
+                        rim_reference,
+                        maximum_center_distance_px=(
+                            float("inf")
+                            if weak_or_reacquiring
+                            else self._rim_max_correction_distance_px
+                        ),
+                        maximum_center_distance_scale=(
+                            self._rim_max_correction_distance_scale
+                        ),
+                        maximum_width_change_ratio=(
+                            self._rim_max_width_change_ratio
+                        ),
+                    )
+                )
+                if accept_rim:
+                    reacquired = tracked_rim is None
+                    if self._nano_rim_tracker is not None:
+                        self._nano_rim_tracker.initialize(
+                            frame=bgr_frame,
+                            detection=court.rim,
+                        )
+                    rim = self._rim_smoother.update(
+                        court.rim,
+                        snap=(reacquired and self._nano_rim_tracker is not None),
+                    )
+                    self._last_rim = rim
 
             if (
                 court.ball is not None
@@ -330,10 +511,12 @@ class ShotAnalysisPipeline:
                 ball_detection=ball,
                 ball_snapshot=ball_snapshot,
                 rim_detection=rim,
+                ankle_y= None,
                 wrist_xy=None,
                 pose_phase=None,
                 timestamp_ms=timestamp_ms,
             )
+            self._update_observed_trajectory(ball_snapshot, ball_state_update)
             completed_shot = self._shot_tracker.update_ball_outcome(
                 ball_state_update.outcome,
                 timestamp_ms,
@@ -364,7 +547,9 @@ class ShotAnalysisPipeline:
                 ball_snapshot=ball_snapshot,
                 **self._ball_state_frame_fields(ball_state_update),
             )
-
+        left_ankle_y_px = raw["image"]["left_ankle"]["y"]
+        right_ankle_y_px = raw["image"]["right_ankle"]["y"]
+        ankle_y_px = (left_ankle_y_px + right_ankle_y_px) / 2.0
         world = self._filter_bank.filter_landmarks(raw["world"], timestamp_s)
         world = self._visibility.apply(world)
 
@@ -387,7 +572,11 @@ class ShotAnalysisPipeline:
             prev_angles=prev_snapshot.angles if prev_snapshot else None,
             dt_s=dt_s,
             ankle_baseline_y=self._ankle_baseline_y,
+            image_landmarks=raw["image"],
+            ankle_image_baseline=self._ankle_image_baseline,
+            prev_image_landmarks=self._prev_image,
         )
+        self._prev_image = raw["image"]
 
         self._ankle_baseline_y = update_ankle_baseline(
             self._ankle_baseline_y,
@@ -395,21 +584,30 @@ class ShotAnalysisPipeline:
             features.total_velocity,
             self._still_threshold,
         )
+        self._ankle_image_baseline = update_ankle_image_baseline(
+            self._ankle_image_baseline,
+            raw["image"],
+            features.total_velocity,
+            self._still_threshold,
+        )
         features.ankle_baseline_y = self._ankle_baseline_y
 
-        phase = self._phase_detector.update(features)
+        phase = self._phase_detector.update(features, timestamp_ms=timestamp_ms)
         phase_label = PHASE_LABELS.get(phase, phase)
         analysis = self._biomechanics.evaluate(phase, angles, features, shooting_side)
 
         wrist_xy = self._shooting_wrist_xy(raw["image"], shooting_side)
+        # print("ankle" , ankle_y_px , " , " , "basket_y" , ball_snapshot.y)
         ball_state_update = self._ball_shot_fsm.update(
             ball_detection=ball,
             ball_snapshot=ball_snapshot,
             rim_detection=rim,
             wrist_xy=wrist_xy,
+            ankle_y=ankle_y_px,
             pose_phase=phase,
             timestamp_ms=timestamp_ms,
         )
+        self._update_observed_trajectory(ball_snapshot, ball_state_update)
 
         snapshot = FrameSnapshot(
             timestamp_ms=timestamp_ms,
@@ -489,8 +687,20 @@ class ShotAnalysisPipeline:
             return None
         return float(wrist["x"]), float(wrist["y"])
 
-    @staticmethod
-    def _ball_state_frame_fields(update: BallStateUpdate) -> dict:
+    def _update_observed_trajectory(
+        self,
+        ball_snapshot: Optional[BallSnapshot],
+        update: BallStateUpdate,
+    ) -> None:
+        self._observed_trajectory.update(
+            ball_snapshot,
+            released_this_frame=update.released_this_frame,
+            shot_finished=update.outcome is not None,
+            rim_center_xy=update.rim_center_xy,
+            rim_radius=update.rim_inner_radius,
+        )
+
+    def _ball_state_frame_fields(self, update: BallStateUpdate) -> dict:
         return {
             "ball_state": update.state.value,
             "ball_tracking_status": update.tracking_status.value,
@@ -498,6 +708,18 @@ class ShotAnalysisPipeline:
             "stabilized_rim_center_xy": update.rim_center_xy,
             "stabilized_rim_inner_radius": update.rim_inner_radius,
             "rim_crossing_xy": update.crossing_xy,
+            "observed_ball_path_segments": (
+                self._observed_trajectory.screen_segments(
+                    update.rim_center_xy,
+                    update.rim_inner_radius,
+                )
+            ),
+            "fitted_observed_ball_path": (
+                self._observed_trajectory.fitted_screen_curve(
+                    update.rim_center_xy,
+                    update.rim_inner_radius,
+                )
+            ),
         }
 
     def _compute_dt(self, timestamp_ms: int) -> float:
@@ -534,17 +756,29 @@ class ShotAnalysisPipeline:
         self._frame_buffer.clear()
         self._frame_index = 0
         self._prev_world = None
+        self._prev_image = None
         self._prev_timestamp_ms = None
         self._ankle_baseline_y = 0.0
+        self._ankle_image_baseline = 0.0
         self._ball_tracker.reset()
         self._ball_buffer.clear()
         self._ball_shot_fsm.reset()
+        self._observed_trajectory.reset()
         self._last_rim = None
         self._last_yolo_frame = -1
+        self._last_rim_yolo_frame = -self._rim_yolo_correction_interval
+        self._rim_smoother.reset()
         if self._nano_ball_tracker is not None:
             self._nano_ball_tracker.reset()
+        if self._nano_rim_tracker is not None:
+            self._nano_rim_tracker.reset()
         if self._ball_detector is not None:
             self._ball_detector.reset()
+
+    @property
+    def player(self) -> PlayerProfile:
+        """Session-level player context (height, handedness)."""
+        return self._player
 
     @property
     def frame_buffer(self) -> FrameBuffer:

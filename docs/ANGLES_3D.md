@@ -27,12 +27,31 @@ This measures the angle **in the image plane** (the 2D projection of the body on
 
 ### The 3D solution
 
-We now use **MediaPipe world landmarks** — 3D coordinates in meters, centered on the hip midpoint, in a body-centric frame:
+We now use **MediaPipe world landmarks** — 3D coordinates in meters, centered on the hip midpoint, in a body-centric frame.
 
-- **Origin:** Midpoint between hips
-- **+Y:** Up (toward head)
-- **+X:** Subject's right
-- **+Z:** Toward the camera
+### ⚠️ Coordinate convention — read this before touching any vertical logic
+
+MediaPipe emits world landmarks with **+Y pointing DOWN**. Measured directly from `pose_landmarker_full` over 1821 frames:
+
+```
+nose.y = -0.45    hip_mid.y = 0.00    ankle_mid.y = +0.47
+```
+
+Google's Pose Landmarker documentation does not state axis directions for world landmarks, so this measurement is our reference.
+
+Swichy's **canonical internal convention is +Y UP**. `pose/landmarks.py::extract_world_landmarks` applies `MEDIAPIPE_TO_SWICHY = [1, -1, 1]` exactly once, at the boundary. Everything downstream may rely on:
+
+| Swichy canonical world space | |
+|---|---|
+| **Origin** | Midpoint between hips |
+| **+Y** | **UP (toward head)** |
+| **+X** | Subject's right |
+| **+Z** | Toward the camera |
+| higher physical position | **larger** Y |
+| rising | **positive** Y velocity |
+| falling | **negative** Y velocity |
+
+**Image landmarks are NOT flipped** — they stay in MediaPipe's native +Y-down screen orientation, because only drawing code consumes them.
 
 Angles are computed with **3D vector dot product**, which is rotation-invariant:
 

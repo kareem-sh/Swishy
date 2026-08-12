@@ -140,7 +140,7 @@ class BallDetector:
                 ball=self._detect_color(bgr_image, frame_index, timestamp_ms)
             )
 
-        if result.rim is not None:
+        if self.sticky_rim and result.rim is not None:
             if (
                 self._sticky_rim_det is None
                 or result.rim.confidence >= self._sticky_rim_det.confidence
@@ -240,7 +240,11 @@ class BallDetector:
 
     def _reject_rim_jump(self, result: CourtDetections) -> CourtDetections:
         """Keep a locked static rim from jumping to a distant false detection."""
-        if self._sticky_rim_det is None or result.rim is None:
+        if (
+            not getattr(self, "sticky_rim", True)
+            or self._sticky_rim_det is None
+            or result.rim is None
+        ):
             return result
 
         locked = self._sticky_rim_det

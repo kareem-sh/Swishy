@@ -141,11 +141,10 @@ def _add_shot_section(pdf: FPDF, shot: DetailedShotReport, frames_dir: Path):
             _multi(pdf, f"  > {drill}", 6)
         pdf.ln(2)
 
-    if s.performance_actions:
-        _section_heading(pdf, "Action Items")
-        for action in s.performance_actions:
-            _multi(pdf, f"  - {action}", 6)
-        pdf.ln(2)
+    # An "Action Items" section used to sit here, printing
+    # `performance_actions` -- which held the "Next Rep Focus" lines above
+    # with a "Fix X:" prefix stuck on the front. The same advice, twice on
+    # one page.
 
     if s.coaching_tips:
         _section_heading(pdf, "Coach Summary")

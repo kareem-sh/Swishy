@@ -1,0 +1,119 @@
+# The phase model, in two layers.
+#
+# WHY TWO LAYERS
+# --------------
+# These used to be one thing: an eight-state machine that ran live, frame by
+# frame, and whose state was also the label attached to every coaching rule.
+# That coupling is what made shot detection fragile.
+#
+# To reach `release` the machine had to pass seven consecutive threshold gates
+# (ready -> loading -> knee_flexion -> ball_lift -> jump -> release), and any
+# one of them failing lost the whole shot. Measured on a ten-shot practice
+# video: 4 shots found out of 10. On a side-on jump shot: 0 out of 1, with 7
+# candidates examined and discarded.
+#
+# The two jobs pull in opposite directions:
+#
+#   FINDING a shot wants FEW states. Every state is another place to get
+#   stuck, and the shot only really needs "the hand is going up", "the ball
+#   left", "it is over".
+#
+#   COACHING a shot wants MANY phases, because "your knee bend" and "your
+#   follow-through" are different pieces of advice and belong under different
+#   headings.
+#
+# So they are now separate. The detector runs four states live. The analysis
+# phases are assigned afterwards, once the whole shot is in hand, by finding
+# extrema over the captured window -- the frame where the knee was most bent,
+# the frame where the wrist was lowest. A minimum over an array cannot get
+# stuck; a live velocity threshold can, and did.
+#
+# FOR ANYONE EXTENDING THIS (e.g. adding ball tracking)
+# -----------------------------------------------------
+# Nothing here is hardcoded in Python. Add an analysis phase by adding it to
+# `analysis.order` with a label, give it rules in biomechanics.yaml, and teach
+# feedback/phase_refiner.py how to find its boundary. The detector does not
+# need to change: a phase that only the ball can see (for instance "ball at
+# the set point") is a refinement question, not a detection question.
+
+# ---------------------------------------------------------------- layer 1
+# What the state machine tracks live. Keep this small.
+detector:
+  states:
+    ready:
+      label: "Ready"
+      description: "Not shooting. Standing, walking, collecting the ball."
+    rise:
+      label: "Rise"
+      description: >
+        The shooting hand is on its way up. Covers the whole upward drive:
+        the dip, the lift and the jump are all one state here, because
+        telling them apart live is a coaching question, not a detection one.
+    release:
+      label: "Release"
+      description: "The ball has left the hand. This is the anchor event."
+    recovery:
+      label: "Recovery"
+      description: "The finish: arm coming down, feet returning to the floor."
+
+  # Where a state may go next. `ready` is reachable from anywhere as a reset.
+  transitions:
+    ready: [rise]
+    rise: [release, ready]
+    release: [recovery]
+    recovery: [ready]
+
+  # The state a shot is anchored on. A candidate opens when this is reached,
+  # retroactively if necessary.
+  anchor: release
+
+# ---------------------------------------------------------------- layer 2
+# What the coaching report talks about. Assigned after the shot is captured.
+#
+# `knee_flexion` was REMOVED. It carried exactly the same two rules as
+# `loading` (knee_flexion_loading, hip_hinge_loading), so a single dip was
+# reported twice under two headings, sometimes with contradictory readings
+# because the deepest knee angle fell in one and the shallower one in the
+# other. One phase covering the whole dip reports the deepest bend once.
+analysis:
+  order:
+    - ready_stance
+    - loading
+    - ball_lift
+    - jump
+    - release
+    - follow_through
+    - landing
+
+  labels:
+    ready_stance: "Ready Stance"
+    loading: "Loading"
+    ball_lift: "Ball Lift"
+    jump: "Jump"
+    release: "Release"
+    follow_through: "Follow-Through"
+    landing: "Landing"
+
+# ------------------------------------------------------- layer 2 boundaries
+# How feedback/phase_refiner.py locates the analysis phases inside a captured
+# shot. These are movement-plausibility choices, not published norms.
+refinement:
+  # How much whole-body elevation counts as leaving the floor at all, as a
+  # fraction of the player's own on-screen height. Below this a shot has no
+  # `jump` phase, which is the correct description of a set shot rather than a
+  # missing measurement.
+  #
+  # Deliberately well BELOW the value the classifier uses to call a shot a jump
+  # shot. Two different questions: this one asks "did the feet leave the
+  # floor?", the classifier asks "was that a jump shot?" -- and a player who
+  # rises slightly answers yes to the first and no to the second.
+  min_takeoff_ratio: 0.05
+
+  # Where in the rise the feet are taken to have left the floor, as a fraction
+  # of that shot's own peak elevation. Relative rather than absolute, so a
+  # small hop and a full jump are cut at the same point in their arc.
+  takeoff_fraction: 0.35
+
+  # The finish is held before the arm drops, so the descent is not looked for
+  # until this long after release.
+  min_follow_through_s: 0.15

@@ -116,9 +116,14 @@ def build_session_report(
         ]
         return report
 
-    scores = [s.summary.score for s in shots if s.summary.total_count > 0]
-    report.overall_score = round(sum(scores) / len(scores)) if scores else 0
-    report.overall_grade = _grade(report.overall_score)
+    scored_shots = [s for s in shots if s.summary.score is not None]
+    scores = [int(s.summary.score) for s in scored_shots]
+    if scores:
+        report.overall_score = round(sum(scores) / len(scores))
+        report.overall_grade = _grade(report.overall_score)
+    else:
+        report.overall_score = None
+        report.overall_grade = "N/A"
 
     violation_counts: Counter = Counter()
     strength_counts: Counter = Counter()
@@ -130,16 +135,18 @@ def build_session_report(
                 violation_counts[ev.name] += 1
 
     report.top_improvements = [
-        f"{name} (failed in {count}/{len(shots)} shots)"
+        f"{name} (failed in {count}/{len(scored_shots)} scored shots)"
         for name, count in violation_counts.most_common(5)
     ]
     report.strengths = [
-        f"{name} (passed in {count}/{len(shots)} shots)"
+        f"{name} (passed in {count}/{len(scored_shots)} scored shots)"
         for name, count in strength_counts.most_common(5)
     ]
 
     report.session_notes = _session_capture_notes(shots)
-    report.practice_plan = _build_session_practice_plan(shots, violation_counts)
+    report.practice_plan = _build_session_practice_plan(
+        scored_shots, violation_counts
+    )
 
     return report
 
