@@ -1,0 +1,136 @@
+# Biomechanical rules for basketball jump-shot analysis.
+# Ranges informed by peer-reviewed shooting kinematics literature.
+# See docs/BIOMECHANICS_RESEARCH.md for sources and rationale.
+
+rules:
+  knee_flexion_loading:
+    name: "Knee Flexion (Load)"
+    metric: knee
+    phases: [loading, knee_flexion]
+    min: 70
+    max: 125
+    severity: warning
+    message_pass: "Solid knee bend — you're loading the legs for power"
+    message_fail: "Bend knees deeper in the load (aim ~90-110°) — leg drive creates lift and range"
+    rationale: "Adequate knee flexion stores elastic energy; made shots show greater knee/hip flexion before release (Knudson 1993; MDPI Biomechanics 2022)"
+
+  hip_hinge_loading:
+    name: "Hip Hinge"
+    metric: hip
+    phases: [loading, knee_flexion]
+    min: 145
+    max: 175
+    severity: info
+    message_pass: "Hip hinge looks athletic — hips back, chest tall"
+    message_fail: "Hinge at the hips slightly — stay tall through the chest, not folded or bolt upright"
+    rationale: "Hip-shoulder-knee chain transfers force proximally to distally; proficient shooters sequence hip then knee then elbow (ISBS 2023)"
+
+  elbow_slot_ball_lift:
+    name: "Elbow Position (Lift)"
+    metric: elbow
+    phases: [ball_lift]
+    min: 75
+    max: 115
+    severity: warning
+    message_pass: "Elbow stays in the slot under the ball"
+    message_fail: "Tuck elbow under the ball — avoid chicken wing or wide elbow flare"
+    rationale: "Higher elbow relative to stature and elbow-under-ball alignment differentiate made vs missed shots (MDPI Biomechanics 2022)"
+
+  shoulder_alignment_lift:
+    name: "Shoulder Elevation"
+    metric: shoulder
+    phases: [ball_lift, jump]
+    min: 65
+    max: 125
+    severity: info
+    message_pass: "Shoulder elevation supports a high release window"
+    message_fail: "Lift the shooting shoulder higher through the drive — steeper arc starts here"
+    rationale: "Greater shoulder flexion at release correlates with made mid-range shots (J. Sports Biomech. 2025)"
+
+  trunk_posture:
+    name: "Trunk Posture"
+    metric: trunk
+    phases: [ready_stance, loading, ball_lift, jump, release]
+    min: 5
+    max: 22
+    severity: warning
+    message_pass: "Torso stays relatively erect — good balance"
+    message_fail: "Stay taller through the torso — excessive lean shifts aim and blocks leg power"
+    rationale: "More erect torso during preparatory phase differentiates made three-point attempts (MDPI Biomechanics 2022)"
+
+  head_stability:
+    name: "Head Stability"
+    metric: head_velocity
+    phases: [loading, ball_lift, jump, release]
+    min: null
+    max: 0.08
+    severity: info
+    message_pass: "Head stays still — eyes can stay on target"
+    message_fail: "Keep head quiet through the shot — minimize bobbing or pulling away early"
+    rationale: "Head movement disrupts visual aim and timing of the kinematic sequence"
+
+  index_alignment_release:
+    name: "Index Finger Alignment (Release)"
+    metric: index_align
+    phases: [release]
+    min: 155
+    max: 180
+    severity: warning
+    message_pass: "Index finger drives through the ball at release"
+    message_fail: "Extend through the index finger at release — snap, don't push flat-handed"
+    rationale: "Elbow and wrist extend abruptly just before release; low variation in wrist/elbow at release implies consistent finger-through-ball mechanics (ISBS set-shot model)"
+
+  elbow_extension_release:
+    name: "Elbow Extension (Release)"
+    metric: elbow
+    phases: [release]
+    min: 158
+    max: 180
+    severity: warning
+    message_pass: "Full elbow extension at release — good arc potential"
+    message_fail: "Extend the elbow fully at release — short extension flattens arc"
+    rationale: "Near-full elbow extension at release maximizes release height and arc (MDPI Sports 2023)"
+
+  release_height:
+    name: "Release Height"
+    metric: release_height
+    phases: [release]
+    min: 0.18
+    max: 0.55
+    severity: info
+    message_pass: "Release height is in a strong range"
+    message_fail: "Release higher — wrist above eye line relative to head protects the shot"
+    rationale: "Greater release height and vertical displacement improve make probability on jump shots (MDPI Biomechanics 2022)"
+
+  follow_through_elbow:
+    name: "Follow-Through (Elbow)"
+    metric: elbow
+    phases: [follow_through]
+    min: 155
+    max: 180
+    severity: warning
+    message_pass: "Elbow stays extended in follow-through"
+    message_fail: "Hold the follow-through — keep elbow extended after release"
+    rationale: "Follow-through confirms complete proximal-to-distal sequencing through the arm"
+
+  follow_through_index:
+    name: "Follow-Through (Index Finger)"
+    metric: index_align
+    phases: [follow_through]
+    min: 160
+    max: 180
+    severity: warning
+    message_pass: "Gooseneck finish — index finger pointing down through the rim"
+    message_fail: "Finish with index finger pointing at the floor (gooseneck) — hold 1 second"
+    rationale: "Wrist and index extension after release impart backspin and consistent arc"
+
+  landing_balance:
+    name: "Landing Balance"
+    metric: ankle_rise
+    phases: [landing]
+    min: null
+    max: 0.06
+    severity: info
+    message_pass: "Soft, balanced landing"
+    message_fail: "Land under control — drifting left/right often traces back to uneven leg drive"
+    rationale: "Controlled landing reflects symmetric force production through the shot"

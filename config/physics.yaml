@@ -1,0 +1,18 @@
+# Future improvement #11 — physics-based trajectory estimation (not wired yet)
+
+enabled: false
+
+# Gravity m/s^2 (Earth default)
+gravity: 9.81
+
+# Optimal entry angle range for make probability heuristics (degrees)
+optimal_entry_angle_min: 45
+optimal_entry_angle_max: 52
+
+# Simulation
+simulation_dt: 0.01
+simulation_max_steps: 500
+
+# Camera / scale (TODO: calibrate per setup)
+pixels_per_meter: null
+rim_diameter_m: 0.457

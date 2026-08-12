@@ -1,0 +1,44 @@
+# On-screen HUD timing — lower = snappier overlay, higher = easier to read
+
+# Phase label: stable frames before update, then minimum hold
+phase_stable_frames: 4
+phase_min_hold_frames: 8
+
+# Angles panel: higher alpha = faster tracking; lower step/hold = quicker updates
+angle_ema_alpha: 0.28
+angle_step_degrees: 2
+angle_min_hold_frames: 4
+angle_invalid_hold_frames: 6
+
+# Coaching strip: how long tips stay before refreshing
+violation_hold_frames: 18
+violation_max_items: 3
+
+# Shot summary card (frames at 30fps ≈ 2 seconds)
+summary_display_frames: 60
+
+# Video playback: 1.0 = real-time, 2.0 = 2x speed, 0 = as fast as CPU allows
+video_playback_sync: false
+video_playback_speed: 1
+
+# OpenCV video window size. Analysis still uses the original frame resolution.
+window_width: 960
+window_height: 540
+
+# Phase 6 — draw ball/rim boxes from custom basketball YOLO
+show_ball_overlay: true
+
+# Shot-scoped measured ball trail. Predicted/interpolated points are excluded.
+trajectory_overlay:
+  show_observed: true
+  # Orange dots are filtered observed centers. The green line is the robust fit.
+  show_observed_polyline: false
+  show_fitted: true
+  observed_max_points: 120
+  maximum_jump_rim_radii: 5.0
+  observed_thickness: 3
+  observed_point_radius: 2
+  fitted_thickness: 3
+  fit_min_points: 5
+  fit_samples: 60
+  fit_outlier_threshold_rim_radii: 0.75

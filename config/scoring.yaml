@@ -1,0 +1,21 @@
+# Shot scoring weights and coaching messages
+
+severity_weights:
+  error: 3
+  warning: 2
+  info: 1
+
+min_evaluated_rules: 2
+max_coaching_tips: 3
+
+# How long to show shot summary overlay (prefer config/display.yaml)
+summary_display_frames: 60
+
+score_messages:
+  excellent: 90
+  good: 75
+  fair: 60
+  excellent_msg: "Excellent mechanics — keep this rhythm."
+  good_msg: "Solid form. Refine the notes above."
+  fair_msg: "Fair attempt — focus on one correction per rep."
+  needs_work_msg: "Break the shot into phases and practice each slowly."

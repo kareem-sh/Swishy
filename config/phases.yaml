@@ -1,0 +1,45 @@
+# Phase detection thresholds for jump-shot FSM.
+# Tune these per camera distance and frame rate.
+
+hysteresis_frames: 2  # consecutive frames required to confirm a phase change
+min_dwell_frames: 2   # minimum frames to hold a phase before allowing exit
+
+thresholds:
+  # ready_stance -> loading
+  loading_hip_drop_velocity: -0.02      # m/s — hip dropping
+  loading_knee_flex_delta: -1.0        # degrees/frame — knee bending
+  loading_wrist_below_shoulder: 0.05   # m — wrist below shoulder plane
+  loading_wrist_up_velocity: 0.03      # m/s — wrist rising into shot (re-shot)
+  loading_wrist_chest_offset: 0.35     # m — wrist within chest/ball-carry zone (hip-relative)
+
+  # loading -> knee_flexion / ball_lift
+  knee_extend_delta: 0.5               # degrees/frame — knee reversing (bottom of dip)
+  ball_lift_wrist_velocity: 0.03       # m/s — wrist rising
+
+  # ball_lift -> jump
+  jump_ankle_rise: 0.03                # m above baseline
+  jump_ankle_velocity: 0.02            # m/s upward
+
+  # ball_lift -> release (set shot / no jump)
+  set_shot_wrist_down: 0.035           # m/s — wrist driving through
+  set_shot_elbow_min: 145               # degrees
+
+  # jump -> release
+  release_peak_tolerance: 0.02         # m from wrist peak
+  release_elbow_min: 150               # degrees
+  release_wrist_velocity_max: 0.05     # m/s — wrist slowing at apex
+  release_index_up_velocity: 0.04      # m/s — index driving through release
+  release_index_align_min: 155         # degrees — elbow-wrist-index line
+
+  # release -> follow_through
+  follow_through_wrist_down_velocity: -0.02
+  follow_through_elbow_min: 155
+  follow_through_index_align_min: 160  # degrees — finger fully extended
+  follow_through_index_down_velocity: -0.02
+
+  # follow_through -> landing
+  landing_ankle_tolerance: 0.04
+  landing_ankle_velocity_max: 0.03
+
+  # landing -> ready_stance
+  ready_max_velocity: 0.2            # m/s avg landmark speed

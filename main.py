@@ -7,10 +7,11 @@ from modes.video_mode import run_video_mode
 # SELECT MODE
 # ==================================
 
-MODE = "image"
+# MODE = "live"
+# MODE = "live"
 
 # MODE = "image"
-# MODE = "video"
+MODE = "video"   # uses assets/videos/video_07_side_jump_shot.mp4
 
 
 # ==================================
@@ -29,10 +30,8 @@ elif MODE == "image":
 
 elif MODE == "video":
 
-    run_video_mode(
-        "assets/test.mp4"
-    )
-
+    result = run_video_mode("assets/videos/Salah5shots.mp4")
+    print(result)
 else:
 
     print("Invalid mode selected.")

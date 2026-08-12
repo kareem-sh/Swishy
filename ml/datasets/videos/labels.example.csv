@@ -1,0 +1,5 @@
+video_path,shot_index,class_id,made,has_hoop,notes
+train/example_01.mp4,0,0,1,1,acceptable form — hoop visible made
+train/example_01.mp4,1,1,,0,needs improvement — no hoop in frame
+train/example_02.mp4,*,1,,,all shots need form improvement
+val/example_holdout.mp4,0,0,0,1,acceptable form but missed

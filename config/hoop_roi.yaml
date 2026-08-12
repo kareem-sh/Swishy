@@ -1,0 +1,7 @@
+# Manual hoop region per camera (normalized 0–1 coordinates)
+# TODO: add UI or script to set ROI from a reference frame
+
+hoop:
+  enabled: false
+  roi_normalized: [0.42, 0.05, 0.58, 0.22]  # x1, y1, x2, y2
+  rim_inner_scale: 0.72

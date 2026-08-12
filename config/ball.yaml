@@ -1,0 +1,118 @@
+# Phase 6 — ball + rim detection (custom basketball YOLO)
+
+enabled: true
+
+detector:
+  backend: yolo
+  # Fine-tuned ball+hoop weights (E-BARD). Use .pt on CPU/VPS; .engine needs NVIDIA+TensorRT.
+  model_path: mlRingBall/runs/basketball_rim_training/basketball_and_rim/weights/best.pt
+  hf_repo: GabrieleGiudici/E-BARD-detection-models
+  hf_file: BODD_yolov8n_0001.pt
+
+  # Recall-oriented thresholds; temporal tracking filters short false hits.
+  min_confidence: 0.05
+  min_confidence_rim: 0.08
+  min_radius_px: 2
+  max_radius_px: 140
+
+  # E-BARD was trained at 704px. Alternate 704/512 while acquiring the rim.
+  imgsz: 960
+  fallback_imgsz: 0
+  # Tracker handles short ball gaps; reserve the costly second pass for rim lock.
+  fallback_on_ball_miss: false
+  fallback_until_rim_found: true
+  rim_search_retry_interval: 4  # bounded 704px retry before rim lock
+  device: auto             # auto | cpu | 0 (CUDA GPU 0)
+  half: true               # FP16 for PyTorch .pt; exported engines use compiled precision
+  frame_stride: 1
+  # A handheld camera changes the rim's pixel position, so do not preserve one
+  # highest-confidence box for the entire video.
+  sticky_rim: false
+  # The hoop label includes the net; its physical rim is near the box top.
+  rim_center_y_fraction: 0.5
+  # Once found, reject detections that jump far from the static hoop.
+  rim_lock_max_shift_ratio: 0.75
+  rim_refresh_frames: 1
+
+tracking:
+  max_missing_frames: 6
+  position_alpha: 0.45
+  velocity_alpha: 0.25
+
+# Hybrid visual tracker:
+# YOLO acquires/corrects the ball; NanoTrack follows it on every frame between
+# corrections. Lower yolo_correction_interval for accuracy, raise it for speed.
+visual_tracking:
+  enabled: true
+  device: auto  # auto | cpu | gpu; GPU requires an OpenCV CUDA build
+  cuda_fp16: false
+  backbone_path: models/nanotrack/nanotrack_backbone_sim.onnx
+  neckhead_path: models/nanotrack/nanotrack_head_sim.onnx
+  yolo_correction_interval: 10
+  yolo_reinitialize_confidence: 0.05
+  yolo_override_confidence: 0.15
+  yolo_max_correction_distance_px: 180
+  maximum_center_jump_px: 180
+  minimum_box_size_px: 12
+  initial_box_scale: 1.35
+
+# Follow the hoop on every frame when the camera pans, shakes, or zooms.
+# YOLO corrects NanoTrack periodically; geometry gates reject oversized boxes.
+rim_tracking:
+  enabled: true
+  device: auto
+  cuda_fp16: false
+  backbone_path: models/nanotrack/nanotrack_backbone_sim.onnx
+  neckhead_path: models/nanotrack/nanotrack_head_sim.onnx
+  yolo_correction_interval: 10
+  yolo_reinitialize_confidence: 0.25
+  minimum_tracking_confidence: 0.10
+  yolo_max_correction_distance_px: 120
+  yolo_max_correction_distance_scale: 1.5
+  maximum_width_change_ratio: 1.5
+  maximum_center_jump_px: 220
+  minimum_box_size_px: 16
+  minimum_frame_size_ratio: 0.65
+  maximum_frame_size_ratio: 1.55
+  minimum_aspect_ratio: 0.35
+  maximum_aspect_ratio: 8.0
+  initial_box_scale: 1.0
+  position_alpha: 0.75
+  size_alpha: 0.50
+
+outcome:
+  post_shot_capture_ms: 2000
+  min_flight_frames: 3
+  rim_inner_scale: 0.72
+
+release_sync:
+  max_body_ball_frame_delta: 3
+  ball_wrist_release_distance_px: 40
+
+ball_state_machine:
+  enabled: true
+  dynamic_rim: true
+
+  release_distance_px: 60
+  release_distance_growth_px: 12
+  release_min_speed_px_s: 120
+
+  ascending_velocity_px_s: 30
+  descending_velocity_px_s: 30
+
+  rim_approach_radius_scale: 3.0
+  rim_above_margin_scale: 0.25
+  rim_below_margin_scale: 1.0
+  net_channel_scale: 1.2
+  # Treat near-edge crossings as unresolved rim contact until the ball either
+  # appears below the net or clearly rebounds away.
+  rim_contact_channel_scale: 1.15
+  rim_depth_scale: 0.20
+  rim_exit_channel_scale: 1.50
+
+  below_confirmation_frames: 2
+  miss_confirmation_frames: 2
+  
+  outcome_timeout_ms: 3000
+  lost_timeout_ms: 800
+  body_grace_ms: 500
