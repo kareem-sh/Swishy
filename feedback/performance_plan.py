@@ -56,7 +56,12 @@ RULE_DRILLS: Dict[str, str] = {
     ),
 }
 
-ACTIVE_SHOT_PHASES = frozenset(PHASE_ORDER) - {"ready_stance"}
+# REMOVED: ACTIVE_SHOT_PHASES.
+# It told the tracker which phases meant "a shot is underway". The tracker now
+# asks that question of the DETECTOR's four states (phase_detection.phases
+# .CORE_ACTIVE), not of the coaching vocabulary, because deciding whether a
+# shot is happening and deciding what to call the part of it you are in are
+# different jobs. Nothing else referenced it.
 
 
 def phases_before(phase: str) -> List[str]:
@@ -147,7 +152,6 @@ def build_shot_performance_plan(summary: ShotSummary) -> ShotSummary:
 
     drills: List[str] = []
     focus: List[str] = []
-    actions: List[str] = []
 
     sorted_violations = sorted(
         summary.violations,
@@ -155,35 +159,26 @@ def build_shot_performance_plan(summary: ShotSummary) -> ShotSummary:
         reverse=True,
     )
 
+    seen = set()
     for violation in sorted_violations[:3]:
+        if violation.message in seen:
+            continue
+        seen.add(violation.message)
         focus.append(violation.message)
         drill = RULE_DRILLS.get(violation.rule_id)
         if drill and drill not in drills:
             drills.append(drill)
-        actions.append(
-            f"Fix {violation.name}: {violation.message}"
-        )
-
-    if summary.started_mid_phase:
-        actions.insert(
-            0,
-            "Next session: start recording before you begin the load so knee bend and ball lift can be scored.",
-        )
-
-    if summary.ended_early:
-        actions.append(
-            "Let the rep finish through landing before stopping the camera — landing balance is part of your score.",
-        )
 
     if not focus and summary.score >= 75:
-        focus.append("Maintain current mechanics — add game-speed reps and track consistency.")
+        focus.append(
+            "Nothing to change. Keep these reps and start shooting them at game speed."
+        )
         drills.append(
-            "Game-speed drill: 5 makes from 5 spots at game pace, one form check between each spot."
+            "Game speed: 5 makes from 5 spots, one form check between each spot."
         )
     elif not focus:
-        focus.append("Break the shot into phases: load → lift → release → hold finish.")
+        focus.append("Take it one piece at a time: load, lift, release, hold the finish.")
 
     summary.next_rep_focus = focus[:2]
     summary.practice_drills = drills[:3]
-    summary.performance_actions = actions[:4]
     return summary

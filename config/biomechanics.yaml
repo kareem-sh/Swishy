@@ -49,46 +49,84 @@ rules:
   knee_flexion_loading:
     name: "Leg Load"
     metric: knee
-    phases: [loading, knee_flexion]
+    phases: [loading]
     min: 80
     max: 145
     ideal_min: 100
     ideal_max: 128
     severity: info
     scored: true
-    message_excellent: "Your leg load is in a strong range. The power for this shot is coming from the floor."
+    message_excellent: "Good load. That shot's powered from the floor, which is what you want."
     refine_low: "Your legs are loading well. Sink slightly less so you can rise in one smooth motion."
     refine_high: "Your leg load is good. Sit a little deeper before you rise to build more lift."
-    message_low: "You are sinking very deep. Come up a little higher so you can rise without a pause."
-    message_high: "Load the legs more before you rise — press the floor away to send the ball up, rather than pushing it with the arm."
+    message_low: "You're bending your knees too deep, so there's a pause at the bottom. Come up a little higher and keep it flowing."
+    message_high: "Bend your knees a bit deeper before you rise. Right now the arm is doing the work — let your legs send the ball up."
     evidence: >
-      NOT SUPPORTED as a proficiency discriminator. Four findings, three
-      directions: proficient shooters loaded deeper at 3-point range
-      (p<0.001), showed no difference at 2-point range, showed no
-      significance after Bonferroni at the free-throw line, and one report
-      associates LOWER preparatory flexion with success. Band is an
-      ENGINEERING DECISION spanning published values (94-122 deg), kept at
-      `info` severity so it informs without penalising. resources.md D3.
+      NOT SUPPORTED as a proficiency discriminator. This is now the most
+      thoroughly contradicted claim in the project, and the position has
+      only hardened with additional sources.
+
+      Non-significant in three independent samples at the preparatory phase:
+          free throw,  N=34  113.3 (9.1) vs 107.3 (14.9)   p=0.549
+          two-point,   N=18  115.6 (10.9) vs 113.8 (6.3)   p=0.672
+          three-point, N=18  109.6 (5.8) vs 109.2 (11.6)   p=0.925
+      Against that: proficient shooters loaded deeper at 3-point range in one
+      earlier sample (p<0.001), and one report associates LOWER preparatory
+      flexion with successful shooting — the opposite direction again.
+
+      DO NOT read the three non-significant p-values as proof of "no
+      difference". At n=18-34 they are evidence of low statistical power, not
+      of equivalence. The honest statement is that no consistent proficiency
+      effect has been demonstrated in either direction.
+
+      What IS consistent is the RANGE. Every sample lands between roughly
+      107 and 116 deg at the preparatory phase, and knee angle deepens
+      reliably with shooting distance (114.8 deg at 5.10 m vs 109.4 deg at
+      6.32 m, p<0.001). So the band is defensible as a description of what
+      shooters do; it is not defensible as a description of what wins.
+
+      Band is an ENGINEERING DECISION spanning published values (94-122 deg),
+      kept at `info` severity so it informs without penalising.
+      resources.md D3; PMC10436204, PMC10531893.
 
   hip_hinge_loading:
     name: "Hip Drive"
     metric: hip
-    phases: [loading, knee_flexion]
+    phases: [loading]
     min: 110
     max: 168
     ideal_min: 125
     ideal_max: 152
     severity: info
     scored: true
-    message_excellent: "Your hips are set well — chest tall and weight balanced over your feet."
+    message_excellent: "Hips are set well — chest tall, weight balanced over your feet."
     refine_low: "Your hip position is good. Open the hips slightly so your chest lifts toward the rim."
     refine_high: "Your hips are good. Send them back a little further to load more power."
-    message_low: "You are folding forward at the waist. Keep your chest up toward the rim as you sink."
-    message_high: "You are standing too upright to build power. Send your hips back as you lower, as if sitting onto a high stool."
+    message_low: "You're folding forward at the waist. Keep your chest up toward the rim as you sink."
+    message_high: "Your hips stay too upright to build power. Push them back as you lower, like you're sitting onto a high stool."
     evidence: >
-      SUPPORTED WITH LIMITATIONS. Hip flexion deepens with distance across
-      two samples, and separated proficiency at 3-point range (143.1 vs
-      155.9 deg, p<0.001). Single research group. resources.md A1, A3.
+      SUPPORTED WITH LIMITATIONS — the best-supported LOWER-BODY rule here,
+      and notably better supported than the knee.
+
+      Hip angle at the preparatory phase separated proficiency in a second,
+      independent sample: Cabarkapa et al. (2023), N=18 female players,
+      two-point range 5.10 m —
+          proficient (>=50% made)      136.9 deg (SD 6.2)
+          non-proficient (<50% made)   128.6 deg (SD 10.0)   p=0.048
+      i.e. the better shooters were LESS folded at the hip, not more.
+
+      It also separated proficiency at 3-point range in the earlier sample
+      (143.1 vs 155.9 deg, p<0.001), and it deepens systematically with
+      distance (133.2 deg at 5.10 m vs 126.3 deg at 6.32 m, p<0.001), which
+      is a dose-response pattern rather than a one-off difference.
+
+      LIMITATIONS: p=0.048 is marginal; n=18; one research group; and the two
+      samples disagree on DIRECTION (the female two-point sample favours a
+      more open hip, the earlier 3-point sample a more closed one). That
+      disagreement is why the band stays wide and severity stays `info`
+      rather than being tightened around either mean.
+
+      resources.md A1, A3; PMC10531893, PMC10436204.
 
   # -------------------------------------------------------------- ball lift
   elbow_slot_ball_lift:
@@ -101,11 +139,11 @@ rules:
     ideal_max: 98
     severity: warning
     scored: true
-    message_excellent: "The ball is set in a strong position to launch from."
+    message_excellent: "The ball's in a strong spot to launch from."
     refine_low: "Good set position. Let the ball sit a touch further from your chest before you lift."
     refine_high: "Good set position. Bring the ball slightly closer in before you lift."
-    message_low: "The ball is set too close in. Give it room so it can travel straight up toward the rim."
-    message_high: "The ball is set too far out, which makes it swing on the way up. Bring it in so it can rise on a straight line to the rim."
+    message_low: "Your elbow is tucked in too tight to your body. Give it a bit of room so the ball can travel straight up."
+    message_high: "Your elbow is flared out too far, so the ball swings on the way up. Bring it in under the ball."
     evidence: >
       ENGINEERING DECISION informed by thin evidence. Published set-point
       values do not vary systematically with distance or skill, but that
@@ -121,14 +159,36 @@ rules:
     max: 135
     severity: info
     scored: false          # measured and displayed, never scored
-    message_excellent: "Shoulder elevation recorded."
-    message_low: "Shoulder elevation recorded (low)."
-    message_high: "Shoulder elevation recorded (high)."
+    message_excellent: "Shoulder elevation, for reference — this one isn't scored."
+    message_low: "Shoulder elevation, for reference — this one isn't scored."
+    message_high: "Shoulder elevation, for reference — this one isn't scored."
     evidence: >
-      NOT SUPPORTED for scoring — measurement, not biomechanics. Single-camera
-      shoulder angle carries a bias of -16 to -26 deg and RMSE of 24-36 deg
-      depending on camera azimuth, which is larger than any coaching effect we
-      could claim. Displayed for observability only. resources.md D4.
+      NOT SUPPORTED FOR SCORING — held back by MEASUREMENT, not by biology.
+      This distinction matters, because the biomechanical evidence here is
+      now stronger than for the knee, which IS scored.
+
+      Shoulder angle at the preparatory phase separated proficiency:
+      Cabarkapa et al. (2023), N=18 female players, two-point range —
+          proficient (>=50% made)      52.3 deg (SD 11.6)
+          non-proficient (<50% made)   63.8 deg (SD 6.7)    p=0.025
+      i.e. better shooters carried a LOWER shoulder. It also decreases with
+      distance (57.4 deg at 5.10 m vs 54.2 deg at 6.32 m, p=0.006).
+
+      WHY IT STAYS UNSCORED ANYWAY: single-camera shoulder angle carries a
+      bias of -16 to -26 deg and RMSE of 24-36 deg depending on camera
+      azimuth. The published proficiency gap is 11.5 deg — roughly half our
+      measurement error. We would be scoring noise. Displayed for
+      observability only.
+
+      NOTE ON THE RANGE: min/max 55-135 predates this evidence and implies
+      that a high shoulder is acceptable while a low one is not, which is
+      backwards relative to the finding above (proficient mean 52.3 sits
+      BELOW our minimum). The range is left unchanged on purpose, because
+      changing display bounds on an unscored rule would alter what the
+      report shows without improving what it knows. Revisit together with
+      the camera-geometry limitation, not before.
+
+      resources.md D4; PMC10531893.
 
   trunk_posture:
     name: "Upper Body Posture"
@@ -140,9 +200,9 @@ rules:
     ideal_max: 13
     severity: warning
     scored: true
-    message_excellent: "Your upper body stays tall and square through the shot."
+    message_excellent: "You stay tall and square the whole way through."
     refine_high: "Your posture is good. Stay a little taller through the top of the shot to keep the ball on line."
-    message_high: "You are leaning through the shot, which pulls the ball off line. Keep your chest facing the rim from start to finish."
+    message_high: "You're leaning your upper body through the shot, and it pulls the ball off line. Keep your chest facing the rim start to finish."
     evidence: >
       SUPPORTED WITH LIMITATIONS. Reduced forward trunk lean at release
       distinguished proficient free-throw shooters. Trunk lean is measured
@@ -158,9 +218,9 @@ rules:
     unit: "m/s"
     severity: info
     scored: true
-    message_excellent: "Your head stays still, so your eyes stay on the target."
+    message_excellent: "Your head stays still, so your eyes stay on target."
     refine_high: "Head control is good. Hold your eyes on the rim a moment longer after the ball leaves."
-    message_high: "Your head moves during the shot, which pulls your aim off. Keep your eyes fixed on the front of the rim until the ball lands."
+    message_high: "You're moving your head mid-shot. Lock your eyes on the front of the rim and keep them there until the ball lands."
     evidence: >
       ENGINEERING DECISION. No published threshold for head movement during
       shooting was found. Retained because a stable gaze is standard coaching
@@ -174,20 +234,46 @@ rules:
     min: 142
     max: 180
     ideal_min: 152
-    ideal_max: 175
+    ideal_max: 168
     severity: warning
     scored: true
-    message_excellent: "You reach fully toward the rim at release."
+    message_excellent: "You reach all the way to the rim at release."
     refine_low: "Good reach. Extend a little further toward the rim to lift the arc."
     refine_high: "Good reach. Ease off the very end of the extension so the release stays smooth."
-    message_low: "The arm is still bent when the ball leaves, which flattens the arc. Reach the ball up toward the rim at the top of the shot."
-    message_high: "The arm locks out hard at release. Reach toward the rim and let the arm finish softly."
+    message_low: "Straighten your elbow more at release. It's still bent when the ball leaves, and that flattens the arc."
+    message_high: "You're snapping your elbow straight too hard. Reach toward the rim and let the arm finish soft."
     evidence: >
-      SUPPORTED WITH LIMITATIONS. Measured elbow extension at release is
-      158.8-159.3 deg — near full extension but NOT 180 deg. Band set around
-      that. Note single-camera elbow error is roughly 17 deg RMSD in a
-      basketball-throwing validation, so treat the number as directional.
-      resources.md A3, D4.
+      SUPPORTED WITH LIMITATIONS — and the strongest numeric anchor in this
+      file.
+
+      Cabarkapa et al. (2023), markerless mocap at 120 Hz, N=34 free-throw
+      shooters, elbow angle AT BALL RELEASE:
+          proficient (>=70% made, n=19)      159.6 deg (SD 1.4)
+          non-proficient (<70% made, n=15)   159.8 deg (SD 1.3)
+
+      Two things follow, and they must not be confused.
+
+      1. The value is a CONVERGENCE NORM, not a proficiency discriminator.
+         An SD of 1.3-1.4 deg across 34 shooters is extremely tight: everyone
+         releases near 160 deg. But the two groups are indistinguishable
+         (p=0.336 at the preparatory phase; the release means differ by
+         0.2 deg), so a player matching 160 deg has a NORMAL release, not a
+         good one. The rule may say "this is where the ball should leave";
+         it may NOT say "this is why you make shots".
+
+      2. The literature band is far tighter than we can measure. +/-3 SD is
+         roughly 155.5-163.7 deg. We do not reproduce 1.4 deg precision:
+         release is located to within one frame at 24-30 fps, and
+         single-camera elbow error is around 17 deg RMSD in a
+         basketball-throwing validation. The ideal band is therefore
+         deliberately WIDENED to 152-168 (centred on 160) to absorb our own
+         measurement error. Narrowing it to the published SD would be
+         borrowing a precision we do not have.
+
+      Also note 180 deg is NOT the target. Full lockout is outside the norm
+      in both groups, which is why message_high exists.
+
+      resources.md A3, D4; Cabarkapa et al. 2023 (PMC10436204).
 
   index_alignment_release:
     name: "Finger Direction"
@@ -199,9 +285,9 @@ rules:
     ideal_max: 180
     severity: warning
     scored: true
-    message_excellent: "The ball leaves cleanly off your fingertips."
+    message_excellent: "The ball comes off your fingertips clean."
     refine_low: "Good release. Push a little further through the fingertips to add backspin."
-    message_low: "The ball is leaving off a flat hand. Send it out over your fingertips, as if reaching into the rim."
+    message_low: "Snap your wrist down through the ball at release. Right now it's coming off a flat hand."
     evidence: >
       ENGINEERING DECISION. No published norm for an elbow-wrist-index
       alignment angle was found; this is a Swichy-defined proxy for a clean
@@ -218,11 +304,11 @@ rules:
     unit: "m"
     severity: warning
     scored: true
-    message_excellent: "You release the ball high, which protects the shot and steepens the arc."
+    message_excellent: "Nice high release — that protects the shot and steepens the arc."
     refine_low: "Release point is good. Let the ball go slightly higher to steepen the arc."
     refine_high: "Release point is good and high. Keep it there without over-reaching."
-    message_low: "The ball is leaving from too low, which flattens the arc. Release it at the top of your rise, not on the way up."
-    message_high: "You are over-reaching at release, which costs you control. Let the ball go a little earlier."
+    message_low: "You're letting it go too early, low in the motion. Release at the top of your rise, not on the way up."
+    message_high: "You're over-reaching at release and losing control. Let it go a touch earlier."
     evidence: >
       SUPPORTED WITH LIMITATIONS. Release height was the only variable that
       separated proficient from non-proficient free-throw shooters (p=0.010),
@@ -241,11 +327,11 @@ rules:
     unit: ""
     severity: info
     scored: true
-    message_excellent: "Your release height is strong for your build."
+    message_excellent: "Strong release height for your build."
     refine_low: "Good release height for your build. A little more lift would steepen the arc further."
     refine_high: "Your release is high for your build. Keep it repeatable rather than pushing higher."
-    message_low: "Your release is low relative to your height. Release at the top of your rise to gain arc."
-    message_high: "Your release is unusually high relative to your height — check that your whole body is in the frame."
+    message_low: "Your release is low for your height. Let it go at the top of your rise to get more arc."
+    message_high: "That release reads unusually high for your height — check your whole body is in frame."
     evidence: >
       SUPPORTED WITH LIMITATIONS. Published release heights are reported ONLY
       as a ratio of body height (1.12 non-proficient vs 1.17 proficient,
@@ -264,9 +350,9 @@ rules:
     ideal_max: 180
     severity: warning
     scored: true
-    message_excellent: "You hold your finish well after the ball leaves."
+    message_excellent: "You hold the finish well after the ball's gone."
     refine_low: "Good finish. Hold the reach toward the rim a moment longer."
-    message_low: "Your arm drops as soon as the ball leaves. Hold the reach toward the rim until the ball reaches the basket."
+    message_low: "Keep your elbow up after the ball leaves. It drops straight away — hold the reach toward the rim until the ball gets there."
     evidence: >
       ENGINEERING DECISION. Holding the follow-through is standard coaching
       practice; no published angular threshold was found. Thresholds are ours.
@@ -281,9 +367,9 @@ rules:
     ideal_max: 180
     severity: warning
     scored: true
-    message_excellent: "Your hand finishes pointing into the rim. Hold it there."
+    message_excellent: "Your hand finishes pointing into the rim. That's it — hold it there."
     refine_low: "Good finish. Let the fingers relax further down toward the floor."
-    message_low: "Your hand stops flat after release. Finish with your fingers pointing down into the front of the rim, and hold for one second."
+    message_low: "Your wrist stops flat after release. Finish with your fingers pointing down into the front of the rim, and hold it a second."
     evidence: >
       ENGINEERING DECISION. Same basis as follow_through_elbow. Thresholds are ours.
 
@@ -299,11 +385,24 @@ rules:
     unit: "m"
     severity: info
     scored: true
-    message_excellent: "You land balanced on the spot you took off from."
-    refine_low: "Balanced landing. Aim to finish even closer to your take-off spot."
-    refine_high: "Balanced landing. Aim to finish even closer to your take-off spot."
-    message_low: "You are drifting on the landing. Land on the same spot you took off from."
-    message_high: "You are drifting on the landing. Land on the same spot you took off from."
+    message_excellent: "You land settled, with your legs back under you."
+    refine_low: "Settled landing. Let the knees absorb a little more on the way down."
+    refine_high: "Settled landing. Let the knees absorb a little more on the way down."
+    message_low: "You're still sinking when the shot ends. Absorb the landing and come back to a balanced stance."
+    message_high: "You land stiff, without absorbing. Let the knees give a little as you come down."
     evidence: >
-      ENGINEERING DECISION. Landing on the take-off spot is standard coaching
-      practice; no published threshold was found. Thresholds are ours.
+      ENGINEERING DECISION. Thresholds are ours; no published value was found.
+
+      CORRECTED CLAIM: this rule previously said "you're drifting on the
+      landing — land where you took off". That is a HORIZONTAL claim, but the
+      metric `ankle_rise` is VERTICAL (ankle height minus standing baseline),
+      so the message described something the rule never measured. The wording
+      now matches the measurement.
+
+      KNOWN LIMITATION: `ankle_rise` is computed from hip-centred world
+      landmarks, where it tracks leg extension rather than the body's height
+      above the floor. It is a weak proxy for "settled". Measuring genuine
+      take-off-to-landing drift needs the horizontal image-space signal
+      (`hip_x_ratio`) compared across the jump and landing phases, which the
+      per-frame rule engine cannot express today. Severity is `info` partly
+      for this reason.

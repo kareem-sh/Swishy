@@ -15,6 +15,7 @@ skipped and everything else still runs.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -30,6 +31,7 @@ from utils.quiet import quiet_native_stderr  # noqa: E402  — must precede medi
 from mediapipe.tasks.python import vision  # noqa: E402
 
 from feedback.models import ShotSummary  # noqa: E402
+from feedback.payload import session_to_dict  # noqa: E402
 from pipeline import ShotAnalysisPipeline  # noqa: E402
 from player.profile import PlayerProfile, build_player_profile  # noqa: E402
 from pose.detector import PoseDetector  # noqa: E402
@@ -88,6 +90,22 @@ class AnalysisRun:
     def scored_shots(self) -> List[ShotSummary]:
         return [s for s in self.shots if not s.is_rejected]
 
+    def to_payload(self) -> dict:
+        """The JSON an API would return for this upload.
+
+        One serialiser for the CLI's `--json` and for any future service, so
+        the two can never drift into describing the same analysis differently.
+        """
+        return session_to_dict(
+            video_name=self.video.name,
+            fps=self.fps,
+            frames_read=self.frames_read,
+            shots=self.shots,
+            discarded_candidates=self.discarded_candidates,
+            rejection=self.rejection.value if self.rejection else None,
+            rejection_detail=self.rejection_detail,
+        )
+
 
 def _decode_and_analyse(video_path, fps, pipe, progress):
     """Feed every frame through the pipeline.
@@ -136,11 +154,26 @@ def analyze_video(
     shooting_hand: str = "auto",
     on_start: Optional[Callable[[VideoMetadata, PlayerProfile], None]] = None,
     progress_factory: Optional[Callable[[VideoMetadata], ProgressReporter]] = None,
+    enable_ball: Optional[bool] = None,
 ) -> AnalysisRun:
     """Run one video through the real pipeline and return what was found.
 
     `on_start` and `progress_factory` are presentation hooks for the CLI.
     Neither affects analysis: every frame is read and processed either way.
+
+    `enable_ball` decides whether the ball/rim detector runs.
+
+        None   -> defer to config/ball.yaml  (the single source of truth)
+        True   -> force on
+        False  -> force off
+
+    This is NOT only about reporting a make or a miss. With the detector
+    active, `ShotTracker` waits for a ball outcome before closing a shot
+    instead of closing on body motion alone, so the flag moves where one shot
+    ends and the next begins. It used to be hardcoded to False here while
+    `modes/video_mode.py` passed nothing and therefore read the config, which
+    meant the same video could be segmented differently depending on which
+    entry point you launched.
     """
     video_path = Path(video_path)
 
@@ -159,7 +192,7 @@ def analyze_video(
         on_start(meta, profile)
 
     fps = meta.fps
-    pipe = ShotAnalysisPipeline(enable_ball=False, player=profile)
+    pipe = ShotAnalysisPipeline(enable_ball=enable_ball, player=profile)
     pipe.set_fps(fps)
 
     progress = progress_factory(meta) if progress_factory is not None else None
@@ -235,6 +268,40 @@ def _print_unsupported_shot(summary: ShotSummary) -> None:
     print("  rules would produce confident but wrong advice.")
 
 
+def _print_phase_notes(ph) -> None:
+    """One phase's notes, or nothing at all if it has none.
+
+    A phase whose only rules are the continuously-checked ones (posture, head
+    stability) has nothing of its own to say -- those are gathered and
+    reported once under "Through the Whole Shot". Printing an empty heading
+    for such a phase just looks broken.
+    """
+    if not (ph.strengths or ph.refinements or ph.fixes or ph.measured):
+        return
+    print(f"\n  --- {ph.label}  ({ph.score}/100) ---")
+    for msg in ph.strengths:
+        print(f"    [ON TARGET] {msg}")
+    for msg in ph.refinements:
+        print(f"    [REFINE]    {msg}")
+    for msg in ph.fixes:
+        print(f"    [CHANGE]    {msg}")
+    for rule in ph.measured:
+        value = rule.measured_value
+        shown = f"{value:.1f}{rule.unit}" if value is not None else "n/a"
+        print(f"    [MEASURED]  {rule.name}: {shown} (not scored)")
+
+
+def _print_next_steps(summary: ShotSummary) -> None:
+    if summary.next_rep_focus:
+        print("\n  WORK ON THIS NEXT")
+        for item in summary.next_rep_focus:
+            print(f"    -> {item}")
+    if summary.practice_drills:
+        print("\n  DRILLS")
+        for drill in summary.practice_drills:
+            print(f"    * {drill}")
+
+
 def print_shot(summary: ShotSummary) -> None:
     print()
     print("=" * 72)
@@ -259,17 +326,8 @@ def print_shot(summary: ShotSummary) -> None:
 
     print("\n  NOTES BY PHASE")
     for ph in summary.phase_scores:
-        print(f"\n  --- {ph.label}  ({ph.score}/100) ---")
-        for msg in ph.strengths:
-            print(f"    [ON TARGET] {msg}")
-        for msg in ph.refinements:
-            print(f"    [REFINE]    {msg}")
-        for msg in ph.fixes:
-            print(f"    [CHANGE]    {msg}")
-        for rule in ph.measured:
-            value = rule.measured_value
-            shown = f"{value:.1f}{rule.unit}" if value is not None else "n/a"
-            print(f"    [MEASURED]  {rule.name}: {shown} (not scored)")
+        _print_phase_notes(ph)
+    _print_next_steps(summary)
 
     if summary.capture_note:
         print(f"\n  NOTE: {summary.capture_note}")
@@ -333,17 +391,45 @@ def main() -> int:
         action="store_true",
         help="suppress the progress bar (the report is unchanged)",
     )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="print the analysis as JSON instead of a text report "
+             "(this is the payload an API would return)",
+    )
+    ball = parser.add_mutually_exclusive_group()
+    ball.add_argument(
+        "--ball",
+        dest="enable_ball",
+        action="store_true",
+        default=None,
+        help="force ball/rim detection on (slower: loads YOLO)",
+    )
+    ball.add_argument(
+        "--no-ball",
+        dest="enable_ball",
+        action="store_false",
+        help="force ball/rim detection off (pose only)",
+    )
     args = parser.parse_args()
+
+    show_progress = not args.quiet and not args.json
 
     run = analyze_video(
         args.video,
         height_cm=args.height_cm,
         shooting_hand=args.hand,
-        on_start=_print_header,
+        on_start=None if args.json else _print_header,
         # The frame total is only known after probing, so the reporter is
         # built by analysis and owned by presentation.
-        progress_factory=None if args.quiet else _make_reporter,
+        progress_factory=_make_reporter if show_progress else None,
+        enable_ball=args.enable_ball,
     )
+
+    if args.json:
+        # Exactly what an API would return for this upload.
+        print(json.dumps(run.to_payload(), indent=2, ensure_ascii=False))
+        return 0 if not run.is_rejected else EXIT_CODES.get(run.rejection, 1)
 
     if run.is_rejected:
         print_rejection(run.rejection, run.rejection_detail)

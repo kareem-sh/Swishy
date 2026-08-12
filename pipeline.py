@@ -132,6 +132,12 @@ class ShotAnalysisPipeline:
         self._biomechanics = BiomechanicsEngine(self._player)
         self._shot_tracker = ShotTracker()
         self._frame_buffer = FrameBuffer(max_frames=FRAME_BUFFER_SIZE)
+        # The tracker opens shots BACKWARDS from a detected release, so it needs
+        # the recent past, and it re-scores the captured frames against the
+        # refined coaching phases, so it needs this engine rather than one of
+        # its own (which could carry a different player profile).
+        self._shot_tracker.attach_history(self._frame_buffer)
+        self._shot_tracker.attach_analyzer(self._biomechanics)
         # Explicit argument wins, then the player profile, then settings.py.
         self._shooting_hand = (
             shooting_hand

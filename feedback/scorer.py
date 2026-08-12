@@ -60,6 +60,56 @@ def _weighted_score(rules: List[RuleResult], weights: dict) -> int:
     return int(round(100.0 * earned / total))
 
 
+WHOLE_SHOT_PHASE = "whole_shot"
+WHOLE_SHOT_LABEL = "Through the Whole Shot"
+
+
+def _whole_shot_rule_ids(rules: List[RuleResult]) -> set:
+    """Rule ids that were evaluated in more than one phase.
+
+    Posture and head stability are checked continuously, so they produce an
+    identical sentence in every phase they run in. Printed per phase that
+    reads as a stuck record -- one real clip repeated the same line four
+    times. Which rules behave this way is discovered from the data, not from
+    a hardcoded list, so adding a continuous rule needs no change here.
+    """
+    phases_by_rule: Dict[str, set] = {}
+    for rule in rules:
+        phases_by_rule.setdefault(rule.rule_id, set()).add(rule.phase)
+    return {rid for rid, phases in phases_by_rule.items() if len(phases) > 1}
+
+
+def _notes(rules: List[RuleResult], outcome: RuleOutcome) -> List[str]:
+    """Messages for one outcome tier, in order, without repeats."""
+    seen, out = set(), []
+    for rule in rules:
+        if rule.outcome is outcome and rule.message not in seen:
+            seen.add(rule.message)
+            out.append(rule.message)
+    return out
+
+
+def _make_phase_score(phase: str, label: str, all_rules: List[RuleResult],
+                      spoken: List[RuleResult], weights: dict) -> PhaseScore:
+    """Score from every rule; speak only the ones handed in as `spoken`.
+
+    The split matters. A continuously-checked rule genuinely applies to this
+    phase, so it belongs in the phase's score. Its wording belongs somewhere
+    else, said once.
+    """
+    scored = [r for r in all_rules if r.scored]
+    return PhaseScore(
+        phase=phase,
+        label=label,
+        score=_weighted_score(all_rules, weights),
+        rules=scored,
+        measured=[r for r in all_rules if not r.scored],
+        strengths=_notes(spoken, RuleOutcome.EXCELLENT),
+        refinements=_notes(spoken, RuleOutcome.GOOD),
+        fixes=_notes(spoken, RuleOutcome.NEEDS_WORK),
+    )
+
+
 def _build_phase_scores(
     rules: List[RuleResult],
     weights: dict,
@@ -72,30 +122,38 @@ def _build_phase_scores(
     ordered = [p for p in PHASE_ORDER if p in by_phase]
     ordered += [p for p in by_phase if p not in PHASE_ORDER]
 
-    phase_scores: List[PhaseScore] = []
-    for phase in ordered:
-        phase_rules = by_phase[phase]
-        scored = [r for r in phase_rules if r.scored]
-        measured_only = [r for r in phase_rules if not r.scored]
+    continuous = _whole_shot_rule_ids(rules)
 
-        phase_scores.append(
-            PhaseScore(
-                phase=phase,
-                label=PHASE_LABELS.get(phase, phase.replace("_", " ").title()),
-                score=_weighted_score(phase_rules, weights),
-                rules=scored,
-                measured=measured_only,
-                strengths=[
-                    r.message for r in scored if r.outcome is RuleOutcome.EXCELLENT
-                ],
-                refinements=[
-                    r.message for r in scored if r.outcome is RuleOutcome.GOOD
-                ],
-                fixes=[
-                    r.message for r in scored if r.outcome is RuleOutcome.NEEDS_WORK
-                ],
-            )
+    phase_scores = [
+        _make_phase_score(
+            phase,
+            PHASE_LABELS.get(phase, phase.replace("_", " ").title()),
+            by_phase[phase],
+            [r for r in by_phase[phase] if r.scored and r.rule_id not in continuous],
+            weights,
         )
+        for phase in ordered
+    ]
+
+    # The continuous rules, gathered once. Worst outcome across the phases
+    # wins, so a posture that slipped anywhere is reported as slipping.
+    if continuous:
+        worst: Dict[str, RuleResult] = {}
+        for rule in rules:
+            if rule.rule_id not in continuous or not rule.scored:
+                continue
+            held = worst.get(rule.rule_id)
+            if held is None or _OUTCOME_RANK.get(rule.outcome, 0) < _OUTCOME_RANK.get(
+                held.outcome, 0
+            ):
+                worst[rule.rule_id] = rule
+        gathered = list(worst.values())
+        if gathered:
+            phase_scores.append(
+                _make_phase_score(
+                    WHOLE_SHOT_PHASE, WHOLE_SHOT_LABEL, gathered, gathered, weights
+                )
+            )
 
     return phase_scores
 

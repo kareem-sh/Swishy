@@ -11,6 +11,7 @@ from feedback.generator import generate_coaching_tips
 from feedback.scorer import score_shot
 from feedback.shot_tracker import ShotTracker
 from phase_detection.features import KinematicFeatures
+from phase_detection.phases import CORE_ANCHOR, CORE_REST
 from utils.frame_buffer import FrameSnapshot
 
 
@@ -69,23 +70,23 @@ def _credible_shot(tracker, rules=None, ankle_rise=0.0, start_ms=0):
     """
     rules = rules or [_rule("a", True)]
     steps = [
-        ("loading", 1.00),
-        ("ball_lift", 1.20),
+        ("rise", 1.00),
+        ("rise", 1.20),
         ("release", 1.48),
-        ("follow_through", 1.40),
-        ("landing", 1.00),
+        ("recovery", 1.40),
+        ("recovery", 1.00),
     ]
     completed = None
     for i, (phase, wrist_y) in enumerate(steps):
-        rise = ankle_rise if phase in ("ball_lift", "release") else 0.0
+        rise = ankle_rise if phase in ("rise", "release") else 0.0
         result = tracker.update(
             phase,
             _snapshot(phase, rules, start_ms + i * 100, wrist_y, rise),
         )
         completed = result or completed
     result = tracker.update(
-        "ready_stance",
-        _snapshot("ready_stance", rules, start_ms + 500, 0.95),
+        CORE_REST,
+        _snapshot(CORE_REST, rules, start_ms + 500, 0.95),
     )
     return result or completed
 
@@ -111,10 +112,10 @@ def test_shot_tracker_completes():
     assert not tracker.shot_in_progress
 
 
-def test_shot_tracker_starts_on_ball_lift():
+def test_shot_tracker_starts_on_rise():
     tracker = ShotTracker()
-    tracker._prev_phase = "ready_stance"
-    assert tracker.update("ball_lift", _snapshot("ball_lift", [])) is None
+    tracker._prev_phase = CORE_REST
+    assert tracker.update("rise", _snapshot("rise", [])) is None
     assert tracker.shot_in_progress
     assert tracker.capture_warning is None
 
@@ -122,23 +123,40 @@ def test_shot_tracker_starts_on_ball_lift():
 def test_shot_tracker_starts_mid_phase():
     """Recording that begins mid-shot is flagged, not silently accepted."""
     tracker = ShotTracker()
-    assert tracker.update("jump", _snapshot("jump", [_rule("a", True)])) is None
+    assert tracker.update("recovery", _snapshot("recovery", [_rule("a", True)])) is None
     assert tracker.shot_in_progress
     assert tracker.capture_warning is not None
-    assert "Jump" in tracker.capture_warning
+    assert "Recovery" in tracker.capture_warning
+
+
+def test_release_opens_a_shot_with_no_candidate_running():
+    """A release is enough on its own -- the tracker rebuilds around it.
+
+    This is the case that used to lose shots. On a ten-shot practice video the
+    state machine detected a release at 17.43 s and it was thrown away, because
+    the previous shot's recovery was still running and a new attempt could only
+    begin from rest. Recovery took 3-5 s; the gap between shots was 2.4 s, so
+    every recovery swallowed the next shot.
+    """
+    tracker = ShotTracker()
+    tracker._prev_phase = "recovery"
+    tracker._first_shot_pending = False
+
+    tracker.update(CORE_ANCHOR, _snapshot(CORE_ANCHOR, [_rule("a", True)], 0, 1.48))
+    assert tracker.shot_in_progress
 
 
 def test_toe_jiggling_does_not_create_shots():
     """Bouncing on the toes must not be counted as shooting.
 
-    The player repeatedly dips into `loading` and settles back, without ever
-    releasing the ball or lifting the wrist. Before the candidate lifecycle
-    this produced one "shot" per dip.
+    The player repeatedly stirs and settles back without ever releasing the
+    ball or lifting the wrist. Before the candidate lifecycle this produced one
+    "shot" per dip.
     """
     tracker = ShotTracker()
     t = 0
     for _ in range(3):
-        for phase, wrist in (("loading", 0.98), ("ready_stance", 1.00)):
+        for phase, wrist in (("rise", 0.98), (CORE_REST, 1.00)):
             assert tracker.update(phase, _snapshot(phase, [], t, wrist)) is None
             t += 100
 
@@ -150,7 +168,6 @@ def test_two_shots_are_independent():
     """Two credible shots produce two summaries with no state leakage."""
     tracker = ShotTracker()
     first = _credible_shot(tracker, start_ms=0)
-    # Past the refractory window before the second attempt begins.
     second = _credible_shot(tracker, start_ms=3000)
 
     assert first is not None and second is not None
@@ -184,12 +201,6 @@ def test_coaching_tips_include_violations():
 
 
 if __name__ == "__main__":
-    test_score_shot_weighted()
-    test_shot_tracker_completes()
-    test_shot_tracker_starts_on_ball_lift()
-    test_shot_tracker_starts_mid_phase()
-    test_toe_jiggling_does_not_create_shots()
-    test_two_shots_are_independent()
-    test_set_shot_and_jump_shot_are_distinguished()
-    test_coaching_tips_include_violations()
-    print("All Phase 5 tests passed.")
+    import pytest
+
+    raise SystemExit(pytest.main([__file__]))

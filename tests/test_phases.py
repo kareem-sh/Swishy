@@ -9,7 +9,12 @@ from analysis.engine import BiomechanicsEngine
 from angles.calculator import AngleResult
 from phase_detection.detector import ShotPhaseDetector
 from phase_detection.features import KinematicFeatures, extract_features
-from phase_detection.phases import PHASE_ORDER
+from phase_detection.phases import (
+    CORE_ANCHOR,
+    CORE_REST,
+    CORE_STATES,
+    PHASE_ORDER,
+)
 
 
 def _make_features(**kwargs) -> KinematicFeatures:
@@ -27,39 +32,40 @@ def _make_features(**kwargs) -> KinematicFeatures:
     return KinematicFeatures(**defaults)
 
 
-def test_phase_transitions():
-    """A dip with the ball in the carry position enters `loading`.
+def test_knee_dip_alone_does_not_start_a_shot():
+    """A dip is not a shot, and no longer opens one.
 
-    The dip is expressed as knee flexion, not as hip velocity. World landmarks
-    are hip-centred -- the hip midpoint IS the origin -- so `hip_velocity_y` is
-    identically zero on every real frame, and the transition that this test
-    used to drive with `hip_velocity_y=-0.05` could never fire outside a
-    synthetic fixture.
+    This used to enter a `loading` state. That state is gone from the detector
+    on purpose: opening on a posture change meant every re-settle and bounce
+    on the toes started an attempt, and it forced the shot through four more
+    threshold gates before it could reach a release. The dip is still scored --
+    the tracker back-fills frames from before the rise, and
+    feedback.phase_refiner finds the dip by its knee minimum -- but it decides
+    nothing.
     """
     det = ShotPhaseDetector()
-    assert det.phase == "ready_stance"
+    assert det.phase == CORE_REST
 
-    # hip_y_avg defaults to 0.6, so the ball has to be carried at or above
-    # that to be in a position it could be shot from. wrist_y=0.4 put the
-    # hands two-tenths BELOW the hips, which is a player standing at rest.
-    loading = _make_features(knee_angle_delta=-3.0, wrist_y=0.7, shoulder_y=0.8)
-    for _ in range(5):
-        det.update(loading)
-    assert det.phase == "loading"
+    dipping = _make_features(knee_angle_delta=-3.0, wrist_y=0.7, shoulder_y=0.8)
+    for _ in range(8):
+        det.update(dipping)
+    assert det.phase == CORE_REST
 
 
 def test_hip_velocity_alone_cannot_start_a_shot():
-    """Guards the bug above: hip velocity is a dead signal, not a weak one.
+    """Hip velocity is a dead signal, not a weak one.
 
-    If this ever passes, someone has reintroduced a condition that reads
-    whole-body motion out of hip-centred coordinates, where it does not exist.
+    If this ever fails, someone has reintroduced a condition that reads
+    whole-body motion out of hip-centred coordinates, where it does not exist:
+    the hip midpoint IS the origin, so `hip_velocity_y` is identically zero on
+    every real frame.
     """
     det = ShotPhaseDetector()
     hip_only = _make_features(hip_velocity_y=-0.05, knee_angle_delta=0.0,
                               wrist_y=0.7, shoulder_y=0.8)
     for _ in range(8):
         det.update(hip_only)
-    assert det.phase == "ready_stance"
+    assert det.phase == CORE_REST
 
 
 def test_biomechanics_knee_rule():
@@ -78,23 +84,37 @@ def test_biomechanics_knee_rule():
     assert knee_rule.passed
 
 
+def test_detector_stays_small():
+    """The state machine must not grow back.
+
+    Every detector state is another place a shot can get stuck and be lost
+    outright: with eight of them, a ten-shot practice video yielded 4 shots and
+    a side-on jump shot yielded 0 with 7 discarded candidates. Coaching detail
+    is added in config/phase_model.yaml under `analysis`, which costs nothing,
+    NOT under `detector`, which costs shots.
+    """
+    assert len(CORE_STATES) <= 4
+    assert CORE_ANCHOR in CORE_STATES
+    assert CORE_REST == CORE_STATES[0]
+
+
 def test_phase_order_complete():
-    assert len(PHASE_ORDER) == 8
+    """The coaching vocabulary is independent of the detector's."""
+    assert len(PHASE_ORDER) == 7
     assert PHASE_ORDER[0] == "ready_stance"
     assert PHASE_ORDER[-1] == "landing"
+    # `knee_flexion` was removed: it carried exactly the same two rules as
+    # `loading`, so one dip was reported twice under two headings.
+    assert "knee_flexion" not in PHASE_ORDER
 
 
-def test_ready_stance_to_ball_lift_on_wrist_rise():
-    """A rising wrist from the carry position starts the ball lift.
+def test_rest_to_rise_on_wrist_rise():
+    """A rising wrist from the carry position starts the shot.
 
-    Two things changed here. The shoulder now sits ABOVE the hips
-    (`shoulder_y=0.4`, not `-0.4`): after the Y-axis correction, up is
-    positive, so the old fixture described an anatomically impossible body and
-    the carry window could never contain the wrist.
-
-    And a rising wrist now goes straight to `ball_lift` rather than `loading`.
-    A wrist travelling upward IS the lift; routing it through `loading` first
-    described a dip that is not happening.
+    The shoulder sits ABOVE the hips (`shoulder_y=0.4`, not `-0.4`): after the
+    Y-axis correction, up is positive, so the old fixture described an
+    anatomically impossible body and the carry window could never contain the
+    wrist.
     """
     det = ShotPhaseDetector()
     still = _make_features(total_velocity=0.05, wrist_y=0.02, hip_y_avg=0.0,
@@ -113,7 +133,7 @@ def test_ready_stance_to_ball_lift_on_wrist_rise():
     for _ in range(5):
         det.update(rising)
         phases.append(det.phase)
-    assert "ball_lift" in phases
+    assert "rise" in phases
 
 
 def test_wrist_outside_carry_window_does_not_start_a_shot():
@@ -123,24 +143,58 @@ def test_wrist_outside_carry_window_does_not_start_a_shot():
                              wrist_velocity_y=0.05, knee_angle_delta=-3.0)
     for _ in range(8):
         det.update(hanging)
-    assert det.phase == "ready_stance"
+    assert det.phase == CORE_REST
 
 
 def test_index_tip_can_confirm_release():
+    """A finger driving through the ball confirms the release.
+
+    The hand is carried up first, because a release condition is only
+    considered once the ball has actually been on its way up -- see
+    ShotPhaseDetector._ball_went_up. Feeding the release frame to a detector
+    that never saw a carry tests a situation that cannot occur.
+    """
     det = ShotPhaseDetector()
-    det.phase = "ball_lift"
+    det.phase = "rise"
+    for wrist_y in (0.30, 0.42, 0.54, 0.66):
+        det.update(_make_features(
+            wrist_y=wrist_y, wrist_velocity_y=0.1, hip_y_avg=0.20,
+            shoulder_y=0.55, elbow_angle=90.0, index_align_angle=170.0,
+        ))
+
     index_release = _make_features(
-        wrist_y=0.6,
+        wrist_y=0.66,
         wrist_velocity_y=0.1,
-        hip_y_avg=0.5,
+        hip_y_avg=0.20,
+        shoulder_y=0.55,
         elbow_angle=90.0,
         index_align_angle=170.0,
         index_velocity_y=0.1,
     )
-
     for _ in range(5):
         det.update(index_release)
     assert det.phase == "release"
+
+
+def test_release_needs_the_ball_to_have_gone_up():
+    """An extended arm with no carry is not a release.
+
+    Merging `ball_lift` and `jump` into one `rise` state removed an implicit
+    guard -- reaching `jump` used to prove the ball had been carried up. Without
+    a replacement, the opening frames of a clip (One Euro filter, ankle
+    baseline and every velocity still settling from nothing) produced a release
+    inside 0.3 s on three separate fixtures.
+    """
+    det = ShotPhaseDetector()
+    det.phase = "rise"
+    # Arm extended, finger aligned, hand well below the shoulder, never moving.
+    still = _make_features(
+        wrist_y=0.30, wrist_velocity_y=0.0, hip_y_avg=0.20, shoulder_y=0.90,
+        elbow_angle=175.0, index_align_angle=175.0,
+    )
+    for _ in range(10):
+        det.update(still)
+    assert det.phase == "rise"
 
 
 def test_unreliable_index_does_not_copy_wrist_velocity():
@@ -209,11 +263,6 @@ def test_diagnostic_foot_motion_does_not_change_phase_speed():
 
 
 if __name__ == "__main__":
-    test_phase_transitions()
-    test_biomechanics_knee_rule()
-    test_phase_order_complete()
-    test_ready_stance_to_loading_on_wrist_rise()
-    test_index_tip_can_confirm_release()
-    test_unreliable_index_does_not_copy_wrist_velocity()
-    test_diagnostic_foot_motion_does_not_change_phase_speed()
-    print("All phase/rule tests passed.")
+    import pytest
+
+    raise SystemExit(pytest.main([__file__]))

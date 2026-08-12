@@ -1,0 +1,1016 @@
+<title>تدقيق نظام Swichy</title>
+<style>
+:root{
+  --ground:#f4f6f7; --surface:#ffffff; --surface-2:#eceff1;
+  --ink:#111820; --ink-2:#3d4a56; --muted:#63707c;
+  --line:#d8dee3; --line-strong:#b9c3ca;
+  --accent:#00726b; --accent-soft:#d9edeb;
+  --ok:#1f6f43; --ok-soft:#dcefe3;
+  --warn:#8a5200; --warn-soft:#f6e8d3;
+  --bad:#a3231d; --bad-soft:#f6dedd;
+  --code-bg:#eef1f3;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#12161a; --surface:#1a1f25; --surface-2:#222931;
+    --ink:#e8edf2; --ink-2:#c2ccd6; --muted:#94a1ad;
+    --line:#2b333c; --line-strong:#3b454f;
+    --accent:#2ad4c4; --accent-soft:#123734;
+    --ok:#6ee7a4; --ok-soft:#12301f;
+    --warn:#e8b465; --warn-soft:#33260f;
+    --bad:#f08a84; --bad-soft:#361715;
+    --code-bg:#161b21;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#12161a; --surface:#1a1f25; --surface-2:#222931;
+  --ink:#e8edf2; --ink-2:#c2ccd6; --muted:#94a1ad;
+  --line:#2b333c; --line-strong:#3b454f;
+  --accent:#2ad4c4; --accent-soft:#123734;
+  --ok:#6ee7a4; --ok-soft:#12301f;
+  --warn:#e8b465; --warn-soft:#33260f;
+  --bad:#f08a84; --bad-soft:#361715;
+  --code-bg:#161b21;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0; background:var(--ground); color:var(--ink);
+  font-family:"Segoe UI","Noto Sans Arabic","Dubai",Tahoma,system-ui,sans-serif;
+  font-size:17px; line-height:1.85; direction:rtl; text-align:right;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1180px;margin:0 auto;padding:0 22px 96px;display:grid;gap:34px;grid-template-columns:1fr}
+@media(min-width:1040px){.wrap{grid-template-columns:250px minmax(0,1fr);align-items:start}}
+nav.toc{display:none}
+@media(min-width:1040px){
+  nav.toc{
+    display:block;position:sticky;top:22px;background:var(--surface);
+    border:1px solid var(--line);border-radius:10px;padding:16px 14px;
+    font-size:13.5px;line-height:1.5;max-height:calc(100vh - 44px);overflow-y:auto;
+  }
+}
+nav.toc h4{margin:0 0 10px;font-size:11px;letter-spacing:.14em;color:var(--muted);font-weight:700}
+nav.toc a{display:block;padding:5px 8px;border-radius:6px;color:var(--ink-2);text-decoration:none}
+nav.toc a:hover{background:var(--surface-2);color:var(--accent)}
+nav.toc a:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+main{min-width:0}
+header.top{padding:56px 0 30px;border-bottom:3px solid var(--ink)}
+.eyebrow{font-size:11.5px;letter-spacing:.2em;color:var(--accent);font-weight:800;margin:0 0 12px}
+h1{margin:0;font-size:clamp(30px,5vw,48px);line-height:1.2;font-weight:800;letter-spacing:-.01em;text-wrap:balance}
+.sub{color:var(--muted);margin:14px 0 0;font-size:16px;max-width:62ch}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
+.meta span{font-size:12px;background:var(--surface-2);border:1px solid var(--line);
+  border-radius:999px;padding:4px 12px;color:var(--ink-2);
+  font-variant-numeric:tabular-nums}
+section{padding-top:44px}
+h2{font-size:clamp(21px,3vw,27px);margin:0 0 6px;font-weight:800;letter-spacing:-.01em;text-wrap:balance}
+h2 .num{color:var(--accent);font-size:.62em;font-weight:800;margin-inline-end:10px;
+  font-variant-numeric:tabular-nums}
+h3{font-size:18px;margin:30px 0 8px;font-weight:700;color:var(--ink)}
+h4{font-size:15.5px;margin:22px 0 6px;font-weight:700;color:var(--ink-2)}
+p{margin:0 0 14px;max-width:74ch}
+ul,ol{margin:0 0 14px;padding-inline-start:24px;max-width:74ch}
+li{margin-bottom:7px}
+.rule{height:1px;background:var(--line);border:0;margin:0}
+code{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace;
+  font-size:.87em;background:var(--code-bg);padding:2px 6px;border-radius:5px;
+  direction:ltr;display:inline-block;unicode-bidi:embed;border:1px solid var(--line)}
+pre{background:var(--code-bg);border:1px solid var(--line);border-radius:9px;
+  padding:14px 16px;overflow-x:auto;direction:ltr;text-align:left;margin:0 0 16px}
+pre code{background:none;border:0;padding:0;font-size:13px;line-height:1.7}
+.tablewrap{overflow-x:auto;margin:0 0 18px;border:1px solid var(--line);border-radius:9px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14.5px;min-width:560px}
+th,td{padding:10px 13px;text-align:right;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:var(--surface-2);font-weight:700;font-size:12.5px;letter-spacing:.03em;
+  color:var(--ink-2);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td code{white-space:nowrap}
+.num-col{font-variant-numeric:tabular-nums}
+.badge{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 9px;
+  border-radius:5px;white-space:nowrap;line-height:1.7}
+.b-ok{background:var(--ok-soft);color:var(--ok)}
+.b-warn{background:var(--warn-soft);color:var(--warn)}
+.b-bad{background:var(--bad-soft);color:var(--bad)}
+.b-info{background:var(--accent-soft);color:var(--accent)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+  padding:20px 22px;margin:0 0 18px}
+.card.flag{border-inline-start:4px solid var(--bad)}
+.card.note{border-inline-start:4px solid var(--accent)}
+.card.warnc{border-inline-start:4px solid var(--warn)}
+.card h4{margin-top:0}
+.card p:last-child,.card ul:last-child{margin-bottom:0}
+.k{font-weight:700;color:var(--ink)}
+.flow{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+  padding:18px;margin:0 0 18px;overflow-x:auto}
+.flow pre{background:none;border:0;padding:0;margin:0;font-size:12.5px;color:var(--ink-2)}
+.stat-row{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin:0 0 20px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:14px 16px}
+.stat .v{font-size:25px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.25}
+.stat .l{font-size:12px;color:var(--muted);margin-top:3px}
+.stat.good .v{color:var(--ok)} .stat.bad .v{color:var(--bad)} .stat.warn .v{color:var(--warn)}
+.ten{counter-reset:ten;list-style:none;padding:0;max-width:none}
+.ten li{counter-increment:ten;background:var(--surface);border:1px solid var(--line);
+  border-radius:9px;padding:16px 18px 16px 18px;margin-bottom:10px;position:relative;
+  padding-inline-start:60px}
+.ten li::before{content:counter(ten);position:absolute;inset-inline-start:18px;top:15px;
+  font-weight:800;color:var(--accent);font-size:19px;font-variant-numeric:tabular-nums}
+footer{margin-top:56px;padding-top:22px;border-top:1px solid var(--line);
+  color:var(--muted);font-size:13.5px}
+a{color:var(--accent)}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+</style>
+
+<div class="wrap">
+<nav class="toc">
+  <h4>الأقسام</h4>
+  <a href="#s0">النظام في ٦٠ ثانية</a>
+  <a href="#s1">١· بنية المستودع</a>
+  <a href="#s2">٢· مسار التنفيذ الفعلي</a>
+  <a href="#s3">٣· الفلترة والرؤية</a>
+  <a href="#s4">٤· الزوايا</a>
+  <a href="#s5">٥· الميزات</a>
+  <a href="#s6">٦· الأطوار</a>
+  <a href="#s7">٧· آلة الحالة</a>
+  <a href="#s8">٨· تقطيع الرميات</a>
+  <a href="#s9">٩· الكرة والحلقة</a>
+  <a href="#s10">١٠· التغذية الراجعة</a>
+  <a href="#s11">١١· البحث مقابل التنفيذ</a>
+  <a href="#s12">١٢· تاريخ Git</a>
+  <a href="#s13">١٣· الكود الميت</a>
+  <a href="#s14">١٤· الاختبارات</a>
+  <a href="#s15">١٥· المشاكل الحالية</a>
+  <a href="#s16">١٦· ما نحتاجه فعلاً</a>
+  <a href="#s17">١٧· خريطة المطوّر</a>
+  <a href="#s18">١٨· اشرح Swichy لأصدقائك</a>
+  <a href="#s19">١٩· عشر حقائق قبل التعديل</a>
+</nav>
+
+<main>
+<header class="top">
+  <p class="eyebrow">تدقيق تقني كامل · لا تعديل على الكود</p>
+  <h1>تدقيق نظام Swichy</h1>
+  <p class="sub">توثيق دقيق لما يفعله المستودع فعلياً — لا لما تقوله أسماء الملفات، ولا لما كان مقصوداً.
+  كل ادّعاء هنا مُتتبَّع إلى ملف ودالة محدّدة.</p>
+  <div class="meta">
+    <span>HEAD: <code>a96b3b3</code></span>
+    <span>١١٣ اختبار ناجح · ٤ xfail</span>
+    <span>١٣/١٣ مقطع مفرد صحيح</span>
+    <span>تعديلات غير مُودَعة: ١٠ ملفات</span>
+  </div>
+</header>
+
+<!-- ============ 60 SECONDS ============ -->
+<section id="s0">
+<h2>النظام الحالي في ٦٠ ثانية</h2>
+
+<p>Swichy مدرّب تصويب كرة سلة يعمل على <span class="k">كاميرا واحدة</span>. يأخذ فيديو،
+يستخرج هيكل الجسم بـ MediaPipe Pose، يحسب زوايا المفاصل ثلاثية الأبعاد، يقسّم الفيديو إلى
+<span class="k">رميات</span>، يقسّم كل رمية إلى <span class="k">أطوار</span>، يقيس كل طور
+مقابل قواعد ميكانيكا حيوية من ملف إعدادات، ثم يُخرج درجة لكل طور ودرجة إجمالية ونصائح تدريبية.</p>
+
+<p>النطاق المدعوم اليوم هو <span class="k">نوعان فقط</span>: رمية القفز
+(<code>JUMP_SHOT</code>) والرمية الثابتة/الحرة (<code>SET_SHOT</code>). اللاي‑أب والخطّاف
+والدنك <span class="k">مُعرَّفة في السجل لكنها غير مُنفَّذة</span> — تُرفض بلا درجة.</p>
+
+<div class="card note">
+<h4>ثلاث حقائق تشرح معظم سلوك النظام</h4>
+<ul>
+<li><span class="k">إحداثيات MediaPipe العالمية مركزها الورك.</span> نقطة الأصل <em>هي</em> منتصف
+الوركين. لذلك حركة الجسم ككل (القفز، الجري) <span class="k">غير مرئية بنيوياً</span> فيها:
+عند القفز يرتفع الورك والكاحل معاً فلا يتغيّر الفرق. هذا سبب أن قياس القفز انتقل إلى
+<span class="k">فضاء الصورة</span> مقسوماً على طول اللاعب على الشاشة.</li>
+<li><span class="k">التوقيت كله بالثواني وليس بالإطارات.</span> المقاطع تتراوح بين ١٢ و٣٠ إطار/ثانية
+وتشمل تصويراً بطيئاً، فعدّاد الإطارات يعني زمناً مختلفاً في كل ملف.</li>
+<li><span class="k">كشف الكرة والحلقة مُعطَّل في المسار الرئيسي.</span> <code>coach_report.py</code>
+يمرّر <code>enable_ball=False</code>، لذلك النظام <span class="k">لا يحدّد اليوم هل دخلت الكرة أم لا</span>.</li>
+</ul>
+</div>
+
+<div class="stat-row">
+  <div class="stat good"><div class="v">١٣ / ١٣</div><div class="l">مقاطع الرمية المفردة صحيحة</div></div>
+  <div class="stat good"><div class="v">١١٣</div><div class="l">اختبار ناجح (+٤ xfail)</div></div>
+  <div class="stat warn"><div class="v">٣٨</div><div class="l">ملف في <code>ml/</code> بلا أي استدعاء</div></div>
+  <div class="stat bad"><div class="v">٠</div><div class="l">إشارات إلى <code>physics/</code></div></div>
+</div>
+</section>
+
+<hr class="rule">
+
+<!-- ============ 1. REPO ============ -->
+<section id="s1">
+<h2><span class="num">٠١</span>بنية المستودع</h2>
+
+<p>المستودع ١٣ حزمة بايثون + إعدادات + اختبارات + وثائق. التصنيف أدناه مبني على
+<span class="k">عدّ الاستدعاءات الفعلي</span> لا على الأسماء.</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>المجلد</th><th>المسؤولية</th><th>موضعه في المسار</th><th>يعتمد على</th><th>الحالة</th></tr></thead>
+<tbody>
+<tr><td><code>pose/</code></td><td>تشغيل MediaPipe واستخراج المعالم + بوابة الرؤية</td><td>المدخل</td><td>—</td><td><span class="badge b-ok">أساسي</span></td></tr>
+<tr><td><code>filters/</code></td><td>مرشّح One Euro لتنعيم المعالم</td><td>بعد الاستخراج</td><td><code>pose/</code></td><td><span class="badge b-ok">أساسي</span></td></tr>
+<tr><td><code>geometry/</code></td><td>رياضيات المتجهات ثلاثية الأبعاد</td><td>أداة</td><td>—</td><td><span class="badge b-ok">أساسي</span></td></tr>
+<tr><td><code>angles/</code></td><td>تعريف سلاسل المفاصل وحساب الزوايا</td><td>بعد الفلترة</td><td><code>geometry/, pose/</code></td><td><span class="badge b-ok">أساسي</span></td></tr>
+<tr><td><code>phase_detection/</code></td><td>استخراج الميزات + آلة حالة الأطوار</td><td>القلب</td><td><code>angles/</code></td><td><span class="badge b-ok">أساسي</span></td></tr>
+<tr><td><code>shots/</code></td><td>أنواع الرميات وسجلها والمصنّف</td><td>بعد الأطوار</td><td>—</td><td><span class="badge b-ok">أساسي</span></td></tr>
+<tr><td><code>analysis/</code></td><td>محرّك قواعد الميكانيكا الحيوية</td><td>التقييم</td><td><code>angles/, config/</code></td><td><span class="badge b-ok">أساسي</span></td></tr>
+<tr><td><code>feedback/</code></td><td>تقطيع الرميات + التسجيل + النصائح + التقارير (١٤ ملفاً)</td><td>المخرج</td><td>كثير</td><td><span class="badge b-warn">أساسي لكن متضخّم</span></td></tr>
+<tr><td><code>player/</code></td><td>ملف اللاعب وطوله (يُدخله المستخدم فقط)</td><td>سياق</td><td>—</td><td><span class="badge b-ok">أساسي</span></td></tr>
+<tr><td><code>utils/</code></td><td>تحقق الفيديو، الطوابع الزمنية، التقدّم، كتم السجلات</td><td>عرضي</td><td>—</td><td><span class="badge b-ok">أساسي</span></td></tr>
+<tr><td><code>ball/</code></td><td>كشف الكرة والحلقة (YOLO) + آلة حالة + نتيجة الرمية (١٢ ملفاً)</td><td>اختياري</td><td><code>models/*.pt</code></td><td><span class="badge b-warn">مبني ومعطَّل</span></td></tr>
+<tr><td><code>visualization/</code></td><td>الرسم على الإطار وواجهة HUD</td><td>العرض</td><td><code>pipeline</code></td><td><span class="badge b-info">يُستخدم في وضع الفيديو فقط</span></td></tr>
+<tr><td><code>modes/</code></td><td>نقاط دخول: live / image / video / headless</td><td>المدخل</td><td>كل شيء</td><td><span class="badge b-info">ثانوي</span></td></tr>
+<tr><td><code>scripts/</code></td><td>CLI الرئيسي + أدوات التشخيص (١٠ ملفات)</td><td>المدخل</td><td>كل شيء</td><td><span class="badge b-ok">أساسي</span></td></tr>
+<tr><td><code>physics/</code></td><td>حسابات مسار قذيفي</td><td>—</td><td>—</td><td><span class="badge b-bad">ميت · ٠ إشارة</span></td></tr>
+<tr><td><code>ml/</code></td><td>تدريب MLP وبناء datasets (٣٨ ملفاً)</td><td>—</td><td>—</td><td><span class="badge b-bad">منفصل · ٠ إشارة من التشغيل</span></td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="card flag">
+<h4>أهم نتيجة بنيوية</h4>
+<p>حزمتان كاملتان لا يستدعيهما مسار التشغيل إطلاقاً: <code>physics/</code> (٣ ملفات) و
+<code>ml/</code> (٣٨ ملفاً، أي أكبر حزمة في المستودع). تم التحقق بالبحث عن
+<code>^from ml</code> و<code>physics.</code> في كل ملفات التشغيل — النتيجة صفر.
+<span class="k">هذا لا يعني حذفها</span>؛ <code>ml/</code> يبدو مسار بحث موازٍ مقصود،
+لكن يجب ألا يُحسب ضمن «تعقيد النظام» عند القراءة.</p>
+</div>
+</section>
+
+<hr class="rule">
+
+<!-- ============ 2. FLOW ============ -->
+<section id="s2">
+<h2><span class="num">٠٢</span>مسار التنفيذ الفعلي</h2>
+
+<p>المسار المُتتبَّع من <code>scripts/coach_report.py::analyze_video</code> —
+وهو المسار الذي تقوده اختبارات القبول أيضاً، أي أن الاختبار يقود الإنتاج نفسه.</p>
+
+<div class="flow"><pre><code>probe_video()                  utils/video_meta.py
+   ↓  VideoMetadata(fps, frame_count, is_valid)   ← يرفض 1000fps ومقاطع لا تُفكّ
+build_player_profile()         player/profile.py   ← الطول من المستخدم فقط أو None
+   ↓
+_decode_and_analyse()          scripts/coach_report.py
+   │  لكل إطار:  timestamp_ms = index * 1000 / SOURCE_fps   ← لا ساعة حائط
+   ↓
+PoseDetector.detect_video_frame()      pose/detector.py
+   ↓  pose_landmarks (صورة) + pose_world_landmarks (متري، مركزه الورك)
+extract_world_landmarks()      pose/landmarks.py
+   ↓  ضرب في MEDIAPIPE_TO_SWICHY = [1,-1,1]   ← تصحيح المحور: +Y إلى الأعلى
+LandmarkFilterBank.filter_landmarks()  filters/one_euro.py
+   ↓  مواضع منعّمة (x,y,z) لكل معلم
+VisibilityGate.apply()         pose/visibility.py
+   ↓  is_reliable / is_stable / confidence  + تعليق مؤقت للمعلم المفقود
+AngleCalculator.compute_all()  angles/calculator.py
+   ↓  7 زوايا: elbow, knee, ankle_flexion, hip, shoulder, index_align, trunk
+extract_features()             phase_detection/features.py
+   ↓  KinematicFeatures  (عالمي + فضاء صورة)
+ShotPhaseDetector.update()     phase_detection/detector.py
+   ↓  اسم الطور
+BiomechanicsEngine.evaluate()  analysis/engine.py
+   ↓  AnalysisResult(active_rules[])
+ShotTracker.update()           feedback/shot_tracker.py
+   ↓  مرشّح → تأكيد → classify() → score_shot()
+ShotSummary                    feedback/models.py
+   ↓
+print_shot() / session_to_dict()   scripts/coach_report.py · feedback/payload.py</code></pre></div>
+
+<h3>ما يحدث عند فقدان البيانات</h3>
+<div class="tablewrap">
+<table>
+<thead><tr><th>الحالة</th><th>السلوك الفعلي</th><th>المكان</th></tr></thead>
+<tbody>
+<tr><td>لا يوجد pose في الإطار</td><td>تُتخطّى الميزات؛ <code>has_pose=False</code>؛ يُحتسب في <code>pose_share</code></td><td><code>coach_report.py</code></td></tr>
+<tr><td>pose_share &lt; 0.30</td><td>رفض كامل: <code>NO_PERSON_DETECTED</code> — بلا درجة</td><td><code>MIN_POSE_FRAME_SHARE</code></td></tr>
+<tr><td>معلم غير موثوق</td><td>تعليق آخر موضع موثوق حتى ٥ إطارات مع تلاشي الثقة</td><td><code>VisibilityGate.apply</code></td></tr>
+<tr><td>زاوية بمعلم مفقود</td><td><code>AngleResult(degrees=None, is_valid=False)</code> — القاعدة تُتخطّى</td><td><code>_resolve_landmarks</code></td></tr>
+<tr><td>معدل إطارات غير معقول</td><td>رفض قبل أي تحليل زمني</td><td><code>validate_fps</code></td></tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<hr class="rule">
+
+<!-- ============ 3. FILTER ============ -->
+<section id="s3">
+<h2><span class="num">٠٣</span>الفلترة وبوابة الرؤية</h2>
+
+<h3>مرشّح One Euro</h3>
+<p>مُطبَّق على <span class="k">كل محور من كل معلم عالمي</span> — أي ٣ مرشّحات لكل معلم
+(<code>LandmarkFilterBank</code>). يعمل <span class="k">قبل</span> حساب الزوايا، لأن الزاوية
+مشتقّة من ثلاثة مواضع، وضجيج أي منها يتضخّم في الناتج.</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>المعامل</th><th>القيمة</th><th>الأثر</th><th>الدعم</th></tr></thead>
+<tbody>
+<tr><td><code>min_cutoff</code></td><td class="num-col">1.0 Hz</td><td>التنعيم الأساسي عند السكون</td><td><span class="badge b-warn">هندسي</span></td></tr>
+<tr><td><code>beta</code></td><td class="num-col">0.007</td><td>سرعة الاستجابة أثناء الحركة السريعة</td><td><span class="badge b-warn">هندسي</span></td></tr>
+<tr><td><code>d_cutoff</code></td><td class="num-col">1.0 Hz</td><td>تنعيم المشتقّة</td><td><span class="badge b-warn">هندسي</span></td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="card warnc">
+<h4>المرشّح مستقل عن معدل الإطارات — بشرط</h4>
+<p>الخوارزمية تستخدم <code>dt</code> الحقيقي في <code>_alpha(cutoff, dt)</code>، أي أنها
+<span class="k">لا تفترض ٣٠ إطاراً/ثانية</span> رياضياً. لكن التعليق في
+<code>config/filter_config.yaml</code> يقول صراحةً «Tuned for 30 FPS»، والمعاملات ثابتة وغير
+تكيّفية. عملياً: عند ١٢ إطاراً/ثانية يصبح التنعيم أضعف نسبياً لأن عدد العيّنات في نفس الزمن أقل.
+<span class="k">لم يُختبر هذا الأثر</span> في أي اختبار حالي.</p>
+</div>
+
+<h3>بوابة الرؤية <code>VisibilityGate</code></h3>
+<div class="tablewrap">
+<table>
+<thead><tr><th>العنصر</th><th>القيمة/السلوك</th></tr></thead>
+<tbody>
+<tr><td>عتبة الظهور</td><td class="num-col">0.6</td></tr>
+<tr><td>عتبة الوجود</td><td class="num-col">0.5</td></tr>
+<tr><td>الثقة الفعّالة</td><td><code>min(visibility, presence)</code> — الأكثر تحفّظاً</td></tr>
+<tr><td>إطارات التعليق</td><td class="num-col">5</td></tr>
+<tr><td>التلاشي</td><td><code>decay = 1 − hold/(hold_frames+1)</code>، ثم <code>is_reliable = held_conf ≥ 0.85 × threshold</code></td></tr>
+<tr><td>بعد انتهاء التعليق</td><td><code>is_reliable=False</code> — الموضع الأصلي يُمرَّر لكنه مُعلَّم غير موثوق</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="card flag">
+<h4>هذه البوابة كانت سبباً مباشراً لفشل كشف الرميات</h4>
+<p>عندما ترفض البوابة معلم المعصم، تُعيد <code>_lm_y()</code> القيمة <code>None</code>،
+وفي <code>extract_features</code> يتحوّل ذلك عبر <code>or 0.0</code> إلى
+<span class="k">صفر</span>. وفي إحداثيات مركزها الورك فإن صفر يعني «المعصم عند مستوى الورك
+تماماً» — رقم <span class="k">معقول المظهر</span> وليس علامة خطأ. في تصوير من الخلف فشل
+معلم المعصم في <span class="k">كل إطار</span>، فرأت آلة الحالة معصماً ساكناً عند الورك طوال
+رمية قفز كاملة ولم تبدأ أبداً.</p>
+<p>الحل الحالي: <code>wrist_world_valid</code> + إشارة معصم بديلة من فضاء الصورة
+(<code>wrist_height_ratio</code>). <span class="k">هذا نمط خطأ عام</span> — أي
+<code>or 0.0</code> على معلم مُبوَّب يُنتج بيانات مُلفَّقة صامتة.</p>
+</div>
+</section>
+
+<hr class="rule">
+
+<!-- ============ 4. ANGLES ============ -->
+<section id="s4">
+<h2><span class="num">٠٤</span>نظام الزوايا</h2>
+
+<p>كل الزوايا <span class="k">ثلاثية الأبعاد</span> ومحسوبة من المعالم العالمية المفلترة.
+ستّ منها زوايا مفصلية بثلاث نقاط، وواحدة (<code>trunk</code>) تُقاس مقابل محور ثابت.</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>الزاوية</th><th>المعالم</th><th>الحساب</th><th>مستهلكها</th><th>الدعم البحثي</th></tr></thead>
+<tbody>
+<tr><td><code>elbow</code></td><td>shoulder→elbow→wrist</td><td>ضرب قياسي بين متجهين</td><td>الطور + قواعد <code>elbow_slot</code>, <code>elbow_extension_release</code></td><td><span class="badge b-warn">قرار هندسي</span></td></tr>
+<tr><td><code>knee</code></td><td>hip→knee→ankle</td><td>ضرب قياسي</td><td>الطور (<code>knee_angle_delta</code>) + قاعدة <code>knee_flexion_loading</code></td><td><span class="badge b-bad">غير مدعوم</span></td></tr>
+<tr><td><code>hip</code></td><td>shoulder→hip→knee</td><td>ضرب قياسي</td><td>قاعدة <code>hip_hinge_loading</code></td><td><span class="badge b-warn">هندسي</span></td></tr>
+<tr><td><code>shoulder</code></td><td>hip→shoulder→elbow</td><td>ضرب قياسي</td><td>قاعدة <code>shoulder_alignment_lift</code> — <span class="k">غير مُسجَّلة</span> (<code>scored:false</code>)</td><td><span class="badge b-info">عرض فقط</span></td></tr>
+<tr><td><code>index_align</code></td><td>elbow→wrist→index</td><td>ضرب قياسي</td><td>انتقال الإطلاق + <code>follow_through_index</code></td><td><span class="badge b-warn">هندسي</span></td></tr>
+<tr><td><code>trunk</code></td><td>mid_hip→mid_shoulder مقابل +Y</td><td><code>angle_from_vertical</code></td><td>قاعدة <code>trunk_posture</code></td><td><span class="badge b-warn">هندسي</span></td></tr>
+<tr><td><code>ankle_flexion</code></td><td>knee→ankle→foot_index</td><td>ضرب قياسي</td><td><span class="k">لا أحد</span></td><td><span class="badge b-bad">تُحسب ولا تُستخدم</span></td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>ملاحظة رياضية مهمة</h3>
+<p><code>angle_between_vectors</code> ثابتة تحت انعكاس الإطار كاملاً (ضرب قياسي بين متجهين
+مشتقّين من نفس الإحداثيات). أما <code>angle_from_vertical</code> فتقارن بمحور
+<span class="k">ثابت</span>، فهي <span class="k">ليست</span> ثابتة تحت الانعكاس وتُعيد
+<code>180 − الزاوية الحقيقية</code> لو مُرّرت لها إحداثيات MediaPipe الخام. هذا موثّق صراحةً في
+<code>geometry/vectors.py</code> وهو سبب وجود تصحيح المحور عند حدود الاستخراج.</p>
+
+<h3>الفجوات</h3>
+<ul>
+<li><span class="k">تُحسب ولا تُستخدم:</span> <code>ankle_flexion</code> — تُحسب لكل إطار في
+<code>compute_all</code> ولا يقرأها أي طور أو قاعدة.</li>
+<li><span class="k">جانب واحد فقط:</span> <code>compute_all</code> يحسب سلسلة
+<code>shooting_side</code> فقط. لا تُحسب زوايا الجانب الآخر، فلا يمكن قياس التماثل.</li>
+<li><span class="k">يقترحها البحث ولا نحسبها:</span> زاوية إطلاق الكرة الحقيقية
+(٤٨–٥٧°) — تحتاج تتبّع الكرة، وهو معطَّل. الموجود هو ارتفاع الذراع فقط، وهما
+<span class="k">مقداران مختلفان</span> خُلط بينهما في نسخة سابقة من البحث.</li>
+</ul>
+</section>
+
+<hr class="rule">
+
+<!-- ============ 5. FEATURES ============ -->
+<section id="s5">
+<h2><span class="num">٠٥</span>نظام الميزات <code>KinematicFeatures</code></h2>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>الميزة</th><th>الفضاء</th><th>الوحدة</th><th>مطبَّعة؟</th><th>الاستخدام</th></tr></thead>
+<tbody>
+<tr><td><code>wrist_y</code>, <code>shoulder_y</code>, <code>hip_y_avg</code>, <code>nose_y</code></td><td>عالمي</td><td>متر (نسبةً للورك)</td><td>لا</td><td>نافذة الحمل، الإطلاق</td></tr>
+<tr><td><code>wrist_velocity_y</code>, <code>index_velocity_y</code></td><td>عالمي</td><td>م/ث</td><td>لا</td><td>ball_lift، release</td></tr>
+<tr><td><code>knee_angle</code>, <code>knee_angle_delta</code></td><td>عالمي</td><td>درجة، درجة/إطار</td><td>لا</td><td>loading، knee_flexion</td></tr>
+<tr><td><code>hip_velocity_y</code></td><td>عالمي</td><td>م/ث</td><td>لا</td><td><span class="badge b-bad">صفر دائماً — إشارة ميتة</span></td></tr>
+<tr><td><code>ankle_y_avg</code>, <code>ankle_baseline_y</code>, <code>ankle_velocity_y</code></td><td>عالمي</td><td>متر</td><td>لا</td><td><span class="badge b-bad">بقايا كشف القفز القديم</span></td></tr>
+<tr><td><code>total_velocity</code></td><td>عالمي</td><td>م/ث</td><td>متوسط ١٥ معلماً</td><td>landing→ready، خط أساس السكون</td></tr>
+<tr><td><code>body_rise_ratio</code></td><td><span class="k">صورة</span></td><td>جزء من طول الجسم</td><td><span class="k">نعم</span></td><td>ball_lift→jump، تصنيف النوع</td></tr>
+<tr><td><code>hip_x_ratio</code></td><td>صورة</td><td>جزء من عرض الإطار</td><td>نعم</td><td>ثابت مقابل متحرك</td></tr>
+<tr><td><code>wrist_height_ratio</code></td><td>صورة</td><td>جزء من طول الجسم</td><td>نعم</td><td>بديل المعصم عند فشل البوابة</td></tr>
+<tr><td><code>wrist_world_valid</code></td><td>—</td><td>منطقي</td><td>—</td><td>يختار بين الفضاءين</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="card flag">
+<h4>إشارتان ميّتتان بنيوياً — ليستا ضعيفتين بل مستحيلتين</h4>
+<p><code>hip_velocity_y</code>: الوركان <em>هما</em> نقطة الأصل، فمتوسط ارتفاعهما صفر في كل
+إطار ومشتقّته صفر دائماً. الشرط <code>loading_hip_drop_velocity: -0.02</code> في
+<code>config/phases.yaml</code> <span class="k">لا يمكن أن يتحقّق أبداً</span> — وقد أُزيل من
+آلة الحالة وأُضيف اختبار حارس (<code>test_hip_velocity_alone_cannot_start_a_shot</code>) يمنع
+عودته. <span class="k">لكن العتبة ما تزال موجودة في الملف</span>.</p>
+<p><code>ankle_y_avg − ankle_baseline_y</code>: يقيس امتداد الساق لا القفز. رمية قفز حقيقية
+سجّلت ٠٫٠٣٠ متر فقط. لم تعد آلة الحالة تستخدمه، لكن الحقول ما تزال تُحسب وتُمرَّر.</p>
+</div>
+
+<h3>الاعتماد على الطول والمعدل</h3>
+<ul>
+<li><span class="k">الطول:</span> ميزة واحدة فقط تعتمد عليه — <code>release_height_ratio</code>
+في <code>analysis/engine.py</code>. إن لم يُدخل المستخدم طولاً تُتخطّى القاعدة ولا تُخمَّن.</li>
+<li><span class="k">معدل الإطارات:</span> كل السرعات مقسومة على <code>dt_s</code> الحقيقي.
+الاستثناء الوحيد هو <code>knee_angle_delta</code> — وحدته <span class="k">درجة لكل إطار</span>
+لا لكل ثانية، والعتبة <code>-1.0</code> تُقارن به مباشرةً. هذه <span class="k">حساسية حقيقية
+لمعدل الإطارات</span> باقية في النظام.</li>
+</ul>
+</section>
+
+<hr class="rule">
+
+<!-- ============ 6. PHASES ============ -->
+<section id="s6">
+<h2><span class="num">٠٦</span>نظام الأطوار</h2>
+
+<p>ثمانية أطوار مُعرَّفة في <code>phase_detection/phases.py</code>. القيم أدناه هي
+<span class="k">القيم الفعلية في المستودع الآن</span>.</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>الطور</th><th>المعنى</th><th>شرط الدخول الفعلي</th><th>مهلة</th></tr></thead>
+<tbody>
+<tr><td><code>ready_stance</code></td><td>وقوف قبل الرمية</td><td>الحالة الابتدائية</td><td><span class="badge b-info">لا شيء — حالة راحة</span></td></tr>
+<tr><td><code>loading</code></td><td>الهبوط وتحميل الساقين</td><td>المعصم في نافذة الحمل <span class="k">و</span> <code>knee_angle_delta &lt; −1.0</code></td><td class="num-col">2.5 ث</td></tr>
+<tr><td><code>knee_flexion</code></td><td>قاع الهبوط وبدء الامتداد</td><td>من <code>loading</code>: <code>knee_angle_delta &gt; +0.5</code></td><td class="num-col">1.5 ث</td></tr>
+<tr><td><code>ball_lift</code></td><td>رفع الكرة</td><td>المعصم يصعد (عالمي <code>&gt;0.03 m/s</code> أو صورة <code>&gt;0.25</code> طول/ث)</td><td class="num-col">2.0 ث</td></tr>
+<tr><td><code>jump</code></td><td>مغادرة الأرض</td><td><code>body_rise_ratio &gt; 0.06</code> <span class="k">(فضاء صورة)</span></td><td class="num-col">2.5 ث</td></tr>
+<tr><td><code>release</code></td><td>مغادرة الكرة لليد</td><td>ثلاثة مسارات — انظر أدناه</td><td class="num-col">2.0 ث</td></tr>
+<tr><td><code>follow_through</code></td><td>المتابعة بعد الإطلاق</td><td>المعصم يهبط <span class="k">أو</span> <code>elbow &gt; 155°</code> <span class="k">أو</span> إصبع ممتد يهبط</td><td class="num-col">3.0 ث</td></tr>
+<tr><td><code>landing</code></td><td>الهبوط والاتزان</td><td><code>|ankle − baseline| &lt; 0.04</code> و<code>ankle_vel &lt; 0.03</code></td><td class="num-col">3.0 ث</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>نافذة حمل الكرة — الشرط الحاكم للبداية</h3>
+<pre><code>hip_y_avg − carry_below_hip(0.15)  &lt;  wrist_y  &lt;  shoulder_y + carry_above_shoulder(0.30)
+# بديل فضاء الصورة عند فشل بوابة الرؤية:
+-0.10 &lt; wrist_height_ratio &lt; 0.55   (بوحدات طول الجسم)</code></pre>
+<p>هذا الشرط <span class="k">حاكم مطلق</span>: إن لم يتحقّق تُعيد الدالة <code>None</code> فوراً
+ولا يُفحص أي شرط آخر. النسخة السابقة كانت <code>wrist_y &lt; hip_y_avg + 0.35</code>، وبما أن
+<code>hip_y_avg ≈ 0</code> بنيوياً فقد كانت تعني «المعصم أقل من ٣٥ سم فوق الورك» — لاعب يرفع
+الكرة لمستوى الذقن لا يحقّقها أبداً، وضاعت رميتان كاملتان بهذا السبب وحده.</p>
+
+<h3>ثلاثة مسارات للإطلاق من <code>ball_lift</code></h3>
+<ol>
+<li>المعصم فوق الورك <span class="k">و</span> يهبط</li>
+<li>المرفق <code>&gt; 145°</code> <span class="k">و</span> المعصم فوق الورك <span class="k">و</span> لا يصعد</li>
+<li>محاذاة السبابة <code>&gt; 150°</code> <span class="k">و</span> السبابة تندفع لأعلى <code>&gt; 0.03</code></li>
+</ol>
+<p>ومن <code>jump</code> ثلاثة مسارات أخرى تعتمد على ذروة المعصم وتباطؤه وامتداد المرفق
+<code>&gt; 150°</code>.</p>
+
+<div class="card warnc">
+<h4>عن الدعم البحثي للعتبات</h4>
+<p><span class="k">لا واحدة من عتبات الأطوار مشتقّة من ورقة علمية.</span> كلها قرارات هندسية
+حول ما يستطيع جسم الإنسان فعله. العتبة الوحيدة ذات صلة بالأدبيات هي عتبة تصنيف نوع الرمية
+<code>0.12</code> طول جسم، المشتقّة من إزاحة عمودية ١٥٫٣±٥٫١ سم للرمية الحرة مقابل ٢٦٫٩–٣١٫٢ سم
+لرمية القفز — وحتى هذه <span class="k">معايَرة وليست مشتقّة</span>، لأن الدراسة قاست
+عَقِب‑القدم‑إلى‑الأرض بينما نقيس ارتفاع معلم الكاحل فوق خط أساس.</p>
+<p>ملاحظة إيجابية مهمة: هذه العتبة <span class="k">لم تُعدَّل</span> أثناء الإصلاح، ووقعت طبيعياً
+في فجوة حقيقية بين أعلى رمية ثابتة (٠٫١٠٨) وأدنى رمية قفز (٠٫١٨٧).</p>
+</div>
+</section>
+
+<hr class="rule">
+
+<!-- ============ 7. FSM ============ -->
+<section id="s7">
+<h2><span class="num">٠٧</span>آلة الحالة — كيف ننتقل بين الأطوار</h2>
+
+<h3>ترتيب الفحص داخل <code>update()</code></h3>
+<ol>
+<li><span class="k">المهلة أولاً</span> — إن تجاوز الطور مهلته يُدفع قسراً للطور التالي، وتُلغى
+أي حالة معلّقة، ويُعاد فوراً.</li>
+<li><code>_evaluate_transition()</code> يُعيد مرشّحاً واحداً أو <code>None</code>.</li>
+<li>إن اختلف المرشّح عن الطور الحالي: يُسجَّل زمن بدايته ويُزاد عدّاده.</li>
+<li>يُنفَّذ الانتقال فقط إن تحقّق <span class="k">التأكيد والمكوث معاً</span>.</li>
+<li><code>_is_valid_transition()</code> يفحص القائمة البيضاء؛ <code>ready_stance</code> مسموح من أي مكان.</li>
+</ol>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>من</th><th>إلى</th><th>الشرط</th><th>التأكيد</th><th>عند المهلة</th></tr></thead>
+<tbody>
+<tr><td><code>ready_stance</code></td><td><code>ball_lift</code></td><td>نافذة الحمل + المعصم يصعد</td><td>0.07 ث + إطاران</td><td>—</td></tr>
+<tr><td><code>ready_stance</code></td><td><code>loading</code></td><td>نافذة الحمل + <code>knee_delta &lt; −1.0</code></td><td>0.07 ث + إطاران</td><td>—</td></tr>
+<tr><td><code>loading</code></td><td><code>ball_lift</code></td><td>المعصم يصعد <span class="k">(يُفحص أولاً)</span></td><td>0.07 ث</td><td>→ <code>ball_lift</code></td></tr>
+<tr><td><code>loading</code></td><td><code>knee_flexion</code></td><td><code>knee_delta &gt; +0.5</code></td><td>0.07 ث</td><td>→ <code>ball_lift</code></td></tr>
+<tr><td><code>knee_flexion</code></td><td><code>ball_lift</code></td><td>المعصم يصعد و فوق الورك</td><td>0.07 ث</td><td>→ <code>ball_lift</code></td></tr>
+<tr><td><code>ball_lift</code></td><td><code>jump</code></td><td><code>body_rise_ratio &gt; 0.06</code></td><td>0.07 ث</td><td>→ <code>release</code></td></tr>
+<tr><td><code>ball_lift</code></td><td><code>release</code></td><td>ثلاثة مسارات</td><td>0.07 ث</td><td>→ <code>release</code></td></tr>
+<tr><td><code>jump</code></td><td><code>release</code></td><td>ذروة/تباطؤ/امتداد</td><td>0.07 ث</td><td>→ <code>release</code></td></tr>
+<tr><td><code>release</code></td><td><code>follow_through</code></td><td>هبوط المعصم أو <code>elbow&gt;155</code></td><td>0.07 ث</td><td>→ <code>follow_through</code></td></tr>
+<tr><td><code>follow_through</code></td><td><code>landing</code></td><td>الكاحل قرب الأساس وبطيء</td><td>0.07 ث</td><td>→ <code>landing</code></td></tr>
+<tr><td><code>landing</code></td><td><code>ready_stance</code></td><td><code>total_velocity &lt; 0.2</code></td><td>0.07 ث</td><td>→ <code>ready_stance</code></td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>ما يمنع التذبذب</h3>
+<ul>
+<li><span class="k">تأكيد زمني:</span> <code>hysteresis_s = 0.07</code> ث <span class="k">و</span>
+شرط إضافي بإطارين على الأقل — حتى لا يكفي إطار واحد عند معدل منخفض.</li>
+<li><span class="k">مكوث أدنى:</span> <code>min_dwell_s = 0.07</code> ث قبل السماح بالخروج؛
+<code>ready_stance</code> مُعفى.</li>
+<li><span class="k">قائمة بيضاء:</span> الرجوع للخلف ممنوع عدا العودة إلى <code>ready_stance</code>.</li>
+<li><span class="k">مهلات لكل طور غير طرفي</span> — أُضيفت لأن <code>knee_flexion</code>
+و<code>ball_lift</code> كانا مصرفين بلا مخرج، وأضاعا ٤ من ١٣ رمية.</li>
+</ul>
+
+<div class="card flag">
+<h4>لماذا كان كشف الأطوار «فوضوياً» — الأسباب التقنية الحقيقية</h4>
+<ol>
+<li><span class="k">قراءة إحداثيات خاطئة (السبب الأول):</span> شرط القفز كان يقرأ ارتفاع
+الكاحل من إحداثيات مركزها الورك — كمية لا تقيس القفز أصلاً. فأطلق ضجيجاً في الرميات الثابتة
+(٠٫٤٣–١٫٩٣ ث في طور <code>jump</code>) وصمت في القفزات الحقيقية.</li>
+<li><span class="k">أطوار بلا مهلة:</span> <code>knee_flexion</code> بمخرج وحيد ولا مهلة =
+مصرف. قتل ٤ مقاطع.</li>
+<li><span class="k">ثابت يفترض إحداثيات مطلقة:</span> شرط <code>ready_stance</code> منع
+الخروج نهائياً في مقطعين.</li>
+<li><span class="k">بيانات مُلفَّقة صامتة:</span> <code>or 0.0</code> على معلم مرفوض.</li>
+<li><span class="k">ترتيب خاطئ للشروط:</span> فحص <code>knee_flexion</code> قبل
+<code>ball_lift</code> كان يحوّل الرمية إلى حالة مخرجها الوحيد هو الشرط الذي لُوحظ للتوّ.</li>
+<li><span class="k">عدّ إطارات بدل الزمن</span> في التأكيد والمكوث.</li>
+<li><span class="k">خطأ ترتيب ثانوي:</span> «طور قصير جداً» — <code>release</code> بطول إطار
+واحد (٠٫٠٣ ث) جعل المصنّف يأخذ عيّنة من نافذة شبه معدومة، فصنّف رمية قفز حقيقية كرمية ثابتة
+رغم أن إشارتها ٠٫٢٠٧ مقابل عتبة ٠٫١٢.</li>
+</ol>
+</div>
+</section>
+
+<hr class="rule">
+
+<!-- ============ 8. SHOT SEGMENTATION ============ -->
+<section id="s8">
+<h2><span class="num">٠٨</span>تقطيع الرميات والرميات المتعدّدة</h2>
+
+<p>المنطق في <code>feedback/shot_tracker.py</code> ويعمل بنموذج <span class="k">مرشّح</span>:
+انتقال الطور يفتح مرشّحاً فقط، ولا يصبح رمية إلا بدليل.</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>الشرط</th><th>القيمة</th><th>الغرض</th></tr></thead>
+<tbody>
+<tr><td><code>require_release</code></td><td>true</td><td>لا رمية بلا إطلاق</td></tr>
+<tr><td><code>min_wrist_rise_m</code></td><td class="num-col">0.18 م</td><td>مسافة سفر المعصم (عالمي)</td></tr>
+<tr><td><code>min_wrist_rise_ratio</code></td><td class="num-col">0.20 طول جسم</td><td>البديل في فضاء الصورة</td></tr>
+<tr><td><code>min_wrist_above_shoulder_m</code></td><td class="num-col">−0.12 م</td><td>يسمح بإطلاق منخفض ويمنع كرة عند الخصر</td></tr>
+<tr><td><code>min_duration_s</code> / <code>max_duration_s</code></td><td class="num-col">0.20 / 12.0 ث</td><td>حدود الحركة الواحدة</td></tr>
+<tr><td><code>refractory_s</code></td><td class="num-col">0.60 ث</td><td>يمنع فتح رمية ثانية من التعافي</td></tr>
+<tr><td><code>candidate_timeout_s</code></td><td class="num-col">6.0 ث</td><td>يُسقط المرشّح بلا إطلاق — مسار «هزّ الأصابع»</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>هل تتسرّب الحالة بين الرميات؟</h3>
+<p><span class="k">لا، بالنسبة لعدّ الرميات وتصنيفها.</span> كل مرشّح كائن مستقل
+(<code>_Candidate</code>) وكل الأدلّة تُجمَع داخله ثم تُرمى عند <code>_discard()</code> أو
+<code>_finalize()</code>. الاختبار <code>test_two_shots_are_independent</code> يتحقّق من ذلك.</p>
+
+<div class="card warnc">
+<h4>لكن هناك حالة مشتركة لم تُختبر</h4>
+<p><code>ShotPhaseDetector</code> <span class="k">لا يُعاد ضبطه</span> بين الرميات: الحقول
+<code>_wrist_peak_y</code> و<code>_knee_min_angle</code> و<code>_in_shot</code> تعيش عبر
+الفيديو كله. <code>_track_shot_metrics</code> يعيد ضبط الذروة فقط عند
+<code>ready_stance and not _in_shot</code>. وشرط انتقال <code>jump→release</code> يعتمد على
+<code>_wrist_peak_y</code>. <span class="k">نظرياً</span> يمكن لذروة رمية سابقة أن ترفع العتبة
+لرمية لاحقة. لم يُرصد هذا في المقاطع الحالية لأنها مفردة، ولا يوجد اختبار يغطّيه.</p>
+</div>
+
+<h3>الحالة الفعلية على المقاطع</h3>
+<p>قُطّع <code>video8.mov</code> و<code>video9.mov</code> إلى ١٣ مقطعاً مفرداً
+(<code>scripts/build_single_shot_clips.py</code>) بحدود عند منتصف المسافة بين المحاولات،
+فلا يمكن لمقطع أن يحوي حدثي رمية. الحقيقة الأرضية مأخوذة
+<span class="k">من مشاهدة الفيديو</span> لا من المصنّف: video8 = ٩ ثابتة + ١ قفزة منخفضة،
+video9 = ٣ قفزات. النتيجة الحالية <span class="k">١٣/١٣</span>.</p>
+</section>
+
+<hr class="rule">
+
+<!-- ============ 9. BALL ============ -->
+<section id="s9">
+<h2><span class="num">٠٩</span>كشف الكرة والحلقة</h2>
+
+<div class="card flag">
+<h4>الجواب المباشر: لا، Swichy لا يحدّد اليوم هل دخلت الكرة</h4>
+<p><code>scripts/coach_report.py:180</code> يُنشئ الخط بـ <code>enable_ball=False</code>.
+فيبقى <code>_ball_detector = None</code>، ومن ثمّ في <code>pipeline.py:236</code> يُستدعى
+<code>configure_ball_outcome(required=False)</code>. النتيجة: <code>ShotTracker</code> يُنهي
+الرمية بالجسد وحده، و<code>summary.outcome</code> يبقى <code>None</code>، ويظهر في JSON
+كـ <code>"outcome": null</code>. <span class="k">تم التحقق من ذلك في مخرجات فعلية.</span></p>
+</div>
+
+<h3>ما هو مبنيّ فعلاً (لكنه غير مُفعَّل في هذا المسار)</h3>
+<div class="tablewrap">
+<table>
+<thead><tr><th>المكوّن</th><th>الملف</th><th>الحالة</th></tr></thead>
+<tbody>
+<tr><td>كاشف YOLO للكرة والحلقة</td><td><code>ball/detector.py</code></td><td>موجود؛ الأوزان حاضرة (<code>BODD_yolov8n_0001.pt</code>)</td></tr>
+<tr><td>تتبّع زمني</td><td><code>ball/tracker.py</code></td><td>يملأ فجوات حتى ٤ إطارات</td></tr>
+<tr><td>تتبّع بصري NanoTrack</td><td><code>ball/nano_tracker.py</code></td><td>خلف علم إعدادات منفصل</td></tr>
+<tr><td>آلة حالة الرمية للكرة</td><td><code>ball/shot_state_machine.py</code></td><td>٥٨٨ سطراً — أكبر ملف في الحزمة</td></tr>
+<tr><td>قرار الدخول/الخروج</td><td><code>ball/outcome.py</code>, <code>ball/fusion.py</code></td><td>يُنتج <code>ShotOutcome</code></td></tr>
+</tbody>
+</table>
+</div>
+
+<p><code>config/ball.yaml</code> يقول <code>enabled: true</code> — وهذا
+<span class="k">تناقض ظاهري</span> مع سلوك المسار الرئيسي. التوفيق: العلم يُقرأ فقط عندما
+يكون <code>enable_ball=None</code>، والـ CLI يمرّر <code>False</code> صراحةً فيتجاوزه.
+أوضاع <code>modes/video_mode.py</code> لا تمرّر شيئاً، فتُفعِّل الكرة فعلاً.
+<span class="k">أي أن سلوك النظام يختلف حسب نقطة الدخول</span> — وهذه نقطة ارتباك حقيقية.</p>
+
+<p>لا يؤثّر كشف الكرة على كشف الأطوار إطلاقاً: <code>ShotPhaseDetector.update()</code> يأخذ
+الميزات والطابع الزمني فقط. تأثيره الوحيد على التقطيع هو تأخير الإنهاء انتظاراً للنتيجة.</p>
+</section>
+
+<hr class="rule">
+
+<!-- ============ 10. FEEDBACK ============ -->
+<section id="s10">
+<h2><span class="num">١٠</span>نظام التغذية الراجعة والتسجيل</h2>
+
+<h3>المسار الكامل</h3>
+<div class="flow"><pre><code>KinematicFeatures + angles
+   ↓ BiomechanicsEngine.evaluate(phase, angles, features, side)     analysis/engine.py
+   ↓   لكل قاعدة نشطة في هذا الطور → RuleResult
+   ↓   التصنيف الثلاثي: خارج min..max → NEEDS_WORK
+   ↓                     داخل ideal   → EXCELLENT
+   ↓                     بينهما       → GOOD (رسالة اتجاهية)
+   ↓ AnalysisResult يُخزَّن في FrameSnapshot لكل إطار
+   ↓ score_shot(frames)                                             feedback/scorer.py
+   ↓   _aggregate_rules  → أسوأ نتيجة لكل (طور, قاعدة)
+   ↓   _build_phase_scores → درجة لكل طور + الملاحظات الثلاث
+   ↓   _weighted_score   → ائتمان جزئي 1.0 / 0.75 / 0.0
+   ↓ generate_coaching_tips + build_shot_performance_plan
+   ↓ ShotSummary → print_shot()  أو  session_to_dict()</code></pre></div>
+
+<h3>لماذا كانت النصائح مكرّرة — السبب الحقيقي</h3>
+<div class="card flag">
+<p>القواعد المستمرّة (<code>trunk_posture</code>, <code>head_stability</code>) نشطة في
+<span class="k">كل طور</span>. وكان <code>_aggregate_rules</code> يفهرس بـ
+<code>phase:rule_id</code>، فتُنتج القاعدة الواحدة <span class="k">مدخلاً لكل طور</span>
+بنفس نص الرسالة حرفياً — فتُطبع الجملة نفسها ٣ أو ٤ مرات.</p>
+<p><span class="k">الإصلاح الحالي:</span> <code>_whole_shot_rule_ids()</code> يكتشف من
+البيانات أي قاعدة قُيّمت في أكثر من طور، فتُنقل نصوصها إلى قسم واحد
+«خلال الرمية كاملة»، مع بقائها محتسبة في درجة كل طور — لأنها تنطبق عليه فعلاً.</p>
+<p><span class="k">مصدر تكرار ثانٍ أُزيل:</span> الحقل <code>performance_actions</code> كان
+يخزّن <code>next_rep_focus</code> نفسها مسبوقة بـ <code>"Fix X: "</code>، ويُكتب في كل رمية
+<span class="k">ولا يقرأه أحد</span> عدا قسم في تقرير PDF كان يطبع النصيحة مرتين في الصفحة.</p>
+</div>
+
+<h3>حمولة JSON</h3>
+<p>كانت <code>shot_summary_to_dict</code> تستقبل قيماً افتراضية مُلفَّقة وتُخرجها كما هي:</p>
+<pre><code>shot_type      = "jump_shot"                      # لا يقرأ المصنّف إطلاقاً
+court_location = "right_wing_three_point_line"    # لا شيء يكشف موقع الملعب
+start/end_ms   = 1000 / 2500                      # قيم نائبة</code></pre>
+<p>أي أن أي واجهة برمجية كانت ستصف <span class="k">كل رمية</span> بأنها رمية قفز من الجناح
+الأيمن مهما حدث فعلاً، بينما حكم المصنّف الحقيقي يُحسب ثم يُرمى. وفي الوقت نفسه كانت الحمولة
+<span class="k">تُسقط</span> درجات الأطوار — وهي الميزة الرئيسية للمنتج.
+البديل الآن <code>feedback/payload.py</code>: نوع حقيقي + ثقة + أدلّة نصّية + درجات الأطوار +
+سبب الرفض + القياس المرافق لكل ادّعاء. وحُذف <code>court_location</code> بالكامل بدل تصفيره،
+لأن الحقل بلا معنى ما دام لا يوجد كاشف للملعب.</p>
+</section>
+
+<hr class="rule">
+
+<!-- ============ 11. RESEARCH ============ -->
+<section id="s11">
+<h2><span class="num">١١</span>البحث مقابل التنفيذ</h2>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>الموضوع</th><th>ما يقوله البحث</th><th>ما يُنفَّذ</th><th>مدعوم؟</th></tr></thead>
+<tbody>
+<tr><td>زاوية الركبة</td><td><span class="k">أدلّة متناقضة</span>: أربع نتائج بثلاثة اتجاهات؛ إحداها تربط <span class="k">قلّة</span> الانثناء بنجاح أعلى</td><td>قاعدة <code>knee_flexion_loading</code> خُفِّضت إلى <code>info</code></td><td><span class="badge b-bad">غير مدعوم</span></td></tr>
+<tr><td>زاوية المرفق</td><td>«ثبات» مبني على نتائج <span class="k">غير دالّة</span> (p=0.471, 0.706, 0.228) بعيّنات ١٠–٣٤</td><td>قواعد مرفق نشطة ومُسجَّلة</td><td><span class="badge b-warn">قرار هندسي</span></td></tr>
+<tr><td>ارتفاع الإطلاق</td><td>يميّز الإتقان (p=0.010) بينما زاوية الإطلاق لا (p=0.179)</td><td>قاعدة ارتفاع + قاعدة نسبة للطول (تُتخطّى بلا طول)</td><td><span class="badge b-ok">مدعوم بحدود</span></td></tr>
+<tr><td>زاوية إطلاق الكرة</td><td>تقارب ٤٨–٥٧°</td><td><span class="k">لا تُحسب</span> — تحتاج تتبّع كرة</td><td><span class="badge b-info">فجوة</span></td></tr>
+<tr><td>القفز مقابل الثابت</td><td>إزاحة ١٥٫٣±٥٫١ سم مقابل ٢٦٫٩–٣١٫٢ سم</td><td>عتبة ٠٫١٢ طول جسم في فضاء الصورة</td><td><span class="badge b-warn">معايَر لا مشتقّ</span></td></tr>
+<tr><td>الهبوط</td><td>لا مصدر في المستودع</td><td>قاعدة <code>landing_balance</code></td><td><span class="badge b-warn">هندسي</span></td></tr>
+<tr><td>مسار الكرة / الحلقة / دخول الكرة</td><td>فيزياء قذيفية معروفة</td><td>مبني ومعطَّل في المسار الرئيسي</td><td><span class="badge b-info">غير مُفعَّل</span></td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="card warnc">
+<h4>ادّعاءان صحّحهما المستودع بنفسه — يجب ألا يعودا</h4>
+<p><span class="k">١· مغالطة الفرضية الصفرية:</span> ادّعاء «ثبات المرفق» كان مبنياً على
+p‑values غير دالّة. عدم الدلالة بعيّنة ١٠–٣٤ دليل على <span class="k">ضعف القوة الإحصائية</span>
+لا على الثبات. أُعيد تصنيفه إلى «قرار هندسي» في <code>resources.md §D2</code>.</p>
+<p><span class="k">٢· خلط زاويتين:</span> «زاوية إطلاق الكرة» (٤٨–٥٧°، فيزياء قذيفة) تختلف عن
+«زاوية ارتفاع الذراع» (٤٠–٦١°، تعريف Cabarkapa الحرفي). كانتا مخلوطتين في نسخة سابقة من
+<code>research.md</code>.</p>
+</div>
+</section>
+
+<hr class="rule">
+
+<!-- ============ 12. GIT ============ -->
+<section id="s12">
+<h2><span class="num">١٢</span>تاريخ Git منذ «إزالة الكود الميت»</h2>
+
+<p>نقطة الارتكاز: <code>4e960c4</code> «Remove dead code and untrack build artifacts».
+بعدها سبعة إيداعات ثم تعديلات غير مُودَعة.</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>الإيداع</th><th>الغرض</th><th>الأثر الوظيفي</th></tr></thead>
+<tbody>
+<tr><td><code>0e4545d</code></td><td>مراجعة أدبيات</td><td>وثائق فقط (<code>research.md</code>)</td></tr>
+<tr><td><code>9269000</code></td><td><span class="k">توحيد +Y للأعلى</span></td><td>الإصلاح الجذري: <code>MEDIAPIPE_TO_SWICHY=[1,−1,1]</code>؛ قاعدة الجذع من ٠٪ إلى ٦٠٪+</td></tr>
+<tr><td><code>8ad914d</code></td><td>اختبارات بمعالم حقيقية</td><td>٢٣ اختباراً؛ عكس التصحيح ينتج ١٤ فشلاً</td></tr>
+<tr><td><code>b54a13d</code></td><td>طول اللاعب + نتائج ثلاثية + درجات الأطوار</td><td>إضافة <code>RuleOutcome</code> والائتمان الجزئي</td></tr>
+<tr><td><code>50b87fd</code></td><td>خط أساس قبل أي تعديل عتبات</td><td>توثيق فقط — انضباط جيد</td></tr>
+<tr><td><code>3c9330d</code></td><td>سجل الأنواع + التقطيع بالمرشّح + تحقق المدخلات</td><td>video_07 من ٧ رميات إلى ١؛ رفض ١٠٠٠fps</td></tr>
+<tr><td><code>a96b3b3</code></td><td><span class="k">إصلاح الإحداثيات والإشارات المُلفَّقة</span></td><td>إصلاح آلة الحالة؛ مقاطع مفردة؛ اختبارات قبول؛ كتم السجلات وشريط التقدّم</td></tr>
+<tr><td><span class="k">غير مُودَع</span></td><td>إعادة هيكلة التغذية الراجعة</td><td>إزالة التكرار؛ <code>payload.py</code>؛ إعادة صياغة ٤٤ رسالة</td></tr>
+</tbody>
+</table>
+</div>
+
+<p><span class="k">كود نجا من قبل نقطة الارتكاز وما يزال إرثياً:</span> حزمة
+<code>ball/</code> بكاملها (من <code>952ed2d</code>, <code>b9eeb6f</code>)، وحزمة
+<code>ml/</code> (من <code>ae22eb2</code>)، و<code>physics/</code> (من <code>49cc683</code>)،
+وأوضاع <code>modes/</code> المتعدّدة. لم يمسّها أي إيداع بعد نقطة الارتكاز.</p>
+</section>
+
+<hr class="rule">
+
+<!-- ============ 13. DEAD CODE ============ -->
+<section id="s13">
+<h2><span class="num">١٣</span>تدقيق الكود الميت والمكرّر</h2>
+<p class="sub" style="margin-bottom:18px">لم يُحذف أي شيء. هذه قائمة مرشّحين بأدلّة ومستوى ثقة.</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>العنصر</th><th>التصنيف</th><th>الدليل</th><th>ما قد ينكسر</th></tr></thead>
+<tbody>
+<tr><td><code>physics/</code> (٣ ملفات)</td><td><span class="badge b-bad">ميت قطعاً</span></td><td>٠ إشارة في كل ملفات التشغيل</td><td>لا شيء معروف</td></tr>
+<tr><td><code>ml/</code> (٣٨ ملفاً)</td><td><span class="badge b-warn">منفصل</span></td><td>٠ استيراد من التشغيل؛ له اختباراته</td><td>مسار بحث موازٍ — لا يُحذف بلا سؤال</td></tr>
+<tr><td><code>ankle_flexion</code></td><td><span class="badge b-bad">يُحسب ولا يُستخدم</span></td><td>يُحسب لكل إطار؛ لا قارئ</td><td>لا شيء — كلفة حسابية فقط</td></tr>
+<tr><td><code>loading_hip_drop_velocity</code></td><td><span class="badge b-bad">عتبة ميتة</span></td><td>الإشارة صفر بنيوياً؛ أُزيل الشرط</td><td>لا شيء — قيمة يتيمة في YAML</td></tr>
+<tr><td><code>jump_ankle_rise</code>, <code>jump_ankle_velocity</code></td><td><span class="badge b-bad">إرث</span></td><td>استُبدلا بـ <code>jump_body_rise_ratio</code></td><td>لا شيء</td></tr>
+<tr><td><code>set_shot_wrist_down</code>, <code>release_peak_tolerance</code>…</td><td><span class="badge b-warn">يحتاج تأكيد</span></td><td>بعضها ما يزال مقروءاً عبر <code>_t()</code></td><td>انتقالات الإطلاق</td></tr>
+<tr><td><code>print_shot_summary</code> مقابل <code>print_shot</code></td><td><span class="badge b-warn">مكرّر</span></td><td>طابعتان بصيغتين مختلفتين</td><td>يستدعيه <code>modes/video_mode.py</code></td></tr>
+<tr><td><code>summary_display_frames</code></td><td><span class="badge b-warn">مكرّر</span></td><td>في <code>scoring.yaml</code> و<code>display.yaml</code></td><td>يحتاج فحص أيّهما يفوز</td></tr>
+<tr><td><code>feedback/report_pdf.py</code> (٢٩٥ سطراً)</td><td><span class="badge b-info">مطلوب</span></td><td>يستدعيه <code>report_writer</code>؛ يغطّيه اختبار</td><td>إنتاج تقرير PDF</td></tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<hr class="rule">
+
+<!-- ============ 14. TESTS ============ -->
+<section id="s14">
+<h2><span class="num">١٤</span>تدقيق الاختبارات</h2>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>الملف</th><th>العدد</th><th>النوع</th><th>ما يثبته فعلاً</th></tr></thead>
+<tbody>
+<tr><td><code>test_acceptance_videos.py</code></td><td class="num-col">١٢ + ٣٩ مُعامَل</td><td><span class="badge b-ok">فيديو حقيقي</span></td><td>الخط الإنتاجي كاملاً على ١٣ مقطعاً: العدّ والنوع والدرجة</td></tr>
+<tr><td><code>test_coordinates.py</code></td><td class="num-col">١١</td><td>معالم حقيقية مسجّلة</td><td>ترتيب تشريحي رأسي — يحرس تصحيح المحور</td></tr>
+<tr><td><code>test_phases.py</code></td><td class="num-col">٩</td><td>اصطناعي</td><td>انتقالات مفردة + حارسان جديدان</td></tr>
+<tr><td><code>test_feedback.py</code></td><td class="num-col">٨</td><td>اصطناعي</td><td>التقطيع، هزّ الأصابع، استقلال رميتين</td></tr>
+<tr><td><code>test_ball_shot_state_machine.py</code></td><td class="num-col">٦</td><td>اصطناعي</td><td>مسار نتيجة الكرة — <span class="k">معطَّل في CLI</span></td></tr>
+<tr><td>الباقي (٦ ملفات)</td><td class="num-col">٢١</td><td>اصطناعي</td><td>الزوايا، التقارير، فجوات الرؤية، أدوات</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="card flag">
+<h4>ثقة زائفة — ما تزال قائمة</h4>
+<ul>
+<li><span class="k">لا اختبار لتسلسل الأطوار.</span> اختبارات القبول تفحص العدد والنوع والدرجة
+فقط. مقطع يمرّ بأطوار خاطئة تماماً وينتهي بنوع صحيح <span class="k">سيمرّ</span>.</li>
+<li><span class="k">لا اختبار للتكرار.</span> لا شيء يؤكّد أن رسالة لا تتكرّر. إصلاح
+«خلال الرمية كاملة» <span class="k">غير محروس باختبار</span> — قد يعود بصمت.</li>
+<li><span class="k">لا اختبار لتغيّر معدل الإطارات.</span> لا شيء يشغّل نفس المحتوى بمعدلين
+ويؤكّد تطابق النتيجة — رغم أن هذا وعد بنيوي صريح للنظام.</li>
+<li><span class="k">لا اختبار للرميات المتعدّدة على فيديو حقيقي.</span> كل المقاطع مفردة عمداً؛
+تسرّب <code>_wrist_peak_y</code> بين الرميات غير مغطّى.</li>
+<li><span class="k">٤ اختبارات xfail</span> — موثّقة لكنها تعني سلوكاً معروف الخطأ.</li>
+</ul>
+</div>
+</section>
+
+<hr class="rule">
+
+<!-- ============ 15. PROBLEMS ============ -->
+<section id="s15">
+<h2><span class="num">١٥</span>المشاكل الحالية مرتّبة</h2>
+
+<div class="card flag">
+<h4>١· اختلاف السلوك حسب نقطة الدخول <span class="badge b-bad">ثقة عالية</span></h4>
+<p><span class="k">الدليل:</span> <code>coach_report.py</code> يعطّل الكرة صراحةً بينما
+<code>modes/video_mode.py</code> يتركها للإعدادات حيث <code>enabled: true</code>.
+<span class="k">الأثر:</span> نفس الفيديو يُنتج نتيجة كرة في مسار ولا شيء في آخر، والاختبارات
+تغطّي المسار المعطَّل فقط. <span class="k">الاتجاه:</span> توحيد القرار في مكان واحد.</p>
+</div>
+
+<div class="card flag">
+<h4>٢· القواعد النشطة في كل طور تُشوّه درجات الأطوار <span class="badge b-warn">ثقة متوسطة</span></h4>
+<p><span class="k">الدليل:</span> في مخرجات فعلية ظهر «Ready Stance 100/100» و«Jump 50/100»
+حيث كانت القواعد المحتسبة هي المستمرّة نفسها. <span class="k">الجذر:</span> القاعدة المستمرّة
+تُحتسب في كل طور، فطور بلا قواعد خاصّة تصبح درجته انعكاساً لوضعية الجذع فقط — رقم يبدو ذا معنى
+وليس كذلك.</p>
+</div>
+
+<div class="card warnc">
+<h4>٣· <code>knee_angle_delta</code> بوحدة «لكل إطار» <span class="badge b-warn">ثقة عالية</span></h4>
+<p>الإشارة الوحيدة الباقية الحسّاسة لمعدل الإطارات، وتقود دخول <code>loading</code>
+و<code>knee_flexion</code>. عند ١٢ إطاراً/ثانية يكون الفرق بين إطارين أكبر بكثير منه عند ٣٠.
+<span class="k">مخفيّة</span> لأن كل مقاطع القبول عند ٢٤–٣٠.</p>
+</div>
+
+<div class="card warnc">
+<h4>٤· حالة كاشف الأطوار تعبر الرميات <span class="badge b-info">ثقة منخفضة على الأثر</span></h4>
+<p><code>_wrist_peak_y</code> لا يُعاد ضبطه بين الرميات ويدخل في شرط <code>jump→release</code>.
+غير مرصود لأن المقاطع مفردة، وغير مغطّى باختبار.</p>
+</div>
+
+<div class="card warnc">
+<h4>٥· عتبات يتيمة في <code>config/phases.yaml</code> <span class="badge b-warn">ثقة عالية</span></h4>
+<p><code>loading_hip_drop_velocity</code> و<code>jump_ankle_rise</code> وغيرهما لم تعد مقروءة.
+خطرها ليس تقنياً بل بشرياً: من يقرأ الملف سيظنّها فعّالة ويعدّلها بلا أثر.</p>
+</div>
+
+<div class="card note">
+<h4>٦· الدرجات غير مُصادَق عليها <span class="badge b-info">حقيقة لا عيب</span></h4>
+<p>لا توجد حقيقة أرضية موسومة من مدرّب. «٦٩/١٠٠» تعني «القواعد عملت»، لا «هذه الرمية جيدة
+بنسبة ٦٩٪». يجب أن يُذكر هذا صراحةً في أي عرض.</p>
+</div>
+</section>
+
+<hr class="rule">
+
+<!-- ============ 16. NEEDS ============ -->
+<section id="s16">
+<h2><span class="num">١٦</span>ما نحتاجه فعلاً</h2>
+
+<h3>الزوايا</h3>
+<div class="tablewrap">
+<table>
+<thead><tr><th>التصنيف</th><th>الزوايا</th><th>السبب</th></tr></thead>
+<tbody>
+<tr><td><span class="badge b-ok">أساسية</span></td><td><code>elbow</code>, <code>trunk</code>, <code>index_align</code></td><td>تقود انتقالات وقواعد مُسجَّلة معاً</td></tr>
+<tr><td><span class="badge b-info">مفيدة</span></td><td><code>knee</code>, <code>hip</code></td><td>تقود الأطوار، لكن دعمها البحثي ضعيف أو متناقض</td></tr>
+<tr><td><span class="badge b-warn">عرض فقط</span></td><td><code>shoulder</code></td><td><code>scored:false</code> عمداً — تُقاس ولا تُحاسَب</td></tr>
+<tr><td><span class="badge b-bad">غير ضرورية</span></td><td><code>ankle_flexion</code></td><td>بلا مستهلك</td></tr>
+<tr><td><span class="badge b-info">ناقصة</span></td><td>زاوية إطلاق الكرة، التماثل يسار/يمين</td><td>الأولى تحتاج الكرة، الثانية تحتاج حساب الجانبين</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>الأطوار</h3>
+<ul>
+<li><span class="k">أساسية:</span> <code>ready_stance</code>, <code>loading</code>,
+<code>ball_lift</code>, <code>release</code>, <code>follow_through</code> — هذه هي الرمية.</li>
+<li><span class="k">أساسي للقفز فقط:</span> <code>jump</code>, <code>landing</code> — غيابهما في
+الرمية الثابتة <span class="k">صحيح وليس عيباً</span>، ولا يُعاقَب عليه.</li>
+<li><span class="k">محلّ تساؤل:</span> <code>knee_flexion</code>. ليس حدثاً فيزيائياً مستقلاً بل
+قاع منحنى <code>loading</code>، ومخرجه الوحيد هو شرط دخول <code>ball_lift</code> نفسه. كان
+مصرفاً قاتلاً حتى أُضيفت له مهلة. <span class="k">مرشّح جدّي للدمج مع <code>loading</code></span>
+— لكن هذا قرار تصميم لا تدقيق.</li>
+</ul>
+</section>
+
+<hr class="rule">
+
+<!-- ============ 17. NAV MAP ============ -->
+<section id="s17">
+<h2><span class="num">١٧</span>خريطة المطوّر</h2>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>أريد أن أغيّر…</th><th>الملفات</th><th>ثم شغّل</th></tr></thead>
+<tbody>
+<tr><td>زاوية موجودة</td><td><code>angles/joint_chains.py</code> → <code>angles/calculator.py::compute_all</code></td><td><code>tests/test_angles.py</code>, <code>test_coordinates.py</code></td></tr>
+<tr><td>إضافة زاوية</td><td><code>joint_chains.py</code> + <code>side_keys</code> في <code>compute_all</code> + قاعدة في <code>config/biomechanics.yaml</code></td><td>القبول كاملاً</td></tr>
+<tr><td>عتبة طور</td><td><code>config/phases.yaml</code> — <span class="k">تأكّد أولاً أنها مقروءة</span> عبر <code>_t()</code></td><td><code>test_phases.py</code> + القبول</td></tr>
+<tr><td>انتقال طور</td><td><code>phase_detection/detector.py::_evaluate_transition</code> + القائمة البيضاء في <code>phases.py</code></td><td>القبول كاملاً</td></tr>
+<tr><td>إضافة/حذف طور</td><td><code>phases.py</code> (<code>PHASE_ORDER</code>, <code>PHASE_LABELS</code>, <code>TRANSITIONS</code>) + <code>_TIMEOUT_TARGET</code> + <code>phase_timeouts_s</code></td><td>كل شيء</td></tr>
+<tr><td>إصلاح تذبذب</td><td><code>hysteresis_s</code>, <code>min_dwell_s</code> في <code>phases.yaml</code>؛ و<code>_confirmed</code>/<code>_dwelled</code></td><td><code>test_phases.py</code></td></tr>
+<tr><td>نصّ التغذية الراجعة</td><td><code>config/biomechanics.yaml</code> — <code>message_low/high/excellent</code></td><td>—</td></tr>
+<tr><td>منع تكرار النصائح</td><td><code>feedback/scorer.py::_whole_shot_rule_ids</code> و<code>_notes</code></td><td><code>test_feedback.py</code></td></tr>
+<tr><td>التسجيل</td><td><code>feedback/scorer.py::_weighted_score</code> + <code>config/scoring.yaml</code> + <code>analysis/models.py::RuleOutcome.credit</code></td><td><code>test_feedback.py</code></td></tr>
+<tr><td>تقطيع الرميات</td><td><code>feedback/shot_tracker.py::_is_credible</code> + <code>config/segmentation.yaml</code></td><td>القبول كاملاً</td></tr>
+<tr><td>تصنيف النوع</td><td><code>shots/classifier.py</code> + <code>JUMP_VERTICAL_DISPLACEMENT_RATIO</code></td><td>القبول كاملاً</td></tr>
+<tr><td>كشف الكرة/الحلقة</td><td><code>ball/detector.py</code> + <code>config/ball.yaml</code> — <span class="k">وفعّلها في <code>coach_report.py:180</code></span></td><td><code>test_ball_*.py</code></td></tr>
+<tr><td>حمولة JSON</td><td><code>feedback/payload.py</code></td><td><code>coach_report.py --json</code></td></tr>
+<tr><td>اختبار فيديو حقيقي</td><td><code>tests/test_acceptance_videos.py</code> + <code>scripts/build_single_shot_clips.py</code></td><td><code>pytest tests/test_acceptance_videos.py -v</code></td></tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<hr class="rule">
+
+<!-- ============ 18. EXPLAIN ============ -->
+<section id="s18">
+<h2><span class="num">١٨</span>اشرح Swichy لأصدقائك</h2>
+
+<p><span class="k">ما هو؟</span> برنامج يشاهد فيديو للاعب يصوّب، ويقول له ما الجيد في حركته
+وما يحتاج تغييراً — بكاميرا هاتف واحدة، بلا حسّاسات ولا بدلة التقاط حركة.</p>
+
+<p><span class="k">ماذا يحدث لكل إطار؟</span> يمرّ الإطار على نموذج MediaPipe فيُعيد ٣٣ نقطة
+جسدية بإحداثيات ثنائية على الصورة وأخرى ثلاثية بالمتر. تُنعَّم النقاط بمرشّح يزيل الرجفة دون
+إبطاء الحركة السريعة. تُفحص ثقة كل نقطة، والنقطة المشكوك فيها تُعلَّق على آخر موضع معروف لخمسة
+إطارات ثم تُعلَّم «غير موثوقة». تُحسب من النقاط الموثوقة سبع زوايا. تُشتقّ من الزوايا والمواضع
+مجموعة ميزات (سرعات، ارتفاعات، نسب). تُغذّى الميزات لآلة حالة تقرّر: في أي طور من الرمية نحن
+الآن؟ وبالتوازي يُراقَب ما إذا كانت هذه الحركة تستحقّ أن تُسمّى «رمية» أصلاً.</p>
+
+<p><span class="k">كيف يعرف أن الرمية بدأت وانتهت؟</span> لا يكفي أن يتغيّر وضع الجسم — وإلا
+لأصبح كل تململ رمية (وهذا ما كان يحدث: مقطع واحد أنتج ٧ «رميات»). الآن أي تغيّر يفتح
+<span class="k">مرشّحاً</span> فقط، ولا يصبح رمية إلا إذا وصل إلى إطلاق فعلي وسافر المعصم مسافة
+حقيقية خلال مدة معقولة. المرشّح الذي لا يصل إلى إطلاق يُسقَط بصمت.</p>
+
+<p><span class="k">ما الذي لا يفعله؟</span> لا يعرف إن دخلت الكرة (الكاشف مبنيّ ومعطَّل في
+المسار الرئيسي). لا يكشف موقع اللاعب في الملعب. لا يحلّل اللاي‑أب ولا الخطّاف ولا الدنك —
+يتعرّف عليها ويرفضها بلا درجة. لا يقدّر طول اللاعب من الصورة إطلاقاً.</p>
+
+<p><span class="k">ما المدعوم علمياً وما الهندسي؟</span> الجزء العلمي محدود وصادق: ارتفاع
+الإطلاق يميّز الإتقان، والفرق في الإزاحة العمودية بين الرمية الثابتة ورمية القفز.
+<span class="k">أما معظم العتبات فقرارات هندسية</span> حول ما يستطيع الجسم فعله، وهي موسومة
+كذلك في الإعدادات. وأهم استنتاج تقني في المشروع ليس بيولوجياً بل حاسوبياً:
+<span class="k">أن الإحداثيات العالمية لـ MediaPipe مركزها الورك</span>، ولذلك لا يمكن قياس
+القفز منها مهما فعلت.</p>
+</section>
+
+<hr class="rule">
+
+<!-- ============ 19. TEN THINGS ============ -->
+<section id="s19">
+<h2><span class="num">١٩</span>عشر حقائق يجب فهمها قبل تعديل Swichy</h2>
+
+<ol class="ten">
+<li><span class="k">الإحداثيات العالمية مركزها الورك.</span> أي محاولة لقياس حركة الجسم ككل
+منها ستُعطي صفراً أو ضجيجاً. حركة الجسم تُقاس في <span class="k">فضاء الصورة</span> مقسومة على
+طول اللاعب على الشاشة.</li>
+
+<li><span class="k">المحور مُصحَّح عند حدود الاستخراج.</span> <code>MEDIAPIPE_TO_SWICHY=[1,−1,1]</code>
+في <code>pose/landmarks.py</code>. كل ما بعدها يفترض +Y للأعلى. أي كود يقرأ MediaPipe مباشرةً
+يكسر هذا العقد.</li>
+
+<li><span class="k">الطوابع الزمنية من فهرس الإطار ومعدل المصدر — لا من ساعة الحائط.</span>
+لذلك بطء المعالجة لا يؤثّر على النتيجة إطلاقاً. «٤١٪ من الزمن الحقيقي» مقياس أداء لا صحّة.</li>
+
+<li><span class="k">التوقيت كله بالثواني.</span> الاستثناء الوحيد الباقي هو
+<code>knee_angle_delta</code> بوحدة درجة/إطار — وهو حسّاس لمعدل الإطارات وغير مختبَر.</li>
+
+<li><span class="k">القيمة المفقودة تصبح رقماً معقولاً.</span> نمط <code>or 0.0</code> يحوّل
+«لم أرَ المعصم» إلى «المعصم عند الورك». تحقّق دائماً من رايات الصلاحية مثل
+<code>wrist_world_valid</code> قبل الثقة بقيمة.</li>
+
+<li><span class="k">الرفض ليس درجة صفر.</span> <code>score=None</code> يعني «لم يعمل أي محلّل».
+لا تُنتج أطواراً ولا نصائح لرمية مرفوضة.</li>
+
+<li><span class="k">كشف الكرة معطَّل في CLI ومفعَّل في وضع الفيديو.</span> تحقّق من نقطة الدخول
+قبل أي استنتاج عن نتيجة الرمية.</li>
+
+<li><span class="k">القواعد المستمرّة تُحتسب في كل طور لكنها تُقال مرة واحدة.</span>
+<code>_whole_shot_rule_ids</code> يكتشفها من البيانات. أي تغيير في التجميع يُعيد التكرار فوراً،
+ولا يوجد اختبار يحرسه.</li>
+
+<li><span class="k">عتبات الأطوار ليست علماً.</span> واحدة فقط (٠٫١٢) لها سند من الأدبيات وهي
+معايَرة لا مشتقّة. لا تصف أي عتبة أخرى بأنها مدعومة بحثياً.</li>
+
+<li><span class="k">الاختبارات تثبت النوع والعدد والدرجة — لا تسلسل الأطوار ولا غياب التكرار
+ولا ثبات معدل الإطارات.</span> اخضرار المجموعة ليس دليلاً على صحّة الأطوار.</li>
+</ol>
+</section>
+
+<footer>
+<p>تدقيق مبني على فحص المستودع عند <code>a96b3b3</code> مع تعديلات عمل غير مُودَعة.
+لم يُعدَّل أي كود مصدري أثناء إعداد هذا التقرير.
+كل رقم هنا مأخوذ من الملفات أو من تشغيل فعلي، لا من التقدير.</p>
+</footer>
+
+</main>
+</div>

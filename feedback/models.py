@@ -71,10 +71,16 @@ class ShotSummary:
     entry_phase: Optional[str] = None
     missing_phases: List[str] = field(default_factory=list)
     capture_note: str = ""
+    # What to work on next, and the drills for it. `performance_actions` used
+    # to sit here too, holding `next_rep_focus` with a "Fix X:" prefix on each
+    # line -- it was written on every shot and read by nothing.
     next_rep_focus: List[str] = field(default_factory=list)
     practice_drills: List[str] = field(default_factory=list)
-    performance_actions: List[str] = field(default_factory=list)
     outcome: Optional["ShotOutcome"] = None
+    # Where this attempt sits in the video, from real frame timestamps.
+    # None means the caller did not record it -- never a placeholder.
+    start_timestamp_ms: Optional[int] = None
+    end_timestamp_ms: Optional[int] = None
 
     @property
     def is_rejected(self) -> bool:

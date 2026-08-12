@@ -15,7 +15,19 @@ min_dwell_frames: 2
 
 thresholds:
   # ready_stance -> loading
-  loading_hip_drop_velocity: -0.02      # m/s — hip dropping
+  #
+  # REMOVED: loading_hip_drop_velocity (-0.02 m/s).
+  # It tested `hip_velocity_y`, which is identically zero on every frame:
+  # MediaPipe world landmarks are hip-centred, so the hip midpoint IS the
+  # origin and its velocity cannot be anything else. The condition could never
+  # fire. Knee flexion is the live signal for a dip, and
+  # tests/test_phases.py::test_hip_velocity_alone_cannot_start_a_shot now
+  # guards against the condition coming back.
+  #
+  # WARNING FOR ANYONE EDITING THIS FILE: the loader
+  # (ShotPhaseDetector._t) silently falls back to a hardcoded default when a
+  # key is missing. Deleting a LIVE key therefore does not raise -- it quietly
+  # changes behaviour. Check the key is actually read before removing it.
   loading_knee_flex_delta: -1.0        # degrees/frame — knee bending
   loading_wrist_up_velocity: 0.03      # m/s — wrist rising into shot (re-shot)
 
@@ -55,7 +67,21 @@ thresholds:
   set_shot_wrist_down: 0.035           # m/s — wrist driving through
   set_shot_elbow_min: 145               # degrees
 
-  # jump -> release
+  # rise -> release
+  #
+  # How far the shooting hand must have climbed since the rise began before
+  # any release condition is allowed to fire. Body heights when the
+  # image-space signal is available, metres otherwise.
+  #
+  # This guard used to be implicit: reaching the old `jump` state meant the
+  # ball had already been carried up through `ball_lift`. With one merged
+  # `rise` state nothing enforced it, and the opening frames of a clip --
+  # where the One Euro filter, the ankle baseline and every velocity are still
+  # settling from nothing -- produced a release inside 0.3 s on three separate
+  # fixtures. Well under the ~0.6 body heights a real shot travels, so it only
+  # excludes a hand that never went up.
+  release_min_wrist_climb: 0.10
+
   release_peak_tolerance: 0.02         # m from wrist peak
   release_elbow_min: 150               # degrees
   release_wrist_velocity_max: 0.05     # m/s — wrist slowing at apex
