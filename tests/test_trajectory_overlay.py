@@ -1,5 +1,6 @@
 """Tests for the observed ball trajectory overlay recorder."""
 
+import math
 import sys
 from pathlib import Path
 
@@ -117,6 +118,51 @@ def test_interpolated_snapshot_is_not_recorded() -> None:
     assert recorder.screen_segments((200, 100), 20) == [[(100.0, 100.0)]]
 
 
+def test_release_confirmation_backtracks_to_last_near_wrist_point() -> None:
+    recorder = ObservedTrajectoryRecorder(
+        release_preroll_points=6,
+        release_near_wrist_scale=0.5,
+    )
+    recorder.update(
+        _ball(100, 200, frame=0),
+        released_this_frame=False,
+        shot_finished=False,
+        rim_center_xy=(300, 100),
+        rim_radius=20,
+        wrist_xy=(100, 200),
+        release_distance_px=60,
+    )
+    recorder.update(
+        _ball(110, 190, frame=1),
+        released_this_frame=False,
+        shot_finished=False,
+        rim_center_xy=(300, 100),
+        rim_radius=20,
+        wrist_xy=(100, 200),
+        release_distance_px=60,
+    )
+    recorder.update(
+        _ball(160, 140, frame=2),
+        released_this_frame=True,
+        shot_finished=False,
+        rim_center_xy=(300, 100),
+        rim_radius=20,
+        wrist_xy=(100, 200),
+        release_distance_px=60,
+    )
+
+    # Confirmation occurred at frame 2, but the reconstructed release begins
+    # at frame 1: the last point still within half the release-distance gate.
+    assert recorder.screen_segments((300, 100), 20) == [
+        [(110.0, 190.0), (160.0, 140.0)]
+    ]
+    assert recorder.relative_points()[0][2] == 33
+    wrist_relative, wrist_distance = recorder.release_wrist_context()
+    assert wrist_relative == (-10.0, 5.0)
+    assert wrist_distance is not None
+    assert math.isclose(wrist_distance, math.sqrt(200.0), rel_tol=1e-9)
+
+
 def test_robust_fit_ignores_one_jitter_outlier() -> None:
     recorder = ObservedTrajectoryRecorder(
         maximum_jump_rim_radii=100,
@@ -151,5 +197,6 @@ if __name__ == "__main__":
     test_missing_detection_starts_a_new_segment()
     test_finished_shot_stops_recording_until_next_release()
     test_interpolated_snapshot_is_not_recorded()
+    test_release_confirmation_backtracks_to_last_near_wrist_point()
     test_robust_fit_ignores_one_jitter_outlier()
     print("All observed trajectory overlay tests passed.")

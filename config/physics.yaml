@@ -1,9 +1,30 @@
 # Future improvement #11 — physics-based trajectory estimation (not wired yet)
 
-enabled: false
+enabled: true
 
 # Gravity m/s^2 (Earth default)
 gravity: 9.81
+
+# Physical calibration inputs. Rim height is the regulation 10 ft rounded to
+# 3.05 m. Player height remains user-provided in config/player.yaml.
+rim_height_m: 3.05
+
+# Print one copyable calibration line per detected release. This is separate
+# from the made/missed state-machine debug output in ball.yaml.
+debug_trajectory: true
+
+# MediaPipe measures nose-to-ankle rather than full head-to-floor height.
+# These fractions convert that visible span and ankle landmark to floor height.
+nose_to_ankle_height_fraction: 0.92
+ankle_to_floor_height_fraction: 0.04
+
+# Reject metric projection when a supposed release is almost level with the
+# rim. This normally means the first detected ball was already in mid-flight.
+minimum_release_to_rim_height_m: 0.25
+
+# A ball release anchor must be close to the wrist stored on that same frame.
+# The base distance comes from ball_state_machine.release_distance_px.
+release_anchor_max_wrist_distance_scale: 1.25
 
 # Optimal entry angle range for make probability heuristics (degrees)
 optimal_entry_angle_min: 45

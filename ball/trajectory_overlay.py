@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import math
+from collections import deque
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import Deque, List, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -18,6 +19,8 @@ class _RelativeTrajectoryPoint:
     x: float
     y: float
     timestamp_ms: int
+    wrist_distance_px: Optional[float] = None
+    wrist_relative_xy: Optional[Point] = None
 
 
 class ObservedTrajectoryRecorder:
@@ -36,6 +39,8 @@ class ObservedTrajectoryRecorder:
         fit_min_points: int = 5,
         fit_samples: int = 60,
         fit_outlier_threshold_rim_radii: float = 0.75,
+        release_preroll_points: int = 12,
+        release_near_wrist_scale: float = 0.5,
     ) -> None:
         self.max_points = max(2, int(max_points))
         self.maximum_jump_rim_radii = max(
@@ -46,7 +51,13 @@ class ObservedTrajectoryRecorder:
         self.fit_outlier_threshold_rim_radii = max(
             0.05, float(fit_outlier_threshold_rim_radii)
         )
+        self.release_near_wrist_scale = max(
+            0.05, float(release_near_wrist_scale)
+        )
         self._segments: List[List[_RelativeTrajectoryPoint]] = []
+        self._preroll: Deque[_RelativeTrajectoryPoint] = deque(
+            maxlen=max(2, int(release_preroll_points))
+        )
         self._active = False
         self._gap_before_next_point = False
 
@@ -56,6 +67,7 @@ class ObservedTrajectoryRecorder:
 
     def reset(self) -> None:
         self._segments.clear()
+        self._preroll.clear()
         self._active = False
         self._gap_before_next_point = False
 
@@ -67,14 +79,9 @@ class ObservedTrajectoryRecorder:
         shot_finished: bool,
         rim_center_xy: Optional[Point],
         rim_radius: Optional[float],
+        wrist_xy: Optional[Point] = None,
+        release_distance_px: float = 60.0,
     ) -> None:
-        if released_this_frame:
-            self.reset()
-            self._active = True
-
-        if not self._active:
-            return
-
         valid_rim = (
             rim_center_xy is not None
             and rim_radius is not None
@@ -82,20 +89,65 @@ class ObservedTrajectoryRecorder:
             and float(rim_radius) > 1e-6
         )
         observed_snapshot = snapshot is not None and not snapshot.is_interpolated
-        if not observed_snapshot or not valid_rim:
-            self._gap_before_next_point = True
-        else:
+        relative_point = None
+        if observed_snapshot and valid_rim:
             rim_x, rim_y = rim_center_xy
             radius = float(rim_radius)
+            wrist_distance = None
+            wrist_relative = None
+            if wrist_xy is not None:
+                wrist_distance = math.hypot(
+                    snapshot.x - float(wrist_xy[0]),
+                    snapshot.y - float(wrist_xy[1]),
+                )
+                wrist_relative = (
+                    (float(wrist_xy[0]) - rim_x) / radius,
+                    (float(wrist_xy[1]) - rim_y) / radius,
+                )
             relative_point = _RelativeTrajectoryPoint(
                 x=(snapshot.x - rim_x) / radius,
                 y=(snapshot.y - rim_y) / radius,
                 timestamp_ms=snapshot.timestamp_ms,
+                wrist_distance_px=wrist_distance,
+                wrist_relative_xy=wrist_relative,
             )
+            if (
+                not self._preroll
+                or relative_point.timestamp_ms != self._preroll[-1].timestamp_ms
+            ):
+                self._preroll.append(relative_point)
+
+        if released_this_frame:
+            self._segments.clear()
+            self._gap_before_next_point = False
+            selected = self._release_preroll(float(release_distance_px))
+            if selected:
+                self._segments.append(list(selected))
+            self._active = True
+        elif not self._active:
+            return
+        elif relative_point is None:
+            self._gap_before_next_point = True
+        else:
             self._append(relative_point)
 
         if shot_finished:
             self._active = False
+
+    def relative_points(self) -> List[Tuple[float, float, int]]:
+        """Return recorded points for calculations in rim-radius units."""
+        return [
+            (point.x, point.y, point.timestamp_ms)
+            for segment in self._segments
+            for point in segment
+        ]
+
+    def release_wrist_context(self) -> Tuple[Optional[Point], Optional[float]]:
+        """Return the wrist recorded with the reconstructed release point."""
+        if not self._segments or not self._segments[0]:
+            return None, None
+        release = self._segments[0][0]
+        return release.wrist_relative_xy, release.wrist_distance_px
 
     def screen_segments(
         self,
@@ -210,6 +262,33 @@ class ObservedTrajectoryRecorder:
         self._segments[-1].append(point)
         self._gap_before_next_point = False
         self._trim_oldest_points()
+
+    def _release_preroll(
+        self, release_distance_px: float
+    ) -> Sequence[_RelativeTrajectoryPoint]:
+        """Backtrack confirmation to the last near-hand ball position."""
+        points = list(self._preroll)
+        if not points:
+            return []
+
+        near_limit = max(1.0, release_distance_px * self.release_near_wrist_scale)
+        selected_index = len(points) - 1
+        for index in range(len(points) - 2, -1, -1):
+            distance = points[index].wrist_distance_px
+            later = [
+                point.wrist_distance_px
+                for point in points[index:]
+                if point.wrist_distance_px is not None
+            ]
+            if (
+                distance is not None
+                and distance <= near_limit
+                and len(later) >= 2
+                and later[-1] > later[0]
+            ):
+                selected_index = index
+                break
+        return points[selected_index:]
 
     def _trim_oldest_points(self) -> None:
         excess = sum(len(segment) for segment in self._segments) - self.max_points

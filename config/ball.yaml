@@ -94,18 +94,18 @@ ball_state_machine:
   dynamic_rim: false
   # Print the exact rim-entry, confirmation-counter, rebound, timeout, and
   # final-decision evidence used for MADE/MISSED/UNKNOWN.
-  debug_outcome: true
+  debug_outcome: false
 
-  release_distance_px: 60
+  release_distance_px: 33
   release_distance_growth_px: 12
-  release_min_speed_px_s: 120
+  release_min_speed_px_s: 60
 
   # Ball height above the ankles as a fraction of visible nose-to-ankle
   # height. Unlike a pixel threshold, this survives resolution, zoom, and
   # camera-distance changes. The pixel fallback is used only if pose scale is
   # unavailable or implausibly small.
   ankle_release_height_ratio: 0.45
-  ankle_release_fallback_px: 350
+  ankle_release_fallback_px: 300
   minimum_player_height_px: 50
 
   ascending_velocity_px_s: 30

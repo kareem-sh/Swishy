@@ -109,6 +109,9 @@ def _outcome_dict(outcome) -> Optional[dict]:
         "entry_frame": outcome.entry_frame,
         "outcome_timestamp_ms": outcome.outcome_timestamp_ms,
         "evidence": list(outcome.evidence),
+        "trajectory_comparison": outcome.timeseries_summary.get(
+            "trajectory_comparison"
+        ),
     }
 
 

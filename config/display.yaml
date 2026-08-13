@@ -34,6 +34,24 @@ trajectory_overlay:
   # Orange dots are filtered observed centers. The green line is the robust fit.
   show_observed_polyline: false
   show_fitted: true
+  # Blue reference arc starts at the measured ball release and reaches the
+  # top of the rim detection at the configured launch angle. This target is
+  # separate from the center geometry used by made/miss classification.
+  show_ideal: true
+  ideal_release_angle_deg: 45.0
+  # Vertical target within YOLO's rim box: 0.0 = top/min Y, 0.5 = box center.
+  ideal_rim_y_fraction: 0.0
+  ideal_samples: 80
+  ideal_thickness: 2
+  # Regulation inside rim diameter; used to express distance and speed in SI.
+  # These remain camera-scale estimates until full perspective calibration.
+  rim_diameter_m: 0.457
+  velocity_fit_points: 5
+  comparison_min_points: 3
+  # Release is confirmed a few frames late. Keep a short measured history and
+  # begin both paths at the last near-wrist point before sustained separation.
+  release_preroll_points: 12
+  release_near_wrist_scale: 0.5
   observed_max_points: 120
   maximum_jump_rim_radii: 5.0
   observed_thickness: 3

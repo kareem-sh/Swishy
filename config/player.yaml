@@ -13,6 +13,6 @@
 # Units: CENTIMETRES. 180 means 1.80 m. Values outside 120-230 cm are rejected
 # with a warning (this catches inches and misplaced decimal points).
 
-height_cm:            # e.g. 180   — leave blank if unknown
+height_cm: 175       # player height in centimetres
 shooting_hand: auto   # auto | left | right
 label: ""             # optional name shown in reports
