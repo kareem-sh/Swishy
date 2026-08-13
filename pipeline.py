@@ -606,6 +606,11 @@ class ShotAnalysisPipeline:
             ankle_y=ankle_y_px,
             pose_phase=phase,
             timestamp_ms=timestamp_ms,
+            player_height_px=(
+                features.body_pixel_height * height
+                if features.body_pixel_height > 0.0
+                else None
+            ),
         )
         self._update_observed_trajectory(ball_snapshot, ball_state_update)
 

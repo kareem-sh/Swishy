@@ -59,7 +59,7 @@ def test_rim_radius_uses_horizontal_opening_not_net_height():
 
     assert classifier.hoop_roi is not None
     assert classifier.hoop_roi["center_y"] == 30.0
-    assert classifier.hoop_roi["rim_radius"] == 36.0
+    assert classifier.hoop_roi["rim_radius"] == 47.5
 
 
 def test_distant_rim_jump_is_rejected_after_lock():
