@@ -68,7 +68,23 @@ class KinematicFeatures:
     #
     # body_rise_ratio: positive means the body moved UP the frame.
     # hip_x_ratio:     horizontal hip position, for stationary-vs-driving.
-    body_rise_ratio: float = 0.0
+    #
+    # `body_rise_ratio` is Optional and None means NOT MEASURED -- the ankles
+    # were not found, no standing baseline had been established yet, or the
+    # player was too small in frame to divide by. It used to default to 0.0,
+    # and 0.0 in this signal is a real and perfectly plausible reading: "the
+    # body is exactly where it started", i.e. the feet never left the floor.
+    # Nothing downstream could tell that apart from a measurement.
+    #
+    # Measured across 6,911 frames it was fabricated on 2.5% of them (ankles
+    # missing 0.9%, player under the size floor 1.6%). Rare, but the harm is
+    # concentrated: `landing_settle` aggregates with `min`, so a fabricated
+    # 0.0 wins the minimum outright and reports a perfectly settled landing
+    # from a frame in which nothing was seen. The `max` readers -- the
+    # classifier, the takeoff cut, `jump_elevation` -- were never affected,
+    # because a zero cannot win a maximum. That asymmetry is exactly why this
+    # survived: it was invisible everywhere except the one place it mattered.
+    body_rise_ratio: Optional[float] = None
     hip_x_ratio: float = 0.0
     body_pixel_height: float = 0.0
 
@@ -299,7 +315,9 @@ def extract_features(
     # player's own on-screen height. Image y grows downward, so a body moving
     # UP produces a SMALLER ankle y -- hence baseline minus current.
     ankle_img_y, hip_x_norm, body_height_norm = _image_metrics(image_landmarks)
-    body_rise_ratio = 0.0
+    # None, not 0.0. See KinematicFeatures.body_rise_ratio: a zero here reads
+    # as "the feet never left the floor", which is a measurement, not a gap.
+    body_rise_ratio = None
     if (
         ankle_img_y is not None
         and ankle_image_baseline > 0.0

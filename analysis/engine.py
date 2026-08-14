@@ -337,6 +337,8 @@ class BiomechanicsEngine:
             # be scored, which is the same error as reporting an unobserved
             # landmark's 0.0. The rule is skipped instead, and a phase left with
             # nothing measurable reports itself unscored rather than judged.
+            if features.body_rise_ratio is None:
+                return None
             if abs(features.body_rise_ratio) >= MAX_SHOOTING_ELEVATION:
                 return None
             return features.body_rise_ratio
