@@ -114,6 +114,77 @@ def _wrist_level(f) -> Optional[float]:
     return None
 
 
+# The fastest a knee can change, in degrees per SECOND. Per second and not per
+# frame because this footage runs 12-30 fps and includes slow motion.
+#
+# Only the physically impossible is removed. A real countermovement is fast on
+# both sides of any frame inside it, so it never triggers this.
+_MAX_KNEE_RATE_DEG_S = 1200.0
+
+
+def _mask_impossible(
+    values: List[Optional[float]],
+    frames: Sequence,
+    max_rate: float,
+) -> List[Optional[float]]:
+    """Blank frames that jump away from both neighbours and back again.
+
+    WHY THE CUT POINTS NEED THIS AND NOT ONLY THE SCORER
+    ----------------------------------------------------
+    `loading` ends at the smallest knee angle in the shot. So a frame whose
+    knee is wrong by 100 degrees does not merely get scored -- it BECOMES the
+    dip bottom, and therefore the phase boundary. Every rule that runs in
+    `loading` is then aggregated over a window whose edge was chosen by the
+    corruption.
+
+    Measured on video8_shot04: the knee read 139.2, 31.9, 80.4 deg on three
+    consecutive frames, roughly 3200 deg/s, with the hip failing on the same
+    frame. `loading` was cut at the 31.9 frame and the phase scored 0.
+
+    Masked rather than repaired. We know the reading is wrong; we do not know
+    what it should have been, and interpolating one would manufacture a
+    measurement. `_argmin` and `_argmax` already skip None.
+    """
+    if len(values) < 3:
+        return values
+
+    out = list(values)
+    for i in range(1, len(values) - 1):
+        if _is_excursion(values, frames, i, max_rate):
+            out[i] = None
+    return out
+
+
+def _is_excursion(values, frames, i: int, max_rate: float) -> bool:
+    """Does frame `i` stray off the line between its neighbours and return?
+
+    A PLAIN RATE TEST IS NOT ENOUGH, and video8_shot04 is why. The corrupt
+    frame there arrives after a 133 ms tracking gap -- the pose was lost for
+    four frames and the first one back was wrong. Across a gap that long a
+    knee genuinely CAN travel 107 degrees, so "degrees per second since the
+    last frame" reads 806 deg/s and calls it plausible.
+
+    What actually gives it away is the shape. The frames on either side agree
+    with each other about where the knee was; only this one disagrees, and the
+    next frame is back where the line predicts. So the test is how far the
+    value sits from the straight line joining its neighbours, against how far
+    the joint could have strayed AND RETURNED in the time available -- which is
+    bounded by the SHORTER of the two gaps, because whatever happened had to
+    reverse within it.
+    """
+    here, before, after = values[i], values[i - 1], values[i + 1]
+    if here is None or before is None or after is None:
+        return False
+
+    back_s = abs(frames[i].timestamp_ms - frames[i - 1].timestamp_ms) / 1000.0
+    fwd_s = abs(frames[i + 1].timestamp_ms - frames[i].timestamp_ms) / 1000.0
+    if back_s <= 0 or fwd_s <= 0:
+        return False
+
+    expected = before + (after - before) * (back_s / (back_s + fwd_s))
+    return abs(here - expected) > max_rate * min(back_s, fwd_s)
+
+
 def _argmin(values: Sequence[Optional[float]], lo: int, hi: int) -> Optional[int]:
     best_i, best_v = None, None
     for i in range(max(0, lo), min(len(values), hi)):
@@ -183,6 +254,9 @@ def compute_cuts(
     feats = [s.features for s in frames]
     wrist = [_wrist_level(f) for f in feats]
     knee = [(f.knee_angle if f is not None else None) for f in feats]
+    # Before any argmin: the dip bottom is the smallest knee angle, so an
+    # impossible reading would otherwise choose the phase boundary itself.
+    knee = _mask_impossible(knee, frames, _MAX_KNEE_RATE_DEG_S)
     rise = [(f.body_rise_ratio if f is not None else None) for f in feats]
 
     release_start, release_end = _release_span(frames, wrist, event_index)

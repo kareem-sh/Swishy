@@ -23,6 +23,82 @@ def _aggregate_policies() -> Dict[str, str]:
             for rid, r in rules.items()}
 
 
+def _rate_limits() -> Dict[str, float]:
+    """The fastest each rule's metric can physically change, per SECOND.
+
+    Per second, never per frame: this footage runs from 12 to 30 fps and
+    includes slow motion, so a per-frame limit would be four different limits
+    depending on the clip.
+
+    A rule that declares no `max_rate` is not despiked at all, which is why
+    adding this could not move a score that did not contain an impossible
+    reading.
+    """
+    rules = (load_yaml("biomechanics.yaml") or {}).get("rules", {}) or {}
+    out: Dict[str, float] = {}
+    for rid, r in rules.items():
+        limit = r.get("max_rate")
+        if limit is not None:
+            out[rid] = float(limit)
+    return out
+
+
+def _despike(entries: List[tuple], max_rate: float) -> List[tuple]:
+    """Drop lone frames that jump away from their neighbours and back.
+
+    WHY THIS IS NOT AN OUTLIER FILTER
+    ---------------------------------
+    It removes nothing for being unusual. It removes frames that describe a
+    movement no body can perform, and only when the frames on either side
+    agree with each other about what was happening instead.
+
+    Measured on video8_shot04: the shooting-side knee read 139.2, then 31.9,
+    then 80.4 deg on three consecutive frames -- a swing of 107 deg and back in
+    roughly 33 ms, about 3200 deg/s, with the hip failing on the same frame.
+    That is a whole-frame pose failure, not a deep knee bend.
+
+    It mattered because `min` and `max` seek the extreme value, so a single
+    corrupt frame is exactly the frame they select. That phase scored 0 and the
+    player was told to bend less deeply, from a frame in which the pose was
+    wrong.
+
+    A PLAIN RATE TEST IS NOT ENOUGH. That corrupt frame arrives after a 133 ms
+    tracking gap -- the pose was lost for four frames and the first one back
+    was wrong -- and across a gap that long a knee genuinely can travel 107
+    degrees. "Degrees per second since the last frame" reads 806 deg/s and
+    calls it plausible.
+
+    What gives it away is the shape: the frames on either side agree with each
+    other, only this one disagrees, and the next is back on the line. So the
+    test is the distance from the straight line joining the neighbours against
+    how far the joint could have strayed AND RETURNED, which is bounded by the
+    SHORTER of the two gaps because the excursion had to reverse within it.
+
+    A frame at the very start or end has only one neighbour and is kept: with
+    nothing to corroborate it, dropping it would be a guess.
+
+    `entries` is (timestamp_ms, RuleResult) in time order.
+    """
+    if len(entries) < 3:
+        return entries
+
+    values = [r.measured_value for _, r in entries]
+    stamps = [ts for ts, _ in entries]
+    kept: List[tuple] = [entries[0]]
+    for i in range(1, len(entries) - 1):
+        here, before, after = values[i], values[i - 1], values[i + 1]
+        if here is not None and before is not None and after is not None:
+            back_s = abs(stamps[i] - stamps[i - 1]) / 1000.0
+            fwd_s = abs(stamps[i + 1] - stamps[i]) / 1000.0
+            if back_s > 0 and fwd_s > 0:
+                expected = before + (after - before) * (back_s / (back_s + fwd_s))
+                if abs(here - expected) > max_rate * min(back_s, fwd_s):
+                    continue
+        kept.append(entries[i])
+    kept.append(entries[-1])
+    return kept
+
+
 def _aggregate_rules(frames: List[FrameSnapshot]) -> Dict[str, RuleResult]:
     """One result per (phase, rule), chosen by that rule's `aggregate` policy.
 
@@ -58,18 +134,37 @@ def _aggregate_rules(frames: List[FrameSnapshot]) -> Dict[str, RuleResult]:
                behaviour rather than silently changing meaning.
     """
     policies = _aggregate_policies()
-    aggregated: Dict[str, RuleResult] = {}
+    limits = _rate_limits()
 
+    # Gathered in time order first, because despiking needs each frame's
+    # neighbours and the streaming comparison below cannot see them.
+    #
+    # Keyed by RULE, not by (phase, rule), and split into phases only after the
+    # despike. A corrupt frame does not respect phase boundaries -- and worse,
+    # it tends to CREATE one: `loading` ends at the smallest knee angle in the
+    # shot, so a frame whose knee is wrong by 100 deg becomes the dip bottom and
+    # therefore the last frame of its own phase. Despiking within the phase
+    # could never see it, because the frame that would contradict it was pushed
+    # into the next phase by the same corruption.
+    series: Dict[str, List[tuple]] = {}
     for snapshot in frames:
         if not snapshot.analysis:
             continue
         for rule in snapshot.analysis.active_rules:
-            key = f"{rule.phase}:{rule.rule_id}"
-            existing = aggregated.get(key)
-            if existing is None:
-                aggregated[key] = rule
-                continue
-            if _replaces(rule, existing, policies.get(rule.rule_id, "worst")):
+            series.setdefault(rule.rule_id, []).append(
+                (snapshot.timestamp_ms, rule)
+            )
+
+    aggregated: Dict[str, RuleResult] = {}
+    for rule_id, entries in series.items():
+        limit = limits.get(rule_id)
+        if limit is not None:
+            entries = _despike(entries, limit)
+        policy = policies.get(rule_id, "worst")
+        for _, rule in entries:
+            key = f"{rule.phase}:{rule_id}"
+            chosen = aggregated.get(key)
+            if chosen is None or _replaces(rule, chosen, policy):
                 aggregated[key] = rule
 
     return aggregated

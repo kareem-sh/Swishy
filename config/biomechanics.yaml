@@ -54,6 +54,7 @@ rules:
     # straightest knee by construction, so any other choice reports a leg
     # that has not bent yet.
     aggregate: min
+    max_rate: 1200          # deg/s, physical ceiling; see scorer._despike
     min: 80
     max: 145
     ideal_min: 100
@@ -143,6 +144,7 @@ rules:
     metric: hip
     phases: [loading]
     aggregate: min          # deepest hinge, same reasoning as the knee
+    max_rate: 1200          # deg/s, physical ceiling; see scorer._despike
     min: 110
     max: 168
     ideal_min: 125
@@ -216,6 +218,7 @@ rules:
     # min: the set point is where the ball is held closest before the drive,
     # i.e. the most flexed elbow of the lift.
     aggregate: min
+    max_rate: 2000          # deg/s, physical ceiling; see scorer._despike
     min: 60
     max: 118
     ideal_min: 74
@@ -381,6 +384,7 @@ rules:
     name: "Upper Body Posture"
     metric: trunk
     aggregate: worst
+    max_rate: 600          # deg/s, physical ceiling; see scorer._despike
     phases: [release]
     min: 0
     max: 25
@@ -474,6 +478,7 @@ rules:
     metric: elbow
     phases: [release]
     aggregate: max          # the reach ACHIEVED, not the frame before it
+    max_rate: 2000          # deg/s, physical ceiling; see scorer._despike
     min: 142
     max: 180
     ideal_min: 152
@@ -766,6 +771,7 @@ rules:
     # max: the finish is a HELD position. Scoring its worst frame scores the
     # arm on its way back down, which every shot does and no rule intends.
     aggregate: max
+    max_rate: 2000          # deg/s, physical ceiling; see scorer._despike
     min: 145
     max: 180
     ideal_min: 155
