@@ -16,13 +16,48 @@ _OUTCOME_RANK = {
 }
 
 
-def _aggregate_rules(frames: List[FrameSnapshot]) -> Dict[str, RuleResult]:
-    """One outcome per (phase, rule) — the worst outcome seen wins.
+def _aggregate_policies() -> Dict[str, str]:
+    """Which frame of a phase represents each rule. From biomechanics.yaml."""
+    rules = (load_yaml("biomechanics.yaml") or {}).get("rules", {}) or {}
+    return {rid: str(r.get("aggregate", "worst")).lower()
+            for rid, r in rules.items()}
 
-    Keyed by phase as well as rule so a rule evaluated in several phases
-    reports separately in each, rather than one phase silently overwriting
-    another's result.
+
+def _aggregate_rules(frames: List[FrameSnapshot]) -> Dict[str, RuleResult]:
+    """One result per (phase, rule), chosen by that rule's `aggregate` policy.
+
+    WHY THIS IS NOT ALWAYS "THE WORST FRAME"
+    ----------------------------------------
+    It used to be, for every rule, and for half of them that was the wrong
+    question asked in a way that could not be noticed from the code.
+
+    A rule describes one of two different things.
+
+    CONTINUOUS rules ask "did this ever slip?" -- trunk lean, head stability.
+    A posture that broke for a moment broke. The worst frame is the answer.
+
+    EXTREMUM rules ask "how far did the movement GO?" -- how deep was the dip,
+    how far did the arm extend. There is one frame that answers that, and it is
+    not the worst one. Scoring the knee by its worst frame scores the moment
+    the player had not yet bent, because "less bend" scores worse; the phase
+    begins at the straightest knee by construction, so the worst frame is
+    always the first one.
+
+    Measured on salah_video before this was fixed: the loading phase contained
+    knee angles from 91 deg (a good, deep load) up to 165 deg (standing), and
+    the rule reported 165 and told the player to bend deeper -- on every shot,
+    to a player whose actual load of 91-102 deg sits at or below the published
+    preparatory norm of 107-116. The advice was not merely wrong, it was
+    reversed.
+
+    Policies, set per rule in biomechanics.yaml:
+        min    the smallest measured value in the phase (deepest flexion)
+        max    the largest (fullest extension, the held finish)
+        worst  the lowest-scoring frame (continuous rules) -- the default,
+               so a rule that does not declare a policy keeps the old
+               behaviour rather than silently changing meaning.
     """
+    policies = _aggregate_policies()
     aggregated: Dict[str, RuleResult] = {}
 
     for snapshot in frames:
@@ -34,18 +69,33 @@ def _aggregate_rules(frames: List[FrameSnapshot]) -> Dict[str, RuleResult]:
             if existing is None:
                 aggregated[key] = rule
                 continue
-
-            new_rank = _OUTCOME_RANK.get(rule.outcome, 0)
-            old_rank = _OUTCOME_RANK.get(existing.outcome, 0)
-            if new_rank < old_rank:
+            if _replaces(rule, existing, policies.get(rule.rule_id, "worst")):
                 aggregated[key] = rule
-            elif new_rank == old_rank and not rule.passed:
-                if _SEVERITY_RANK.get(rule.severity, 0) > _SEVERITY_RANK.get(
-                    existing.severity, 0
-                ):
-                    aggregated[key] = rule
 
     return aggregated
+
+
+def _replaces(new: RuleResult, old: RuleResult, policy: str) -> bool:
+    """Does `new` represent this phase better than `old`, under `policy`?"""
+    if policy in ("min", "max"):
+        # An extremum is only meaningful over frames that HAVE a value. A
+        # frame the engine could not measure must never displace one it could,
+        # or "not observed" quietly becomes the reported measurement.
+        if new.measured_value is None:
+            return False
+        if old.measured_value is None:
+            return True
+        return (new.measured_value < old.measured_value if policy == "min"
+                else new.measured_value > old.measured_value)
+
+    new_rank = _OUTCOME_RANK.get(new.outcome, 0)
+    old_rank = _OUTCOME_RANK.get(old.outcome, 0)
+    if new_rank < old_rank:
+        return True
+    if new_rank == old_rank and not new.passed:
+        return (_SEVERITY_RANK.get(new.severity, 0)
+                > _SEVERITY_RANK.get(old.severity, 0))
+    return False
 
 
 def _weighted_score(rules: List[RuleResult], weights: dict) -> int:

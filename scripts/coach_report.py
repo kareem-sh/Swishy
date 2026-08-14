@@ -304,9 +304,27 @@ def _print_phase_notes(ph) -> None:
     for msg in ph.fixes:
         print(f"    [CHANGE]    {msg}")
     for rule in ph.measured:
-        value = rule.measured_value
-        shown = f"{value:.1f}{rule.unit}" if value is not None else "n/a"
-        print(f"    [MEASURED]  {rule.name}: {shown} (not scored)")
+        print(f"    [MEASURED]  {rule.name}: {_format_measured(rule)} (not scored)")
+
+
+# Angles are printed as whole degrees, not to one decimal.
+#
+# A tenth of a degree is a claim we cannot support. MediaPipe's own full and
+# heavy models disagree about the elbow by 11.5 deg on average and about the
+# finger line by 39 deg (scripts/measure_angle_uncertainty.py), so "157.3" and
+# "157" are equally true and only one of them looks honest. False precision in
+# a coaching report is worse than a rounded number: it invites the player to
+# chase a change smaller than the instrument can see.
+#
+# Distances keep two decimals -- they are metres, where 0.01 is a centimetre
+# and genuinely resolvable.
+def _format_measured(rule) -> str:
+    value = rule.measured_value
+    if value is None:
+        return "n/a"
+    if rule.unit in ("", None, "deg"):
+        return f"{value:.0f}{rule.unit or ''}"
+    return f"{value:.2f}{rule.unit}"
 
 
 def _print_next_steps(summary: ShotSummary) -> None:

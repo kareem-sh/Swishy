@@ -40,7 +40,6 @@ CONNECTIONS: Sequence[Tuple[int, int]] = (
 )
 
 PHASE_COLOURS: Dict[str, Tuple[int, int, int]] = {
-    "ready_stance": (150, 150, 150),
     "loading": (80, 180, 255),
     "ball_lift": (0, 210, 255),
     "jump": (0, 230, 120),

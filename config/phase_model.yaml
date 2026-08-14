@@ -75,9 +75,22 @@ detector:
 # reported twice under two headings, sometimes with contradictory readings
 # because the deepest knee angle fell in one and the shallower one in the
 # other. One phase covering the whole dip reports the deepest bend once.
+# `ready_stance` was REMOVED, and its frames now belong to `loading`.
+#
+# It owned no rule of its own. The only rule that listed it -- trunk_posture --
+# runs across five phases and is reported once, under "Through the Whole Shot",
+# so nothing was ever said under the Ready Stance heading. On a real clip it
+# was frequently a SINGLE frame, and on salah_video shot 2 it had none at all,
+# producing a heading for a phase that did not occur.
+#
+# Merging it into `loading` is safe only because rules now declare how they
+# aggregate across a phase (see `aggregate:` in biomechanics.yaml). Loading now
+# starts at frame zero rather than at the straightest knee, which under the old
+# worst-frame aggregation would have made the knee rule read a STANDING leg and
+# report it as a failed dip. With `aggregate: min` the extra frames cannot
+# change the answer: the deepest bend is still the deepest bend.
 analysis:
   order:
-    - ready_stance
     - loading
     - ball_lift
     - jump
@@ -86,7 +99,6 @@ analysis:
     - landing
 
   labels:
-    ready_stance: "Ready Stance"
     loading: "Loading"
     ball_lift: "Ball Lift"
     jump: "Jump"

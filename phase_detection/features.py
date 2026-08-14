@@ -41,12 +41,10 @@ class KinematicFeatures:
     wrist_y: float = 0.0
     wrist_velocity_y: float = 0.0
     ankle_y_avg: float = 0.0
-    ankle_velocity_y: float = 0.0
     ankle_baseline_y: float = 0.0
     knee_angle: Optional[float] = None
     knee_angle_delta: float = 0.0
     hip_y_avg: float = 0.0
-    hip_velocity_y: float = 0.0
     elbow_angle: Optional[float] = None
     index_y: float = 0.0
     index_velocity_y: float = 0.0
@@ -260,24 +258,33 @@ def extract_features(
     if index_align_key in angles and angles[index_align_key].is_valid:
         index_align_angle = angles[index_align_key].degrees
 
-    wrist_vel = ankle_vel = hip_vel = nose_vel = index_vel = 0.0
+    # `hip_velocity_y` and `ankle_velocity_y` were REMOVED, not just unused.
+    #
+    # hip_velocity_y was arithmetically incapable of being anything but zero:
+    # MediaPipe world landmarks are hip-centred, so the hip midpoint IS the
+    # origin. Subtracting one origin from another and dividing by dt is an
+    # elaborate way to compute 0.0, once per frame, forever. A threshold that
+    # tested it could never fire, which is how it survived unnoticed.
+    #
+    # ankle_velocity_y was real arithmetic with no reader: nothing in the
+    # detector, the rules or the refiner ever consulted it. Whole-body vertical
+    # motion is measured in image space (`body_rise_ratio`), because hip-centred
+    # world coordinates are blind to it -- so an ankle velocity in world space
+    # describes the legs folding, which no rule asks about.
+    #
+    # Both were computed on every frame of every video.
+    wrist_vel = nose_vel = index_vel = 0.0
     knee_delta = 0.0
 
     if prev_world is not None and dt_s > 0:
         prev_wrist = _lm_y(prev_world, wrist_key)
         prev_index = _lm_y(prev_world, index_key)
-        prev_ankle = _avg_y(prev_world, ("left_ankle", "right_ankle"))
-        prev_hip = _avg_y(prev_world, ("left_hip", "right_hip"))
         prev_nose = _lm_y(prev_world, "nose")
 
         if prev_wrist is not None:
             wrist_vel = (wrist_y - prev_wrist) / dt_s
         if index_y_value is not None and prev_index is not None:
             index_vel = (index_y - prev_index) / dt_s
-        if prev_ankle is not None:
-            ankle_vel = (ankle_y - prev_ankle) / dt_s
-        if prev_hip is not None:
-            hip_vel = (hip_y - prev_hip) / dt_s
         if prev_nose is not None:
             nose_vel = (nose_y - prev_nose) / dt_s
 
@@ -325,12 +332,10 @@ def extract_features(
         wrist_y=wrist_y,
         wrist_velocity_y=wrist_vel,
         ankle_y_avg=ankle_y,
-        ankle_velocity_y=ankle_vel,
         ankle_baseline_y=ankle_baseline_y,
         knee_angle=knee_angle,
         knee_angle_delta=knee_delta,
         hip_y_avg=hip_y,
-        hip_velocity_y=hip_vel,
         elbow_angle=elbow_angle,
         index_y=index_y,
         index_velocity_y=index_vel,

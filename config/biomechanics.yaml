@@ -50,6 +50,10 @@ rules:
     name: "Leg Load"
     metric: knee
     phases: [loading]
+    # min: the DEPTH of the dip is the whole point. The phase begins at the
+    # straightest knee by construction, so any other choice reports a leg
+    # that has not bent yet.
+    aggregate: min
     min: 80
     max: 145
     ideal_min: 100
@@ -93,6 +97,7 @@ rules:
     name: "Hip Drive"
     metric: hip
     phases: [loading]
+    aggregate: min          # deepest hinge, same reasoning as the knee
     min: 110
     max: 168
     ideal_min: 125
@@ -133,6 +138,9 @@ rules:
     name: "Ball Set Position"
     metric: elbow
     phases: [ball_lift]
+    # min: the set point is where the ball is held closest before the drive,
+    # i.e. the most flexed elbow of the lift.
+    aggregate: min
     min: 60
     max: 118
     ideal_min: 74
@@ -155,6 +163,7 @@ rules:
     name: "Shoulder Elevation"
     metric: shoulder
     phases: [ball_lift, jump]
+    aggregate: worst        # unscored anyway; displayed only
     min: 55
     max: 135
     severity: info
@@ -202,7 +211,8 @@ rules:
   trunk_posture:
     name: "Upper Body Posture"
     metric: trunk
-    phases: [ready_stance, loading, ball_lift, jump, release]
+    aggregate: worst        # continuous: a posture that slipped, slipped
+    phases: [loading, ball_lift, jump, release]
     min: 0
     max: 25
     ideal_min: 0
@@ -221,25 +231,45 @@ rules:
   head_stability:
     name: "Eyes and Head"
     metric: head_velocity
+    aggregate: worst        # continuous
     phases: [loading, ball_lift, jump, release]
     max: 0.08
     ideal_max: 0.05
     unit: "m/s"
     severity: info
-    scored: true
-    message_excellent: "Your head stays still, so your eyes stay on target."
-    refine_high: "Head control is good. Hold your eyes on the rim a moment longer after the ball leaves."
-    message_high: "You're moving your head mid-shot. Lock your eyes on the front of the rim and keep them there until the ball lands."
+    scored: false          # measured and displayed, never scored
+    message_excellent: "Head movement, for reference — this one isn't scored."
+    refine_high: "Head movement, for reference — this one isn't scored."
+    message_high: "Head movement, for reference — this one isn't scored."
     evidence: >
-      ENGINEERING DECISION. No published threshold for head movement during
-      shooting was found. Retained because a stable gaze is standard coaching
-      practice and the measurement is reliable. Threshold is ours.
+      NOT SUPPORTED FOR SCORING — the threshold never had a basis, and now has
+      a measurement against it.
+
+      It was always an ENGINEERING DECISION: no published threshold for head
+      movement during shooting was found. The old note claimed "the
+      measurement is reliable". That claim is now contradicted by data.
+
+      Measured across five videos, head velocity during the shot ran
+      p10 = 0.00, median = 0.20, p90 = 0.50 m/s against a maximum of 0.08 --
+      so the rule failed 59 of 80 evaluations, roughly three players in four.
+      A threshold nobody derived, which almost nobody meets, is not measuring
+      head stability; it is measuring the threshold.
+
+      There is a second problem it cannot escape. head_velocity is computed
+      from hip-centred world landmarks, so it is the head's motion RELATIVE TO
+      THE HIPS, not in space. A player who rises smoothly with a perfectly
+      still gaze still registers motion here. Re-deriving it against an
+      image-space reference is the honest fix, and until that exists the
+      number is shown and not scored.
+
+      Displayed because a stable gaze is genuine coaching practice.
 
   # ---------------------------------------------------------------- release
   elbow_extension_release:
     name: "Reach at Release"
     metric: elbow
     phases: [release]
+    aggregate: max          # the reach ACHIEVED, not the frame before it
     min: 142
     max: 180
     ideal_min: 152
@@ -308,24 +338,45 @@ rules:
     name: "Finger Direction"
     metric: index_align
     phases: [release]
+    aggregate: max          # the straightest finger line the release reached
     min: 148
     max: 180
     ideal_min: 160
     ideal_max: 180
-    severity: warning
-    scored: true
-    message_excellent: "The ball comes off your fingertips clean."
-    refine_low: "Good release. Push a little further through the fingertips to add backspin."
-    message_low: "Snap your wrist down through the ball at release. Right now it's coming off a flat hand."
+    severity: info
+    scored: false          # measured and displayed, never scored
+    message_excellent: "Fingertip direction, for reference — this one isn't scored."
+    refine_low: "Fingertip direction, for reference — this one isn't scored."
+    message_low: "Fingertip direction, for reference — this one isn't scored."
     evidence: >
-      ENGINEERING DECISION. No published norm for an elbow-wrist-index
-      alignment angle was found; this is a Swichy-defined proxy for a clean
-      fingertip release. Thresholds are ours.
+      NOT SUPPORTED FOR SCORING — withdrawn from the score on MEASUREMENT
+      grounds, exactly as shoulder_alignment_lift was.
+
+      It was never more than an ENGINEERING DECISION: no published norm for an
+      elbow-wrist-index alignment angle exists, and this is a Swichy-defined
+      proxy for a clean fingertip release. What has changed is that its
+      reliability is now measured rather than assumed.
+
+      MediaPipe's full and heavy models, on the same 448 frames of
+      salah_video.mp4, disagree about this angle by a mean of 39.2 deg
+      (median 41.3, p90 62.0) and differ by more than 10 deg on 92.4% of
+      frames. The ideal band is 20 deg wide. The uncertainty is TWICE the
+      entire band, so every tier boundary sits well inside the noise.
+
+      The cause is not mysterious: the index landmark is the least reliable
+      point used anywhere in this project (visibility p10 = 0.58 on the same
+      footage), and the angle is built from a short elbow-wrist-index chain
+      where a small positional error becomes a large angular one.
+
+      Kept and displayed because a fingertip release is real coaching and the
+      number is worth showing. Scoring it would penalise players for our
+      measurement. scripts/measure_angle_uncertainty.py; docs/LIMITS.md.
 
   release_height:
     name: "Release Height"
     metric: release_height
     phases: [release]
+    aggregate: max          # the highest point the ball was let go from
     min: 0.06
     max: 0.62
     ideal_min: 0.16
@@ -349,6 +400,7 @@ rules:
     name: "Release Height (relative to your height)"
     metric: release_height_ratio
     phases: [release]
+    aggregate: max
     min: 1.02
     max: 1.58
     ideal_min: 1.14
@@ -373,6 +425,9 @@ rules:
     name: "Follow-Through"
     metric: elbow
     phases: [follow_through]
+    # max: the finish is a HELD position. Scoring its worst frame scores the
+    # arm on its way back down, which every shot does and no rule intends.
+    aggregate: max
     min: 145
     max: 180
     ideal_min: 155
@@ -390,23 +445,33 @@ rules:
     name: "Finish Position"
     metric: index_align
     phases: [follow_through]
+    aggregate: max          # the held finish, as above
     min: 150
     max: 180
     ideal_min: 162
     ideal_max: 180
-    severity: warning
-    scored: true
-    message_excellent: "Your hand finishes pointing into the rim. That's it — hold it there."
-    refine_low: "Good finish. Let the fingers relax further down toward the floor."
-    message_low: "Your wrist stops flat after release. Finish with your fingers pointing down into the front of the rim, and hold it a second."
+    severity: info
+    scored: false          # measured and displayed, never scored
+    message_excellent: "Finish position, for reference — this one isn't scored."
+    refine_low: "Finish position, for reference — this one isn't scored."
+    message_low: "Finish position, for reference — this one isn't scored."
     evidence: >
-      ENGINEERING DECISION. Same basis as follow_through_elbow. Thresholds are ours.
+      NOT SUPPORTED FOR SCORING. Same metric as index_alignment_release and
+      withdrawn from the score for the same measured reason: 39.2 deg mean
+      model disagreement against an 18 deg ideal band.
+
+      follow_through_elbow remains SCORED. The two are not equivalent: the
+      elbow angle carries 11.5 deg of uncertainty against a 25 deg band, which
+      is tight but usable, while the finger line carries 39 deg against 18.
+      Same phase, same footage, different verdict, because the measurement
+      quality is different -- not because the coaching idea is.
 
   # ---------------------------------------------------------------- landing
   landing_balance:
     name: "Landing"
     metric: ankle_rise
     phases: [landing]
+    aggregate: worst        # any moment of imbalance is the finding
     min: -0.06
     max: 0.06
     ideal_min: -0.03

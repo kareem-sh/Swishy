@@ -23,11 +23,11 @@ That is why the phases the player is shown are computed here and not there.
 
 BOUNDARIES
 ----------
-Seven segments, from six cut points, each found from the signal that actually
+Six segments, from five cut points, each found from the signal that actually
 defines it:
 
-    ready_stance    before the knee starts to bend
-    loading         knee bending, down to the bottom of the dip
+    loading         everything up to the bottom of the dip, including the
+                    stance before the knee starts to bend
     ball_lift       upward drive, feet still on the floor
     jump            feet off the floor          (omitted if the player
                                                  never left the floor)
@@ -79,7 +79,10 @@ class PhaseCuts:
     jumped: bool
 
     def as_labels(self) -> List[str]:
-        labels = ["ready_stance"] * self.total
+        # Everything before the lift is `loading`. There is no separate resting
+        # phase any more: it carried no rule, and on real clips it was often a
+        # single frame or none at all. See phase_model.yaml.
+        labels = ["loading"] * self.total
         _fill(labels, self.load_start, self.lift_start, "loading")
         _fill(labels, self.lift_start, self.takeoff, "ball_lift")
         _fill(labels, self.takeoff, self.release_start, "jump")

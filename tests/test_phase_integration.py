@@ -76,7 +76,7 @@ def test_the_two_vocabularies_are_disjoint_in_purpose():
     shot.
     """
     assert len(CORE_STATES) == 4, CORE_STATES
-    assert len(PHASE_ORDER) == 7, PHASE_ORDER
+    assert len(PHASE_ORDER) == 6, PHASE_ORDER
     overlap = set(CORE_STATES) & set(PHASE_ORDER)
     assert overlap <= {"release"}, (
         f"detector states leaking into the coaching vocabulary: {overlap}"
