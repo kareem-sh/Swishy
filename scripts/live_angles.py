@@ -23,6 +23,25 @@ REAL TIME IS FINE HERE, AND ONLY HERE
 The main pipeline is deliberately offline, because a shot's phases cannot be
 known until the shot is over. An angle has no such problem: it is a property of
 a single frame, complete the moment that frame arrives.
+
+NOTHING TEMPORAL IS APPLIED, AND THAT TOOK A DELIBERATE CHOICE
+Two mechanisms in the pipeline reach across frames, and both are off here:
+
+  * the One Euro filter, which smooths landmark positions over time;
+  * the visibility gate's HOLD, which -- when a landmark's confidence dips --
+    substitutes its position from an earlier frame for up to `hold_frames`.
+
+The hold is the dangerous one for a measuring instrument. It does not smooth a
+value, it FREEZES one: the number on screen belongs to an earlier moment while
+looking exactly like a current reading. Measured over 1362 frames of
+salah_video.mp4, held readings were 0.4% of the total but wrong by up to 128
+degrees against the same frame's raw MediaPipe angle. On the other 99.6% this
+tool's output matched raw MediaPipe to 0.00000000 degrees.
+
+So the gate here runs with hold_frames=0. Thresholds still apply, because an
+angle the pipeline would reject must not look trustworthy here -- but a
+landmark that fails them reads "--" rather than a stale number. That is the
+project's standing rule: never silently turn "not observed" into a value.
 """
 
 from __future__ import annotations
@@ -59,12 +78,17 @@ CONNECTIONS = (
 # What to show, and the range each should sit in when you are standing
 # normally. The expected range is the point: a number alone tells you nothing
 # about whether it is right.
+#
+# The ranges are RANGES, not targets. A fully extended human elbow does not
+# reach 180: the carrying angle holds the forearm a few degrees off the line of
+# the upper arm, so 170-180 is a straight arm and reading 175 is not an error of
+# 5. Quoting a single number here would invite exactly that misreading.
 ANGLES = (
-    ("elbow", "Elbow", "straight ~180, square ~90"),
-    ("shoulder", "Shoulder", "arm down ~10, out ~90"),
-    ("knee", "Knee", "standing ~175, squat ~90"),
-    ("hip", "Hip", "standing ~175, hinged ~120"),
-    ("index_align", "Finger line", "aligned ~180"),
+    ("elbow", "Elbow", "straight 170-180, square ~90"),
+    ("shoulder", "Shoulder", "down ~10, out ~90  (+-26 deg, see SOURCES D4)"),
+    ("knee", "Knee", "standing 170-180, squat ~90"),
+    ("hip", "Hip", "standing 170-180, hinged ~120"),
+    ("index_align", "Finger line", "aligned 160-180"),
 )
 
 
@@ -87,6 +111,9 @@ def main() -> int:
     parser.add_argument("--side", default="right", choices=["right", "left"])
     parser.add_argument("--mirror", action="store_true",
                         help="flip horizontally so the view behaves like a mirror")
+    parser.add_argument("--pipeline-hold", action="store_true",
+                        help="re-enable the visibility gate's temporal hold, to see "
+                             "what the pipeline sees rather than what the camera sees")
     args = parser.parse_args()
 
     cap = cv2.VideoCapture(args.camera, cv2.CAP_DSHOW)
@@ -95,14 +122,15 @@ def main() -> int:
         return 2
 
     detector = PoseDetector(vision.RunningMode.VIDEO)
-    # The same gate the pipeline uses, with the same settings, so an angle
-    # shown here is judged reliable by exactly the rule that governs it in a
-    # report. A tool that measured under laxer rules would be worse than no
-    # tool: it would clear a joint the pipeline goes on to reject.
+    # The pipeline's gate, with the pipeline's THRESHOLDS -- so a joint the
+    # pipeline would reject cannot look trustworthy here -- but with the
+    # temporal hold switched off (see the module docstring). Holding replaces a
+    # dipped landmark with its position from an earlier frame, which is exactly
+    # the fabrication this tool exists to expose, not to commit.
     gate = VisibilityGate(
         visibility_threshold=VISIBILITY_THRESHOLD,
         presence_threshold=PRESENCE_THRESHOLD,
-        hold_frames=VISIBILITY_HOLD_FRAMES,
+        hold_frames=0 if not args.pipeline_hold else VISIBILITY_HOLD_FRAMES,
         require_presence=VISIBILITY_REQUIRE_PRESENCE,
     )
     calculator = AngleCalculator(gate)
@@ -183,8 +211,15 @@ def main() -> int:
                 _text(frame, hint, 210, y, (130, 130, 130), 0.42)
                 y += 30
 
-            _text(frame, "orange = unstable this frame", 14, y + 4,
-                  (0, 200, 255), 0.42)
+            # With the hold off, an untrusted landmark yields "--" and orange
+            # cannot occur -- so say what "--" means instead of describing a
+            # colour that will never appear.
+            if args.pipeline_hold:
+                _text(frame, "orange = HELD from an earlier frame, not measured now",
+                      14, y + 4, (0, 200, 255), 0.42)
+            else:
+                _text(frame, '"--" = not measurable this frame (nothing is held)',
+                      14, y + 4, (140, 140, 140), 0.42)
 
         if frozen:
             _text(frame, "FROZEN", w // 2 - 50, 36, (0, 210, 255), 0.75, 2)
