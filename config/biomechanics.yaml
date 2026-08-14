@@ -145,7 +145,7 @@ rules:
     phases: [loading]
     aggregate: min          # deepest hinge, same reasoning as the knee
     max_rate: 1200          # deg/s, physical ceiling; see scorer._despike
-    min: 110
+    min: 100                # widened from 110 -- see WIDENED BAND below
     max: 168
     ideal_min: 125
     ideal_max: 152
@@ -157,6 +157,61 @@ rules:
     message_low: "You're folding forward at the waist. Keep your chest up toward the rim as you sink."
     message_high: "Your hips stay too upright to build power. Push them back as you lower, like you're sitting onto a high stool."
     evidence: >
+      WIDENED BAND: the lower bound moved 110 -> 100, which is the action
+      SOURCES.md Part E records for this rule verbatim -- "Keep, widen band,
+      distance-specific". Two of the three are done; the distance part waits on
+      shooting distance becoming an input.
+
+      THE JUSTIFICATION IS NOT THE FAILURE RATE. 100 sits 35 deg BELOW the
+      lowest published value in the corpus (A1's 135.5 at long range), so it is
+      not an attempt to match the literature -- it is an outer bound that
+      should only fire on gross deviation, the same logic as jump_elevation's
+      upper bound in this file. Moving it to 115 or 120 to "tighten" the rule
+      would put it inside the published range and start failing normal
+      shooters; moving it to 90 would stop it detecting anything.
+
+      MEASURED ACROSS 46 SHOTS, all 53 clips, before the change:
+
+          p25 116.3    median 124.8    p75 141.9    range 44.3-174.5
+          old floor 110 -> 7 failures        new floor 100 -> 4
+
+      WHAT THE FOUR REMAINING FAILURES ARE, and why this bound is right: one
+      corrupt frame (44.3 deg, with the knee reading 31.9 on the same frame),
+      two phases measured from a SINGLE frame (67.9 and 91.3), and exactly one
+      genuine deep forward hinge (90.9 deg with a normal knee of 126.3, over 12
+      frames). The rule now catches the real thing and little else.
+
+      ⚠️ SAMPLE SIZE IS DOING MORE WORK HERE THAN THE THRESHOLD. Of the nine
+      failures at the old bounds, four came from phases of five frames or
+      fewer and three from a single frame -- including the highest reading in
+      the corpus, 174.5 deg from one frame. Every well-sampled shot (12-32
+      frames) falls between 90.9 and 150.8 with no outlier at all. A phase
+      measured from one frame is currently scored with the same confidence as
+      one measured from twenty-five, and that is a project-wide gap, not a hip
+      problem. Fixing it would do more for this rule than any further threshold
+      change.
+
+      ⚠️ OUR DISTRIBUTION SITS BELOW THE PUBLISHED ONE. Median 124.8 against
+      A3's proficient mean of 143.1 -- eighteen degrees. Either these shooters
+      hinge more than the studied cohorts, or our three-landmark hip angle is
+      not measuring what their system measured. Until that is resolved the
+      ideal band 125-152 is left UNCHANGED, even though half our shots fall
+      below it: moving it down to centre on our own median would discard the
+      only published anchor the rule has and replace it with a description of
+      whoever we happen to have filmed.
+
+      ⚠️ IT IS NOW THE ONLY SCORED RULE IN `loading`. knee_flexion_loading was
+      demoted to a displayed metric on the corpus's own instruction, so the
+      phase rests on this rule alone. The two are NOT interchangeable and it
+      was measured before the demotion was accepted: across the same 46 shots
+      they share r = 0.698, r-squared 0.488 -- under half their variance -- and
+      they disagree about pass/fail on 16 of 46 shots, 35%. Real information
+      was lost with the knee. That was a deliberate call, recorded here rather
+      than smoothed over, and it is why this rule's bounds matter more now than
+      they did.
+
+      ---- the original assessment follows, unchanged ----
+
       DIRECTION is contested; THE BAND IS AN ENGINEERING DECISION. This block
       previously opened "SUPPORTED WITH LIMITATIONS — the best-supported
       LOWER-BODY rule here, and notably better supported than the knee". The
