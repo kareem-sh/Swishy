@@ -8,8 +8,12 @@ severity_weights:
 min_evaluated_rules: 2
 max_coaching_tips: 3
 
-# How long to show shot summary overlay (prefer config/display.yaml)
-summary_display_frames: 60
+# REMOVED: summary_display_frames.
+# It was defined here AND in display.yaml, and pipeline.py reads display.yaml
+# first, so this copy never took effect. Both happened to hold 60, which is
+# why nothing ever looked wrong -- and is exactly what makes a shadowed
+# setting dangerous: the next person edits the copy that does nothing.
+# It is an overlay-timing setting, so display.yaml is its right home.
 
 score_messages:
   excellent: 90

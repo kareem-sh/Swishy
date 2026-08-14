@@ -51,6 +51,7 @@ from phase_detection.phases import PHASE_LABELS
 from player.profile import PlayerProfile, load_player_profile
 from pose.landmarks import extract_all_landmarks
 from pose.visibility import VisibilityGate
+from shots.segmenter import segment
 from utils.config_loader import load_yaml
 from utils.frame_buffer import FrameBuffer, FrameSnapshot
 from visualization.hud_display import HudDisplay, HudDisplaySmoother
@@ -150,6 +151,10 @@ class ShotAnalysisPipeline:
         self._biomechanics = BiomechanicsEngine(self._player)
         self._shot_tracker = ShotTracker()
         self._frame_buffer = FrameBuffer(max_frames=FRAME_BUFFER_SIZE)
+        # Offline segmentation needs the whole video, not the rolling window
+        # the live path uses. Kept as a plain list, and only when a caller has
+        # asked for it, so a live session never grows without bound.
+        self._offline_history: Optional[List[FrameSnapshot]] = None
         # The tracker opens shots BACKWARDS from a detected release, so it needs
         # the recent past, and it re-scores the captured frames against the
         # refined coaching phases, so it needs this engine rather than one of
@@ -704,6 +709,8 @@ class ShotAnalysisPipeline:
             analysis=analysis,
         )
         self._frame_buffer.push(snapshot)
+        if self._offline_history is not None:
+            self._offline_history.append(snapshot)
 
         completed_shot = self._shot_tracker.update(
             phase,
@@ -1112,6 +1119,45 @@ class ShotAnalysisPipeline:
                 self._resolved_side = "right"
 
         return self._resolved_side
+
+    def enable_offline_segmentation(self) -> None:
+        """Record every frame so the video can be segmented once, at the end.
+
+        Call before the first frame. A caller that never calls this behaves
+        exactly as before, which keeps live capture unchanged and unbounded
+        memory opt-in.
+        """
+        self._offline_history = []
+
+    def segment_offline(self) -> List[ShotSummary]:
+        """Find and score every shot in the recorded video.
+
+        Replaces the live detector's running commentary with a single pass
+        over the finished signal. The live tracker's own results are discarded
+        rather than merged: they were produced by a detector that could not see
+        ahead, and mixing two segmentations would double-count every shot
+        found by both.
+        """
+        if not self._offline_history:
+            return []
+
+        fps = self._fps if self._fps and self._fps > 0 else DEFAULT_FPS
+        signal = [
+            f.features.wrist_height_ratio if f.features is not None else None
+            for f in self._offline_history
+        ]
+        windows = segment(signal, fps)
+
+        self._shot_tracker.reset()
+        summaries: List[ShotSummary] = []
+        for start, peak, end in windows:
+            frames = self._offline_history[start:end + 1]
+            summary = self._shot_tracker.finalize_window(
+                frames, peak_ms=self._offline_history[peak].timestamp_ms
+            )
+            if summary is not None:
+                summaries.append(summary)
+        return summaries
 
     def finalize_session(self) -> Optional[ShotSummary]:
         """Close any shot still in progress (e.g. video ended mid-rep)."""

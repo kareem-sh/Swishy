@@ -137,14 +137,23 @@ def _decode_and_analyse(video_path, fps, pipe, progress):
             )
             if result.has_pose:
                 pose_frames += 1
-            if result.shot_summary is not None:
-                shots.append(result.shot_summary)
             index += 1
             if progress is not None:
-                progress.advance(
-                    note=f"{len(shots)} shot(s) found" if shots else ""
-                )
+                progress.advance(note="reading")
         cap.release()
+
+    # Segmentation happens HERE, once, with the whole video decoded -- not
+    # frame by frame on the way past.
+    #
+    # A shot is a shape in time: the hand rises out of a stance and comes back
+    # down. Deciding at frame 400 whether frame 400 is part of one means
+    # guessing at what frames 401-460 will do, and every timeout, hysteresis
+    # window and latch in the old detector existed to cover that guess. None of
+    # them is needed once the file has been read, because it has all already
+    # happened.
+    shots = pipe.segment_offline()
+    if progress is not None:
+        progress.advance(note=f"{len(shots)} shot(s) found")
     return shots, pose_frames, index
 
 
@@ -194,15 +203,17 @@ def analyze_video(
     fps = meta.fps
     pipe = ShotAnalysisPipeline(enable_ball=enable_ball, player=profile)
     pipe.set_fps(fps)
+    # Uploading a file is an offline task, so it is analysed as one.
+    pipe.enable_offline_segmentation()
 
     progress = progress_factory(meta) if progress_factory is not None else None
     shots, pose_frames, index = _decode_and_analyse(video_path, fps, pipe, progress)
     if progress is not None:
         progress.finish(f"Analysed {index} frames in {progress.elapsed_s:.0f}s.")
 
-    trailing = pipe.finalize_session()
-    if trailing is not None:
-        shots.append(trailing)
+    # No `finalize_session()` here. That exists to close an attempt the live
+    # detector still had open when the video ended -- a problem that cannot
+    # arise when segmentation runs after the last frame is already read.
 
     pose_share = pose_frames / max(index, 1)
     run = AnalysisRun(

@@ -133,14 +133,31 @@ def _argmax(values: Sequence[Optional[float]], lo: int, hi: int) -> Optional[int
     return best_i
 
 
-def _release_span(frames: Sequence, wrist: Sequence[Optional[float]]) -> tuple:
+def _release_span(
+    frames: Sequence,
+    wrist: Sequence[Optional[float]],
+    event_index: Optional[int] = None,
+) -> tuple:
     """The frames during which the ball left the hand.
 
-    Preferred source is the state machine: it fired the anchor event, that is
-    what defines a shot, and this module should not second-guess it. The
-    fallback -- the highest point the hand reached -- only applies to a shot
-    captured without an anchor, which happens when a recording stops mid-motion.
+    `event_index` wins when the caller has one. Offline segmentation locates
+    the shooting event as the peak of the hand's own trajectory across the
+    whole video, which is a better answer than anything derivable from inside
+    the window -- and, critically, it does not come from the live detector.
+
+    That matters because the frames still carry the live detector's labels. On
+    an attempt where it entered `release` early, every frame from the window's
+    start was marked, `release_start` landed at 0, and the dip and the lift had
+    nowhere to live: a 2.4 s shot reported three phases out of seven, with no
+    knee bend for the loading rules to score.
+
+    The state machine remains the source when no event is supplied, which is
+    the live path, where its anchor is the only evidence available.
     """
+    if event_index is not None:
+        clamped = max(0, min(int(event_index), len(frames) - 1))
+        return clamped, min(len(frames), clamped + 1)
+
     marked = [i for i, s in enumerate(frames) if s.phase == CORE_ANCHOR]
     if marked:
         return marked[0], marked[-1] + 1
@@ -152,7 +169,9 @@ def _release_span(frames: Sequence, wrist: Sequence[Optional[float]]) -> tuple:
     return peak, min(len(frames), peak + 1)
 
 
-def compute_cuts(frames: Sequence) -> PhaseCuts:
+def compute_cuts(
+    frames: Sequence, event_index: Optional[int] = None
+) -> PhaseCuts:
     """Locate every coaching-phase boundary in one captured shot."""
     n = len(frames)
     if n == 0:
@@ -163,7 +182,7 @@ def compute_cuts(frames: Sequence) -> PhaseCuts:
     knee = [(f.knee_angle if f is not None else None) for f in feats]
     rise = [(f.body_rise_ratio if f is not None else None) for f in feats]
 
-    release_start, release_end = _release_span(frames, wrist)
+    release_start, release_end = _release_span(frames, wrist, event_index)
 
     # --- the dip -----------------------------------------------------------
     # Bottom of the countermovement, by definition the smallest knee angle
@@ -276,6 +295,6 @@ def _hand_has_dropped(f) -> bool:
     return False
 
 
-def refine_phases(frames: Sequence) -> List[str]:
+def refine_phases(frames: Sequence, event_index: Optional[int] = None) -> List[str]:
     """Coaching phase for every frame of one captured shot."""
-    return compute_cuts(frames).as_labels()
+    return compute_cuts(frames, event_index).as_labels()

@@ -74,6 +74,21 @@ class KinematicFeatures:
     hip_x_ratio: float = 0.0
     body_pixel_height: float = 0.0
 
+    # The RAW ankle height in image space, before any baseline is subtracted.
+    #
+    # `body_rise_ratio` above already answers "how high are the feet?", but it
+    # answers it against a baseline that adapts frame by frame, and that choice
+    # is baked in by the time anyone downstream sees the number. Shot typing
+    # needs a different baseline -- one taken locally, just before this
+    # attempt -- because the floor's height IN THE IMAGE depends on where the
+    # player is standing, so a single figure for a whole clip is only valid
+    # while the player never moves.
+    #
+    # Keeping the raw measurement alongside the derived one lets each consumer
+    # pick its own reference. None means the ankles were not seen; it is never
+    # 0.0, which would read as "ankles at the top of the frame".
+    ankle_image_y: Optional[float] = None
+
     # Wrist height, also from image space, as a fraction of on-screen body
     # height above the hip line. Positive means above the hips.
     #
@@ -328,6 +343,7 @@ def extract_features(
         body_rise_ratio=body_rise_ratio,
         hip_x_ratio=hip_x_ratio,
         body_pixel_height=body_height_norm,
+        ankle_image_y=ankle_img_y,
         wrist_height_ratio=wrist_above_hip,
         wrist_height_velocity=wrist_ratio_velocity,
         wrist_above_shoulder_ratio=wrist_above_shoulder,

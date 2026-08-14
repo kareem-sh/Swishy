@@ -47,6 +47,7 @@ from feedback.phase_refiner import refine_phases
 from feedback.scorer import score_shot
 from phase_detection.phases import CORE_ACTIVE, CORE_ANCHOR, CORE_REST, PHASE_LABELS
 from shots.classifier import AttemptEvidence, classify
+from shots.elevation import shooting_event_ms, takeoff_elevation
 from shots.types import RejectionReason, ShotType
 from utils.config_loader import load_yaml
 from utils.frame_buffer import FrameSnapshot
@@ -95,6 +96,11 @@ class _Candidate:
     wrist_ratio_max: float = float("-inf")
     wrist_ratio_shoulder_max: float = float("-inf")
     wrist_world_seen: bool = False
+    ankle_image_seen: bool = False
+    # Frame offset of the shooting event, when a caller decided the bounds
+    # offline and therefore already knows where the hand peaked. None on the
+    # live path, where the state machine's anchor is the only evidence.
+    event_index: Optional[int] = None
     vertical_displacement_max: float = 0.0
     hip_x_min: float = float("inf")
     hip_x_max: float = float("-inf")
@@ -114,6 +120,8 @@ class _Candidate:
             self.wrist_above_shoulder_max = max(
                 self.wrist_above_shoulder_max, f.wrist_y - f.shoulder_y
             )
+        if f.ankle_image_y is not None:
+            self.ankle_image_seen = True
         if f.wrist_height_ratio is not None:
             self.wrist_ratio_min = min(self.wrist_ratio_min, f.wrist_height_ratio)
             self.wrist_ratio_max = max(self.wrist_ratio_max, f.wrist_height_ratio)
@@ -156,9 +164,61 @@ class _Candidate:
             return 0.0
         return float(self.hip_x_max - self.hip_x_min)
 
+    def takeoff_elevation(self) -> Optional[float]:
+        """Elevation at the shooting event, against a stance baseline.
+
+        Preferred over `vertical_displacement_max` because that figure is a
+        running maximum of `body_rise_ratio` across the whole attempt, and
+        `body_rise_ratio` is measured against a baseline that adapts frame by
+        frame. Two failure modes follow from that, both observed:
+
+          - the adaptive baseline drifts upward during a long flight, so the
+            jump it is meant to measure shrinks as it happens (worst in slow
+            motion, where the flight lasts longest);
+          - a maximum over the whole attempt catches the player walking out to
+            collect the ball, which reads as elevation because standing
+            further away also lifts the feet in the image.
+
+        Returns None when the stance cannot be observed, so the caller can
+        decline to classify instead of guessing.
+        """
+        timestamps = [f.timestamp_ms for f in self.frames]
+        ankles = [
+            f.features.ankle_image_y if f.features is not None else None
+            for f in self.frames
+        ]
+        heights = [
+            f.features.body_pixel_height if f.features is not None else 0.0
+            for f in self.frames
+        ]
+        wrists = [
+            f.features.wrist_height_ratio if f.features is not None else None
+            for f in self.frames
+        ]
+        event_ms = shooting_event_ms(timestamps, wrists)
+        if event_ms is None:
+            return None
+        return takeoff_elevation(timestamps, ankles, heights, wrists, event_ms)
+
     def evidence(self) -> AttemptEvidence:
+        elevation = self.takeoff_elevation()
+        # Two different reasons the stance measurement can be missing, and only
+        # one of them justifies refusing to classify.
+        #
+        # If the ankles were never seen in image space at all, there is nothing
+        # to be strict about -- fall back to the legacy figure, which is what
+        # every consumer had before this measurement existed.
+        #
+        # If the ankles WERE seen but no stance preceded the shot, we know the
+        # recording opened mid-attempt. That is a real, identifiable gap in the
+        # evidence, and guessing SET there mislabels a jump shot and then
+        # scores it against the wrong mechanics.
+        measured = elevation is not None or not self.ankle_image_seen
         return AttemptEvidence(
-            vertical_displacement_m=self.vertical_displacement_max,
+            vertical_displacement_m=(
+                self.vertical_displacement_max if elevation is None else elevation
+            ),
+            vertical_displacement_measured=measured,
             horizontal_travel_m=self.horizontal_travel_m,
             wrist_rise_m=self.wrist_rise_m,
             wrist_above_shoulder_m=(
@@ -572,7 +632,7 @@ class ShotTracker:
         """
         if not c.frames:
             return []
-        labels = refine_phases(c.frames)
+        labels = refine_phases(c.frames, c.event_index)
         out: List[FrameSnapshot] = []
         for snap, label in zip(c.frames, labels):
             analysis = snap.analysis
@@ -583,7 +643,57 @@ class ShotTracker:
             out.append(replace(snap, phase=label, analysis=analysis))
         return out
 
-    def _finalize(self, now_ms: int, force: bool = False) -> Optional[ShotSummary]:
+    def finalize_window(
+        self, frames: Sequence[FrameSnapshot], peak_ms: Optional[int] = None
+    ) -> Optional[ShotSummary]:
+        """Score one attempt whose bounds were decided offline.
+
+        The live path discovers an attempt while it is happening and must judge
+        the evidence as it arrives. Here the bounds already came from
+        `shots.segmenter`, which saw the whole video, so the questions the live
+        path asks -- has the wrist travelled far enough, did a release happen,
+        has the body finished -- are already answered by the window existing at
+        all. What remains is the part that was never the problem: relabel the
+        phases, classify, score.
+
+        Landing is not required. Offline bounds are cut where the hand comes
+        back down, so an attempt whose landing falls outside the window is
+        bounded correctly, not truncated.
+        """
+        usable = [f for f in frames if f is not None]
+        if not usable:
+            return None
+
+        candidate = _Candidate(
+            started_ms=usable[0].timestamp_ms,
+            entry_phase=usable[0].phase,
+            mid_start=False,
+        )
+        for snapshot in usable:
+            candidate.observe(snapshot)
+        # The peak IS the shooting event: the segmenter found this window
+        # because the hand rose and came back down around it.
+        candidate.reached_release = True
+        candidate.release_ms = peak_ms if peak_ms is not None else candidate.last_ms
+        if peak_ms is not None:
+            candidate.event_index = min(
+                range(len(usable)),
+                key=lambda i: abs(usable[i].timestamp_ms - peak_ms),
+            )
+        candidate.body_finished = True
+        candidate.body_finished_ms = candidate.last_ms
+
+        previous, self._candidate = self._candidate, candidate
+        try:
+            return self._finalize(
+                candidate.last_ms, force=True, trust_bounds=True
+            )
+        finally:
+            self._candidate = previous
+
+    def _finalize(
+        self, now_ms: int, force: bool = False, trust_bounds: bool = False
+    ) -> Optional[ShotSummary]:
         c = self._candidate
         if c is None:
             return None
@@ -597,7 +707,14 @@ class ShotTracker:
         # that the body was seen to land. It must NOT relax the evidence that
         # a shot happened at all -- a clip that stops during a stray movement
         # would otherwise be closed out as a scored shot.
-        if not self._is_credible(c, require_landing=not force):
+        # The credibility check asks whether a shot happened at all. Offline
+        # bounds have already answered that: the window exists because the hand
+        # rose more than half a body height above everything around it, which
+        # is stronger evidence than any of the live thresholds below. Re-asking
+        # discards real shots -- measured, it threw away the only attempt in
+        # video_07 and in video_01, both of which the segmenter had located
+        # correctly.
+        if not trust_bounds and not self._is_credible(c, require_landing=not force):
             self._discard()
             return None
 

@@ -62,6 +62,31 @@ GROUND_TRUTH_SHOTS = {
 }
 
 
+def _round_or_none(value: Optional[float]) -> Optional[float]:
+    return None if value is None else round(value, 5)
+
+
+def _foot_y(image_landmarks, names: tuple) -> Optional[float]:
+    """Mean image y of the named foot landmarks, or None if unseen.
+
+    Separate from `_image_metrics` because the ankle cannot answer the
+    question these landmarks exist for. Rising onto the balls of the feet
+    lifts the ANKLE by 5-8 cm without the foot leaving the floor -- the same
+    magnitude as a light jump. The TOE stays down through that rise and only
+    lifts when the foot actually leaves the ground, so toe and ankle together
+    separate "on tiptoe" from "airborne", which either alone cannot.
+    """
+    if not image_landmarks:
+        return None
+    seen = []
+    for name in names:
+        lm = image_landmarks.get(name)
+        if lm is None or float(lm.get("visibility", 0.0)) < 0.5:
+            continue
+        seen.append(float(lm["y_norm"]))
+    return float(np.mean(seen)) if seen else None
+
+
 def _stillness_threshold() -> float:
     """Speed below which the player counts as standing still, in m/s.
 
@@ -133,6 +158,12 @@ def extract(video_path: Path) -> dict:
                     else round(float(features.wrist_height_ratio), 5)
                 ),
                 "ankle_img_y": None if ankle_img_y is None else round(ankle_img_y, 5),
+                "toe_img_y": _round_or_none(
+                    _foot_y(result.image_landmarks, ("left_foot_index", "right_foot_index"))
+                ),
+                "heel_img_y": _round_or_none(
+                    _foot_y(result.image_landmarks, ("left_heel", "right_heel"))
+                ),
                 "body_h": round(float(body_height), 5),
                 "vel": (
                     0.0 if features is None else round(float(features.total_velocity), 4)
@@ -260,6 +291,49 @@ def _fallback_peaks(signal: np.ndarray, prominence: float, distance: int) -> tup
         np.array([lefts[k] for k in kept], dtype=float),
         np.array([rights[k] for k in kept], dtype=float),
     )
+
+
+def evidence_window(
+    signal: np.ndarray, peak: int, fraction: float = 0.25, max_span: int = 10**9
+) -> tuple:
+    """Bound one attempt by where the hand was last down, not by a fraction
+    of prominence.
+
+    `peak_widths(rel_height=...)` descends a share of the PROMINENCE and then
+    runs outward until the signal crosses that level. On practice footage the
+    player walks between reps holding the ball, so the signal never returns
+    that low and the window runs away -- measured at 25 s for a 2 s shot.
+
+    Descending a share of THIS PEAK'S OWN RISE instead gives a level the signal
+    is guaranteed to have crossed, because the peak rose from it.
+    """
+    n = len(signal)
+    lo_bound = max(0, peak - max_span)
+    hi_bound = min(n - 1, peak + max_span)
+
+    left_floor = float(np.min(signal[lo_bound:peak + 1]))
+    right_floor = float(np.min(signal[peak:hi_bound + 1]))
+    left_cut = left_floor + fraction * (signal[peak] - left_floor)
+    right_cut = right_floor + fraction * (signal[peak] - right_floor)
+
+    start = peak
+    while start > lo_bound and signal[start] > left_cut:
+        start -= 1
+    end = peak
+    while end < hi_bound and signal[end] > right_cut:
+        end += 1
+
+    # The cuts above land where the hand STARTS rising and where it finishes
+    # dropping, which is the lift and the release -- but a coaching report also
+    # talks about the knee dip that precedes the lift and the landing that
+    # follows the finish, and the hand is already low through both. So the
+    # window is extended outward while the hand STAYS low, and capped, because
+    # "the hand is low" is also true of the entire walk to fetch the ball.
+    while start > lo_bound and signal[start - 1] <= left_cut:
+        start -= 1
+    while end < hi_bound and signal[end + 1] <= right_cut:
+        end += 1
+    return start, end
 
 
 def _interpolate(signal: List[Optional[float]]) -> np.ndarray:
