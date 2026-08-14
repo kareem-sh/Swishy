@@ -579,6 +579,25 @@ class ShotAnalysisPipeline:
     ) -> FrameResult:
         self._frame_index += 1
         timestamp_s = timestamp_ms / 1000.0
+
+        # Recorded for EVERY call, before any early return.
+        #
+        # This used to sit further down, after the no-pose branch had already
+        # returned, so frames where MediaPipe found nobody were simply absent
+        # from the list. The list then ran shorter than the video, and playback
+        # drew frame N's skeleton over frame N+k's pixels -- the skeleton
+        # appearing to run ahead of the player, by one frame for every frame
+        # ever missed. A parallel array is only parallel if it is appended to
+        # unconditionally.
+        if self._offline_landmarks is not None:
+            marks = None
+            if detection_result and getattr(detection_result, "pose_landmarks", None):
+                marks = [
+                    (float(lm.x), float(lm.y))
+                    for lm in detection_result.pose_landmarks[0]
+                ]
+            self._offline_landmarks.append((timestamp_ms, marks))
+
         ball, rim, ball_snapshot = self._process_ball(bgr_frame, timestamp_ms)
 
         raw = extract_all_landmarks(detection_result, width, height)
@@ -719,14 +738,6 @@ class ShotAnalysisPipeline:
         self._frame_buffer.push(snapshot)
         if self._offline_history is not None:
             self._offline_history.append(snapshot)
-        if self._offline_landmarks is not None:
-            marks = None
-            if detection_result and getattr(detection_result, "pose_landmarks", None):
-                marks = [
-                    (float(lm.x), float(lm.y))
-                    for lm in detection_result.pose_landmarks[0]
-                ]
-            self._offline_landmarks.append(marks)
 
         completed_shot = self._shot_tracker.update(
             phase,
@@ -1194,13 +1205,24 @@ class ShotAnalysisPipeline:
             # Record the per-frame labels a viewer needs. These are the refined
             # coaching phases, not the four detector states, so what is drawn
             # on the video is what the report talks about.
+            # Keyed by TIMESTAMP, not by index. `_offline_history` holds only
+            # frames where a pose was found, so its indices are not video frame
+            # numbers and never were; the timestamp is the one identifier both
+            # sides agree on.
             labels = refine_phases(frames, peak - start)
-            for offset, label in enumerate(labels):
-                self._offline_overlay[start + offset] = (
-                    summary.shot_number,
-                    label,
-                    summary.score,
-                )
+            for snap, label in zip(frames, labels):
+                angles = {
+                    name: round(result.degrees, 1)
+                    for name, result in (snap.angles or {}).items()
+                    if result is not None and result.is_valid
+                    and result.degrees is not None
+                }
+                self._offline_overlay[snap.timestamp_ms] = {
+                    "shot": summary.shot_number,
+                    "phase": label,
+                    "score": summary.score,
+                    "angles": angles,
+                }
         return summaries
 
     def finalize_session(self) -> Optional[ShotSummary]:

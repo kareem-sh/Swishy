@@ -50,13 +50,13 @@ VIDEO = "assets/videos/salah_video.mp4"
 # Your height in centimetres, or None. Never estimated from the camera: a
 # single lens cannot separate a tall player from a near one. Without it, the
 # height-relative metrics are skipped and everything else still runs.
-HEIGHT_CM = None
+HEIGHT_CM = 178
 
 # "auto" picks the shooting hand from the footage.
 SHOOTING_HAND = "auto"
 
 # Ball and rim detection. Slower (loads YOLO) and only affects make/miss.
-ENABLE_BALL = False
+ENABLE_BALL = True
 
 # After the report is printed, replay the video with the analysis drawn on it.
 # The drawing shows the FINAL phase of every frame, which is why it can only
@@ -98,7 +98,14 @@ def main() -> int:
     if SHOW_VIDEO and run.landmarks:
         from modes.replay import replay
 
-        replay(path, run.landmarks, run.overlay, shot_count=len(run.shots))
+        side = run.shots[0].shooting_side if hasattr(run.shots[0], "shooting_side") else "right"
+        replay(
+            path,
+            run.landmarks,
+            run.overlay,
+            shot_count=len(run.shots),
+            shooting_side=side,
+        )
     return 0
 
 
