@@ -2,6 +2,7 @@
 
 from typing import Dict, List
 
+from analysis.engine import BiomechanicsEngine
 from analysis.models import RuleOutcome, RuleResult
 from feedback.models import PhaseScore, ShotSummary
 from phase_detection.phases import ACTIVE_PHASES, PHASE_LABELS, PHASE_ORDER
@@ -256,6 +257,53 @@ def _make_phase_score(phase: str, label: str, all_rules: List[RuleResult],
     )
 
 
+def _hold_rule(hold_s) -> RuleResult | None:
+    """The follow-through hold, as a RuleResult, from a shot-level measurement.
+
+    WHY THIS IS NOT AN ORDINARY RULE. `BiomechanicsEngine` evaluates one frame
+    at a time and has no way to know when the release happened, so "seconds the
+    arm stayed up after the ball left" cannot be a per-frame metric. It is
+    measured once per shot by `phase_refiner.hold_duration_s` -- from the
+    shooting event until the hand falls back below the shoulder, across every
+    captured frame regardless of phase label -- and attached here.
+
+    Everything else about it is an ordinary rule: bands, messages, severity and
+    `scored` all come from biomechanics.yaml, so it is tuned in the same place
+    as the rest and nothing about it is hardcoded.
+
+    Returns None when the hand never came back down inside the clip. A
+    recording that stopped early is not a perfect follow-through and not a
+    dropped one -- it is not a measurement, and must not become a score.
+    """
+    if hold_s is None:
+        return None
+    cfg = ((load_yaml("biomechanics.yaml") or {}).get("rules", {}) or {})
+    rule = cfg.get("follow_through_hold")
+    if not rule:
+        return None
+
+    min_v, max_v = rule.get("min"), rule.get("max")
+    ideal_min, ideal_max = rule.get("ideal_min"), rule.get("ideal_max")
+    outcome = BiomechanicsEngine._classify(hold_s, min_v, max_v, ideal_min, ideal_max)
+    return RuleResult(
+        rule_id="follow_through_hold",
+        name=rule.get("name", "Holding the Finish"),
+        passed=outcome is not RuleOutcome.NEEDS_WORK,
+        severity=rule.get("severity", "warning"),
+        message=BiomechanicsEngine._message(rule, outcome, hold_s, ideal_min, ideal_max),
+        phase="follow_through",
+        measured_value=hold_s,
+        min_value=min_v,
+        max_value=max_v,
+        ideal_min=ideal_min,
+        ideal_max=ideal_max,
+        unit=rule.get("unit", "s"),
+        scored=bool(rule.get("scored", True)),
+        outcome=outcome,
+        confidence=0.9,
+    )
+
+
 def _expected_rules(phase: str, shot_type) -> List[str]:
     """Scored rules that SHOULD have produced a value for this phase.
 
@@ -366,6 +414,7 @@ def score_shot(
     ended_early: bool = False,
     entry_phase: str | None = None,
     shot_type=None,
+    hold_s: float | None = None,
 ) -> ShotSummary:
     """Compute per-phase scores and an overall 0-100 score for one shot."""
     cfg = load_yaml("scoring.yaml")
@@ -373,6 +422,12 @@ def score_shot(
     min_rules = int(cfg.get("min_evaluated_rules", 1))
 
     rule_list = list(_aggregate_rules(frames).values())
+
+    # The follow-through hold is measured once per shot, not per frame, so it
+    # joins the rule list here rather than coming out of the engine.
+    hold_rule = _hold_rule(hold_s)
+    if hold_rule is not None:
+        rule_list.append(hold_rule)
 
     if not rule_list:
         return ShotSummary(

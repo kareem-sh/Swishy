@@ -43,7 +43,7 @@ from ball.models import ShotOutcome
 from feedback.generator import generate_coaching_tips
 from feedback.models import ShotSummary
 from feedback.performance_plan import build_shot_performance_plan
-from feedback.phase_refiner import refine_phases
+from feedback.phase_refiner import hold_duration_s, refine_phases
 from feedback.scorer import score_shot
 from phase_detection.phases import CORE_ACTIVE, CORE_ANCHOR, CORE_REST, PHASE_LABELS
 from shots.classifier import AttemptEvidence, classify
@@ -754,6 +754,7 @@ class ShotTracker:
                 frames,
                 self.shot_count,
                 shot_type=getattr(classification.shot_type, "value", None),
+                hold_s=hold_duration_s(frames, c.event_index),
                 started_mid_phase=c.mid_start,
                 ended_early=not c.body_finished,
                 entry_phase=frames[0].phase if frames else c.entry_phase,

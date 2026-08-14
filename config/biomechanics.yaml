@@ -60,7 +60,7 @@ rules:
     ideal_min: 100
     ideal_max: 128
     severity: info
-    scored: true
+    scored: false          # DEMOTED -- see evidence below
     message_excellent: "Good load. That shot's powered from the floor, which is what you want."
     refine_low: "Your legs are loading well. Sink slightly less so you can rise in one smooth motion."
     refine_high: "Your leg load is good. Sit a little deeper before you rise to build more lift."
@@ -836,13 +836,82 @@ rules:
     ideal_min: 155
     ideal_max: 180
     severity: warning
-    scored: true
+    scored: false          # redundant with release -- see evidence
     message_excellent: "You hold the finish well after the ball's gone."
     refine_low: "Good finish. Hold the reach toward the rim a moment longer."
     message_low: "Keep your elbow up after the ball leaves. It drops straight away — hold the reach toward the rim until the ball gets there."
     evidence: >
       ENGINEERING DECISION. Holding the follow-through is standard coaching
       practice; no published angular threshold was found. Thresholds are ours.
+
+  follow_through_hold:
+    name: "Holding the Finish"
+    metric: hold_duration          # SHOT-LEVEL: see scorer._hold_rule
+    phases: [follow_through]
+    min: 0.25
+    ideal_min: 0.50
+    unit: "s"
+    severity: warning
+    scored: true
+    message_excellent: "You hold the finish while the ball is in the air. That is exactly it."
+    refine_low: "Good finish. Keep the hand up there until the ball reaches the rim."
+    message_low: "The arm comes down as soon as the ball goes. Leave it up and pointed at the rim until the shot lands."
+    evidence: >
+      ENGINEERING DECISION, and it replaces a rule that was measuring the wrong
+      thing. No published threshold for follow-through duration was found; the
+      numbers are ours.
+
+      WHY THIS EXISTS: THE ELBOW RULE WAS A DUPLICATE. `follow_through_elbow`
+      and `elbow_extension_release` are the same metric with the same
+      aggregation in adjacent windows, and once `release` widened to cover the
+      real extension they became the same measurement. Measured across 45
+      shots:
+
+          release   p25 147.0   median 152.3   p75 157.0   max 178.9
+          follow    p25 143.7   median 151.9   p75 160.3   max 178.8
+          decay     p25  -9.9   median   2.3   p75   6.9
+
+      A median decay of 2.3 deg, distributed symmetrically about zero with a
+      NEGATIVE lower quartile. The two distributions are indistinguishable, so
+      scoring both counted the elbow twice in the overall score and told the
+      player nothing new the second time.
+
+      An earlier note in this file guessed the opposite -- that the widened
+      release had left `follow_through_elbow` measuring the hold at last, and
+      that its rising failure rate was a real finding about players dropping
+      their arms. The measurement above refutes that. It is recorded because
+      the guess was reasonable and wrong, and the only reason it did not become
+      a band change is that it was measured first.
+
+      WHAT THE PHASE ACTUALLY CONTAINS THAT NOTHING ELSE DOES: duration.
+      Observed hold across the same shots runs 0.03 s to 1.17 s -- a factor of
+      forty between a player who holds the finish and one who drops it at
+      release. That spread was sitting unscored while the angle was scored
+      twice.
+
+      THE NUMBERS ARE OURS AND ARE NOT DERIVED FROM THE OBSERVED SPREAD.
+      0.25 s is roughly the point below which the arm is falling at release
+      rather than being held at all. 0.50 s is the coached behaviour -- hold
+      until the ball is well on its way. Deliberately NOT fitted to our
+      distribution's quartiles, because a band drawn through the sample would
+      simply relabel whatever these particular shooters happen to do.
+
+      HOW IT IS MEASURED, and why it is not an ordinary rule. The engine
+      evaluates one frame at a time and has no way to know when the release
+      happened, so this cannot be a per-frame metric. It comes from
+      `feedback.phase_refiner.hold_duration_s`, which measures the arm directly
+      -- from the shooting event until the hand falls back below the shoulder,
+      across every captured frame regardless of phase label -- and is injected
+      into this phase by `feedback.scorer`. It deliberately ignores the
+      `follow_through` phase boundaries: that phase is pinned to
+      `min_follow_through_s` at one end and to the landing at the other, and on
+      salah_video it was exactly 5 frames on all five shots, which makes it
+      useless as a witness for the thing it is named after.
+
+      NOT OBSERVED IS NOT ZERO. When the hand never comes back down inside the
+      clip, `hold_duration_s` returns None and this rule is skipped rather than
+      scored -- a recording that stopped early must not be read as a perfect
+      follow-through, nor as a dropped one.
 
   follow_through_index:
     name: "Finish Position"
