@@ -38,8 +38,15 @@ import cv2  # noqa: E402
 from mediapipe.tasks.python import vision  # noqa: E402
 
 from angles.calculator import AngleCalculator  # noqa: E402
+from config.settings import (  # noqa: E402
+    PRESENCE_THRESHOLD,
+    VISIBILITY_HOLD_FRAMES,
+    VISIBILITY_REQUIRE_PRESENCE,
+    VISIBILITY_THRESHOLD,
+)
 from pose.detector import PoseDetector  # noqa: E402
 from pose.landmarks import extract_all_landmarks  # noqa: E402
+from pose.visibility import VisibilityGate  # noqa: E402
 
 # Drawn pairs. Face points are left out: nothing here is measured from them.
 CONNECTIONS = (
@@ -88,7 +95,17 @@ def main() -> int:
         return 2
 
     detector = PoseDetector(vision.RunningMode.VIDEO)
-    calculator = AngleCalculator()
+    # The same gate the pipeline uses, with the same settings, so an angle
+    # shown here is judged reliable by exactly the rule that governs it in a
+    # report. A tool that measured under laxer rules would be worse than no
+    # tool: it would clear a joint the pipeline goes on to reject.
+    gate = VisibilityGate(
+        visibility_threshold=VISIBILITY_THRESHOLD,
+        presence_threshold=PRESENCE_THRESHOLD,
+        hold_frames=VISIBILITY_HOLD_FRAMES,
+        require_presence=VISIBILITY_REQUIRE_PRESENCE,
+    )
+    calculator = AngleCalculator(gate)
 
     print("\n  Live angle check. Q quit | SPACE freeze | H hide skeleton\n")
     print("  Sanity test: straighten your arm (elbow -> ~180), then bend it")
@@ -126,7 +143,17 @@ def main() -> int:
             _panel(frame, 0, 0, 360, 60)
             _text(frame, "No person detected", 14, 38, (60, 90, 255), 0.7, 2)
         else:
-            angles = calculator.compute_all(raw["world"], args.side)
+            # Same order as pipeline.process_frame: gate the landmarks, then
+            # measure. The gate marks each landmark reliable or not, and the
+            # calculator refuses to build an angle from an unreliable one --
+            # skip it and every angle comes back invalid.
+            #
+            # The One Euro filter the pipeline also runs is deliberately NOT
+            # applied here. It smooths across frames, and smoothing is exactly
+            # what you do not want when the question is "does this instant read
+            # correctly?" -- it would hide the jitter this tool exists to show.
+            world = gate.apply(raw["world"])
+            angles = calculator.compute_all(world, args.side)
 
             if show_skeleton and result.pose_landmarks:
                 pts = [(int(lm.x * w), int(lm.y * h))
