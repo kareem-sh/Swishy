@@ -180,6 +180,15 @@ rules:
       measurement error. We would be scoring noise. Displayed for
       observability only.
 
+      CONFIRMED ON OUR OWN FOOTAGE. The published figure above came from the
+      literature; it has now been reproduced here. Measured on salah_video.mp4,
+      the 3D shoulder angle sits +11.6 deg from the same angle measured flat in
+      the image, and MediaPipe's full and heavy models disagree with each other
+      about it by a mean of 8.6 deg. Both are of the same order as the entire
+      effect the rule would be detecting. The decision to display and not score
+      is therefore ours by measurement, not only by citation.
+      scripts/measure_angle_uncertainty.py; docs/LIMITS.md.
+
       NOTE ON THE RANGE: min/max 55-135 predates this evidence and implies
       that a high shoulder is acceptable while a low one is not, which is
       backwards relative to the finding above (proficient mean 52.3 sits
@@ -272,6 +281,26 @@ rules:
 
       Also note 180 deg is NOT the target. Full lockout is outside the norm
       in both groups, which is why message_high exists.
+
+      DO NOT NARROW THE IDEAL BAND. Measured since: MediaPipe's own full and
+      heavy models, on the same frames of salah_video.mp4, disagree about the
+      elbow by a mean of 11.5 deg (median 9.2, p90 23.8) and differ by more
+      than 10 deg on 46% of frames. That is a LOWER bound on our error, and it
+      does not improve on high-confidence frames -- restricted to landmarks
+      scoring visibility > 0.9 it rises slightly, to 11.6 deg and 52%.
+
+      The ideal band 152-168 has a half-width of 8 deg, roughly the size of
+      that uncertainty. Consequence, stated plainly so it is not rediscovered
+      as a bug: the EXCELLENT-versus-GOOD split on this rule is a WEAK signal.
+      A player truly at 160 can measure anywhere from about 148 to 172. The
+      outer band (142-180, 38 deg wide) is comfortably clear of the noise, so
+      the NEEDS WORK verdict remains trustworthy -- it is only the inner
+      distinction that is soft.
+
+      The band is kept wide on purpose. Tightening it toward the published
+      SD of 1.4 deg would make the rule look precise while making it less
+      true. Re-measure with scripts/measure_angle_uncertainty.py before
+      revisiting. docs/LIMITS.md carries the full table.
 
       resources.md A3, D4; Cabarkapa et al. 2023 (PMC10436204).
 

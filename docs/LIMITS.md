@@ -11,8 +11,62 @@ Written down so a limitation cannot quietly be presented as a result.
 | Clip cut at the release | no shot found | no valley for prominence, no stance for elevation |
 | Broadcast footage | 1 of 6 types correct | camera zoomed 4.7× in 2.5 s; a free throw measured 0.638 body heights of "rise" |
 | `video9` | 8 test failures | stance baselines read negative; unresolved |
+| `video8.mov` shot 4 | typed jump, is a set shot | borderline elevation; flipped when the One Euro lag was fixed. Same clip in isolation types correctly. No test covers it |
 | A catch | scored as a shot | same body movement as a shot; needs the ball |
 | Make / miss | mostly unanswered | ball outcome not joined to the offline path |
+
+---
+
+## How precise an angle is
+
+Measured, not estimated. There is no protractor in the footage, so accuracy
+cannot be checked directly — but uncertainty can be **bounded** without any
+ground truth, by running the same frames through MediaPipe's own lite, full and
+heavy models. All three are Google's and equally plausible; wherever two differ,
+one is wrong by at least that much. Reproduce with
+`scripts/measure_angle_uncertainty.py`.
+
+`full` vs `heavy`, 448 sampled frames of `salah_video.mp4`:
+
+| Angle | mean | median | p90 | disagree > 10° |
+|---|---|---|---|---|
+| **Elbow** | **11.5°** | 9.2° | 23.8° | **46%** |
+| Knee | 8.9° | 7.3° | 17.2° | 32% |
+| Shoulder | 8.6° | 5.7° | 17.8° | 26% |
+| Hip | 6.2° | 4.6° | 12.0° | 16% |
+
+Two findings matter more than the table itself.
+
+**Confidence does not identify the reliable frames.** Restricted to frames
+where every landmark scores `visibility > 0.9`, elbow disagreement *rose*
+slightly (11.5° → 11.6°) and the share differing by more than 10° went from 46%
+to 52%. You cannot filter your way to precision using MediaPipe's own score.
+
+**`heavy` is not the fix.** Its forearm length varies more than `full`'s
+(CV 18.1% vs 14.8%). The larger model reconstructs the arm *worse* here.
+Bone-length variation overall runs 5–18%: a forearm was reconstructed as short
+as 4 cm on some frames, which is anatomically impossible and marks frames where
+the depth estimate collapses.
+
+### What this means for the rules
+
+Band widths in `config/biomechanics.yaml` must be read against these numbers.
+
+| Rule | Outer band | Ideal band | Uncertainty | Verdict |
+|---|---|---|---|---|
+| Elbow at release | 142–180 (**38°**) | 152–168 (**16°**) | ~11.5° | outer sound, ideal marginal |
+| Knee at loading | 80–145 (65°) | 100–128 (28°) | ~8.9° | sound |
+| Hip at loading | 110–168 (58°) | 125–152 (27°) | ~6.2° | sound |
+
+So `[CHANGE]` — a value outside the outer band — is trustworthy: a deviation
+that large is real. But the split between `[ON TARGET]` and `[REFINE]` on the
+**elbow** is a weak signal, because the ideal band's half-width (8°) is about
+the size of the measurement uncertainty. It is reported, and deliberately not
+narrowed. Narrowing it would borrow a precision that does not exist.
+
+The defensible claim is *"this system detects gross deviations from a shooting
+pattern"*. The indefensible one is *"your elbow was 157°, target 160°"* — a 3°
+claim on an 11° instrument.
 
 ---
 
