@@ -39,6 +39,15 @@ class PhaseScore:
     refinements: List[str] = field(default_factory=list)
     fixes: List[str] = field(default_factory=list)
     measured: List[RuleResult] = field(default_factory=list)  # displayed, not scored
+    # Why this phase carries no score, when it carries none.
+    #
+    # A phase the player PERFORMED must never be shown as a silent blank. If it
+    # happened and we could not measure it, that is a fact about the FOOTAGE,
+    # and the report says so and says which measurement was missing. Empty
+    # string means the phase either has a score or has nothing to score by
+    # design -- `jump` in a set shot, where no rule applies because the player
+    # never left the floor.
+    unmeasured_reason: str = ""
 
     @property
     def evaluated(self) -> bool:

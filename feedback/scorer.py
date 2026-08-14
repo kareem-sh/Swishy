@@ -4,7 +4,7 @@ from typing import Dict, List
 
 from analysis.models import RuleOutcome, RuleResult
 from feedback.models import PhaseScore, ShotSummary
-from phase_detection.phases import PHASE_LABELS, PHASE_ORDER
+from phase_detection.phases import ACTIVE_PHASES, PHASE_LABELS, PHASE_ORDER
 from utils.config_loader import load_yaml
 from utils.frame_buffer import FrameSnapshot
 
@@ -256,30 +256,85 @@ def _make_phase_score(phase: str, label: str, all_rules: List[RuleResult],
     )
 
 
+def _expected_rules(phase: str, shot_type) -> List[str]:
+    """Scored rules that SHOULD have produced a value for this phase.
+
+    "Should" means the rule is scored and applies to this kind of shot. A rule
+    scoped to jump shots is not expected in a set shot, so its absence there is
+    the design working, not a measurement that failed.
+    """
+    cfg = (load_yaml("biomechanics.yaml") or {}).get("rules", {}) or {}
+    out = []
+    for rid, rule in cfg.items():
+        if phase not in (rule.get("phases") or []):
+            continue
+        if not rule.get("scored", True):
+            continue
+        allowed = rule.get("shot_types")
+        if allowed and (shot_type is None or shot_type not in allowed):
+            continue
+        out.append(str(rule.get("name", rid)))
+    return out
+
+
+def _unmeasured_reason(phase: str, shot_type) -> str:
+    """Why a phase the player performed carries no score.
+
+    A phase that HAPPENED must never appear as a silent blank. Either it is
+    scored, or the report says what could not be measured -- because at that
+    point the limitation is in the footage, and the person filming is the only
+    one who can fix it.
+    """
+    expected = _expected_rules(phase, shot_type)
+    if not expected:
+        # Nothing applies here by design. `jump` in a set shot is the case:
+        # the player never left the floor, so there is no flight to assess and
+        # no failure to report.
+        return ""
+    label = PHASE_LABELS.get(phase, phase.replace("_", " ").title())
+    what = ", ".join(expected)
+    return (
+        f"{label} happened, but {what} could not be measured anywhere in it. "
+        "That is a limit of this recording, not of the shot: film from the "
+        "side with the whole body in frame and the shooting arm unobscured."
+    )
+
+
 def _build_phase_scores(
     rules: List[RuleResult],
     weights: dict,
+    phases_present: List[str] | None = None,
+    shot_type=None,
 ) -> List[PhaseScore]:
     """Group rules by phase and score each phase independently."""
     by_phase: Dict[str, List[RuleResult]] = {}
     for rule in rules:
         by_phase.setdefault(rule.phase, []).append(rule)
 
+    # A phase the player performed but which produced NO rule at all never
+    # reached `by_phase`, so it would simply vanish from the report. It is
+    # added here with an explanation instead of being dropped.
+    for phase in (phases_present or []):
+        if phase in ACTIVE_PHASES:
+            by_phase.setdefault(phase, [])
+
     ordered = [p for p in PHASE_ORDER if p in by_phase]
     ordered += [p for p in by_phase if p not in PHASE_ORDER]
 
     continuous = _whole_shot_rule_ids(rules)
 
-    phase_scores = [
-        _make_phase_score(
+    phase_scores = []
+    for phase in ordered:
+        score = _make_phase_score(
             phase,
             PHASE_LABELS.get(phase, phase.replace("_", " ").title()),
             by_phase[phase],
             [r for r in by_phase[phase] if r.scored and r.rule_id not in continuous],
             weights,
         )
-        for phase in ordered
-    ]
+        if score.score is None:
+            score.unmeasured_reason = _unmeasured_reason(phase, shot_type)
+        phase_scores.append(score)
 
     # The continuous rules, gathered once. Worst outcome across the phases
     # wins, so a posture that slipped anywhere is reported as slipping.
@@ -310,6 +365,7 @@ def score_shot(
     started_mid_phase: bool = False,
     ended_early: bool = False,
     entry_phase: str | None = None,
+    shot_type=None,
 ) -> ShotSummary:
     """Compute per-phase scores and an overall 0-100 score for one shot."""
     cfg = load_yaml("scoring.yaml")
@@ -332,7 +388,9 @@ def score_shot(
             entry_phase=entry_phase,
         )
 
-    phase_scores = _build_phase_scores(rule_list, weights)
+    phase_scores = _build_phase_scores(
+        rule_list, weights, _phases_seen(frames), shot_type
+    )
 
     # Overall score is computed across every scored rule, not as a mean of
     # phase scores: averaging phase means would let a phase carrying one rule

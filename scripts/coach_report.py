@@ -302,7 +302,8 @@ def _print_phase_notes(ph) -> None:
     reported once under "Through the Whole Shot". Printing an empty heading
     for such a phase just looks broken.
     """
-    if not (ph.strengths or ph.refinements or ph.fixes or ph.measured):
+    if not (ph.strengths or ph.refinements or ph.fixes or ph.measured
+            or ph.unmeasured_reason):
         return
     header = f"{ph.score}/100" if ph.score is not None else "not scored"
     print(f"\n  --- {ph.label}  ({header}) ---")
@@ -314,6 +315,12 @@ def _print_phase_notes(ph) -> None:
         print(f"    [CHANGE]    {msg}")
     for rule in ph.measured:
         print(f"    [MEASURED]  {rule.name}: {_format_measured(rule)} (not scored)")
+    if ph.unmeasured_reason:
+        # The player did this phase. We could not measure it. Saying so, and
+        # saying it is the recording, is the only honest report -- a blank
+        # reads as "nothing happened here", which is a different and untrue
+        # statement about their shot.
+        print(f"    [FILMING]   {ph.unmeasured_reason}")
 
 
 # Angles are printed as whole degrees, not to one decimal.
@@ -370,7 +377,14 @@ def print_shot(summary: ShotSummary) -> None:
         if ph.score is None:
             # Nothing scoreable in this phase. Printing 0 would read as a
             # failed phase, which is a different and untrue statement.
-            print(f"  {ph.label:<22}    --  {'-' * 20}  {ph.grade}")
+            #
+            # The two blanks are not the same and the grade column says which:
+            # "not filmed clearly" means the player DID this and the recording
+            # is why it carries no mark; "not applicable" means there was
+            # nothing here to assess, which is the honest description of the
+            # flight phase of a shot taken with both feet on the floor.
+            note = "not filmed clearly" if ph.unmeasured_reason else "not applicable"
+            print(f"  {ph.label:<22}    --  {'-' * 20}  {note}")
             continue
         print(f"  {ph.label:<22} {ph.score:>3}/100  {_bar(ph.score)}  {ph.grade}")
 

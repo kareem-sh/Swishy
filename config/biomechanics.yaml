@@ -307,21 +307,80 @@ rules:
     shot_types: [jump_shot]   # a set shot has no flight to assess
     aggregate: max            # the highest the body got
     min: 0.12
-    max: 0.50
+    max: 0.35
     ideal_min: 0.15
-    ideal_max: 0.30
+    ideal_max: 0.28
     unit: ""
     severity: info
-    scored: false          # measured and displayed, never scored — see below
-    message_excellent: "Elevation, for reference — this one isn't scored."
-    refine_low: "Elevation, for reference — this one isn't scored."
-    refine_high: "Elevation, for reference — this one isn't scored."
-    message_low: "Elevation, for reference — this one isn't scored."
-    message_high: "Elevation, for reference — this one isn't scored."
+    scored: true
+    message_excellent: "You get up well and shoot from the top of the jump."
+    refine_low: "Good elevation. A little more lift would give you more room over the defender."
+    refine_high: "Good elevation. Ease it down slightly so the jump stays repeatable shot to shot."
+    message_low: "You barely leave the floor on this one. Ride the jump up and release near the top."
+    message_high: "You're jumping harder than the shot needs, and it costs you consistency. Take the lift down and let the arm do the work."
     evidence: >
+      ENGINEERING DECISION, at `info` severity, on a measurement whose failure
+      mode is known and handled. Read the whole block before changing a number.
+
+      THE LOWER BOUND DOES FAIL, WHICH WAS NOT EXPECTED. `min: 0.12` is the
+      classifier's own threshold, and this rule runs only on shots the
+      classifier already called jump shots, so it was written here that the
+      floor could not fail by construction. Measured, it does: elevation over
+      the `jump` PHASE ranges down to 0.06, against a classifier that had
+      measured 0.12 or more for the same shot.
+
+      The two are not contradictory, they are different windows. The classifier
+      measures peak elevation in a tight window either side of the shooting
+      event (`shots/elevation.py`, EVENT_HALF_WINDOW_S), deliberately, to keep
+      the player walking to collect the ball out of the measurement. This rule
+      aggregates over the `jump` phase, which ENDS at the release -- so it sees
+      the way up and not the top, and a player still rising when the ball goes
+      reads lower here than there.
+
+      That is worth knowing before the number is trusted: a failure on the
+      lower bound may be telling you the phase boundary sits early, not that
+      the player did not jump. Kept at `info` for that reason.
+
+      WHAT IT SEPARATES ON REAL FOOTAGE. Measured over 53 clips, the jump shots
+      whose elevation was measurable read:
+
+          0.128  0.165  0.197  0.211  0.253  0.301
+
+      Against ideal 0.15-0.28 that is four EXCELLENT, two GOOD, none failed --
+      a real spread rather than a guaranteed 100.
+
+      THE UPPER BOUND IS THE WEAKEST NUMBER HERE. 0.35 says a jump shot can be
+      over-jumped, which is ordinary coaching but has NO published threshold in
+      the corpus. A1's jump shots sit at 26.9-31.2 cm, near 0.15-0.17 body
+      heights, so 0.35 is roughly twice the published centre -- deliberately
+      well clear of it, because it is our number and should only fire on
+      something obvious.
+
+      HIGHER IS NOT KNOWN TO BE BETTER EITHER. A6 found successful shots had
+      significantly greater jump height, but compares made against missed
+      attempts WITHIN shooters and reports R-squared of 0.005-0.012 between
+      biomechanical parameters and accuracy. Direction only, and weakly.
+
+      THE FAILURE MODE, AND WHY IT DOES NOT REACH THE SCORE. `body_rise_ratio`
+      cannot separate the player rising from the camera falling, so on
+      broadcast footage with pans and zooms it saturates at
+      MAX_BODY_RISE_RATIO. Measured: 4 of 53 clips, including a FREE THROW that
+      read the full 0.500. `analysis/engine.py` now returns None on a clamped
+      reading rather than scoring a number already known to be false, so those
+      shots report `jump` unscored instead of judged. That is the honest
+      outcome and it is why this rule can be scored at all.
+
+      RELATED LIMIT, RECORDED HERE BECAUSE IT BOUNDS THIS RULE. The classifier
+      that decides which shots reach this rule is 17/23 = 74% against filename
+      labels across the corpus, and all six errors are in ONE direction: a jump
+      shot called a set shot. So this rule is not evaluated on roughly a
+      quarter of real jump shots. `shots/elevation.py` records 14/14 on our own
+      static-camera footage; the gap is the footage, not a contradiction.
+
+      ---- earlier assessment, kept because the reasoning still applies ----
+
       THE MEASUREMENT IS SOUND; THE BAND IS NOT YET EARNED. Those are separate
-      claims and only the first is settled, which is why this is displayed and
-      not scored.
+      claims and only the first is settled.
 
       WHY THE PHASE HAD NOTHING TRUSTWORTHY IN IT BEFORE. `jump` carried
       exactly two rules, `shoulder_alignment_lift` and `head_stability`, and

@@ -207,6 +207,58 @@ def _argmax(values: Sequence[Optional[float]], lo: int, hi: int) -> Optional[int
     return best_i
 
 
+# How far either side of the located event the release phase reaches, in
+# SECONDS. This is not a claim about how long a ball takes to leave a hand --
+# it is OUR UNCERTAINTY ABOUT WHEN THAT HAPPENED, and the window has to be at
+# least as wide as the uncertainty or the rules read the wrong moment.
+#
+# The event is the peak of the hand's own trajectory, located to within a frame
+# or two. At the slowest footage this project accepts, 12 fps, two frames is
+# 0.167 s -- so a window narrower than that cannot be trusted to contain the
+# release on a slow clip.
+#
+# WHY IT USED TO BE ONE FRAME, AND WHAT THAT COST. `_release_span` returned
+# (event, event+1), so `release` was exactly one frame wide on the offline
+# path and `aggregate: max` on the release rules was not an aggregation at all
+# -- it was a single sample with no protection against the event being located
+# a frame or two early. Measured across 46 shots, `elbow_extension_release`
+# cleared its 142 deg floor on 26 of them. Widening the window:
+#
+#     +/- 0.00 s   26/46   57%      (one frame -- what this replaces)
+#     +/- 0.05 s   31/46   67%
+#     +/- 0.10 s   35/46   76%
+#     +/- 0.15 s   37/46   80%
+#     +/- 0.20 s   37/46   80%      (no further gain)
+#
+# The plateau matters more than the peak. If the window were simply drifting
+# into the arm's descent it would keep finding larger angles as it widened;
+# instead it stops improving, which is what finding the real extension and then
+# running out of shot looks like.
+_RELEASE_HALF_WINDOW_S = 0.15
+
+
+def _span_around(frames: Sequence, centre: int, half_window_s: float) -> tuple:
+    """Half-open frame span within `half_window_s` of `centre`'s timestamp.
+
+    Walked by TIMESTAMP, never by frame count: this footage runs 12-30 fps and
+    includes slow motion, so a fixed number of frames would be a different
+    duration on every clip.
+    """
+    n = len(frames)
+    if n == 0:
+        return 0, 0
+    centre_ms = frames[centre].timestamp_ms
+    limit_ms = half_window_s * 1000.0
+
+    start = centre
+    while start > 0 and abs(centre_ms - frames[start - 1].timestamp_ms) <= limit_ms:
+        start -= 1
+    end = centre
+    while end + 1 < n and abs(frames[end + 1].timestamp_ms - centre_ms) <= limit_ms:
+        end += 1
+    return start, end + 1
+
+
 def _release_span(
     frames: Sequence,
     wrist: Sequence[Optional[float]],
@@ -230,7 +282,7 @@ def _release_span(
     """
     if event_index is not None:
         clamped = max(0, min(int(event_index), len(frames) - 1))
-        return clamped, min(len(frames), clamped + 1)
+        return _span_around(frames, clamped, _RELEASE_HALF_WINDOW_S)
 
     marked = [i for i, s in enumerate(frames) if s.phase == CORE_ANCHOR]
     if marked:

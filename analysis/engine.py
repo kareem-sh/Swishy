@@ -9,6 +9,29 @@ from typing import List, Optional
 
 from analysis.models import AnalysisResult, RuleOutcome, RuleResult
 from phase_detection.features import KinematicFeatures
+
+# Above this much whole-body elevation, in the player's own body heights, the
+# reading is rejected as unmeasured rather than scored.
+#
+# This is NOT the rule's band, and the difference is the point. `jump_elevation`
+# allows up to 0.35 and calls anything above it over-jumping -- a judgement
+# about the player. This is a judgement about the INSTRUMENT: past 0.40 body
+# heights, roughly 72 cm on a 1.8 m player, the number is no longer describing
+# a basketball shot. A1's jump shots reach 26.9-31.2 cm, near 0.15-0.17 body
+# heights, and the highest elevation we believe anywhere in our own corpus is
+# 0.301.
+#
+# The readings it removes are camera motion, not athletes. `body_rise_ratio`
+# measures the player against the frame, so it cannot separate the player
+# rising from the camera falling: on broadcast clips that pan and zoom it runs
+# up toward MAX_BODY_RISE_RATIO and stops there. Measured across 53 clips it
+# produced 0.47-0.49 on three Curry clips and a full 0.500 on a FREE THROW.
+#
+# A ceiling exactly AT the clamp was tried first and was not enough -- the
+# Curry readings sit just under it and were scored, failing the 0.35 bound and
+# reporting 0 for the jump phase. A player scored 0 for the camera panning is
+# the failure this whole class of fix exists to prevent.
+MAX_SHOOTING_ELEVATION = 0.40
 from player.profile import PlayerProfile
 from utils.config_loader import load_yaml
 
@@ -300,6 +323,22 @@ class BiomechanicsEngine:
             # measured against the player's own stance before this attempt, so
             # "back where you started" IS zero by construction. That is what
             # makes a band around it principled rather than fitted.
+            #
+            # A CLAMPED VALUE IS NOT A MEASUREMENT. `body_rise_ratio` is capped
+            # at MAX_BODY_RISE_RATIO on the ground that nobody jumps half their
+            # own height, so a reading sitting ON the cap means the signal went
+            # somewhere impossible and was cut off there -- we know it is wrong,
+            # not how wrong. Measured across 53 clips it saturates on 4 of them,
+            # including a FREE THROW that read the full 0.500; those are
+            # broadcast clips where the camera pans and zooms, and the ratio
+            # cannot separate the player rising from the camera falling.
+            #
+            # Returning the cap would let a number we already know to be false
+            # be scored, which is the same error as reporting an unobserved
+            # landmark's 0.0. The rule is skipped instead, and a phase left with
+            # nothing measurable reports itself unscored rather than judged.
+            if abs(features.body_rise_ratio) >= MAX_SHOOTING_ELEVATION:
+                return None
             return features.body_rise_ratio
 
         if metric == "wrist_height":

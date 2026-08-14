@@ -753,6 +753,7 @@ class ShotTracker:
             summary = score_shot(
                 frames,
                 self.shot_count,
+                shot_type=getattr(classification.shot_type, "value", None),
                 started_mid_phase=c.mid_start,
                 ended_early=not c.body_finished,
                 entry_phase=frames[0].phase if frames else c.entry_phase,

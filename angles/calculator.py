@@ -134,6 +134,24 @@ class AngleCalculator:
         trunk_vector = segment_vector(hip_mid, shoulder_mid)
 
         degrees = angle_from_vertical(trunk_vector)
+
+        # Past 90 deg the shoulders are BELOW the hips. Nobody shoots a
+        # basketball inverted, so this is not a posture -- it is a pose failure,
+        # usually the trunk vector resolved backwards.
+        #
+        # It has to be caught here rather than by the rule band. `trunk_posture`
+        # allows 0-25, so a reading of 159.8 is simply "outside the band" and
+        # scores exactly like a real 30 deg lean: the player is told to keep
+        # their chest toward the rim, from a frame in which the detector had
+        # them upside down. Measured across 53 clips this reached the score 5
+        # times on 2 clips, at 97.8 to 159.8 deg.
+        #
+        # Invalid, not clamped. We know the reading is wrong; we do not know
+        # what the trunk was actually doing, and substituting a plausible
+        # number would manufacture a measurement.
+        if degrees is not None and degrees > 90.0:
+            return AngleResult("trunk", None, False, False)
+
         stable = all(
             world_landmarks[n].get("is_stable", True)
             for n in ("left_hip", "right_hip", "left_shoulder", "right_shoulder")
