@@ -58,6 +58,11 @@ SHOOTING_HAND = "auto"
 # Ball and rim detection. Slower (loads YOLO) and only affects make/miss.
 ENABLE_BALL = False
 
+# After the report is printed, replay the video with the analysis drawn on it.
+# The drawing shows the FINAL phase of every frame, which is why it can only
+# happen once the whole file has been read.
+SHOW_VIDEO = True
+
 
 def main() -> int:
     video = sys.argv[1] if len(sys.argv) > 1 else VIDEO
@@ -72,6 +77,7 @@ def main() -> int:
         height_cm=HEIGHT_CM,
         shooting_hand=SHOOTING_HAND,
         enable_ball=ENABLE_BALL,
+        keep_landmarks=SHOW_VIDEO,
     )
 
     if run.is_rejected:
@@ -88,6 +94,11 @@ def main() -> int:
     for shot in run.shots:
         print_shot(shot)
     print_session_summary(run.shots, run.discarded_candidates)
+
+    if SHOW_VIDEO and run.landmarks:
+        from modes.replay import replay
+
+        replay(path, run.landmarks, run.overlay, shot_count=len(run.shots))
     return 0
 
 

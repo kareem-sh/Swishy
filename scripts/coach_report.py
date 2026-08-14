@@ -75,6 +75,9 @@ class AnalysisRun:
     video: Path
     fps: float
     shots: List[ShotSummary] = field(default_factory=list)
+    # Playback data, present only when the caller asked to keep it.
+    landmarks: Optional[list] = None
+    overlay: dict = field(default_factory=dict)
     pose_share: float = 0.0
     discarded_candidates: int = 0
     frames_read: int = 0
@@ -164,6 +167,7 @@ def analyze_video(
     on_start: Optional[Callable[[VideoMetadata, PlayerProfile], None]] = None,
     progress_factory: Optional[Callable[[VideoMetadata], ProgressReporter]] = None,
     enable_ball: Optional[bool] = None,
+    keep_landmarks: bool = False,
 ) -> AnalysisRun:
     """Run one video through the real pipeline and return what was found.
 
@@ -204,7 +208,7 @@ def analyze_video(
     pipe = ShotAnalysisPipeline(enable_ball=enable_ball, player=profile)
     pipe.set_fps(fps)
     # Uploading a file is an offline task, so it is analysed as one.
-    pipe.enable_offline_segmentation()
+    pipe.enable_offline_segmentation(keep_landmarks=keep_landmarks)
 
     progress = progress_factory(meta) if progress_factory is not None else None
     shots, pose_frames, index = _decode_and_analyse(video_path, fps, pipe, progress)
@@ -224,6 +228,9 @@ def analyze_video(
         discarded_candidates=pipe.shot_tracker.discarded_candidates,
         frames_read=index,
     )
+    # Carried so a viewer can redraw without paying for pose detection again.
+    run.landmarks = pipe.offline_landmarks
+    run.overlay = pipe.offline_overlay
 
     # No person in frame => this is not footage of someone shooting.
     if pose_share < MIN_POSE_FRAME_SHARE:

@@ -51,6 +51,7 @@ from phase_detection.phases import PHASE_LABELS
 from player.profile import PlayerProfile, load_player_profile
 from pose.landmarks import extract_all_landmarks
 from pose.visibility import VisibilityGate
+from feedback.phase_refiner import refine_phases
 from shots.segmenter import segment
 from utils.config_loader import load_yaml
 from utils.frame_buffer import FrameBuffer, FrameSnapshot
@@ -155,6 +156,13 @@ class ShotAnalysisPipeline:
         # the live path uses. Kept as a plain list, and only when a caller has
         # asked for it, so a live session never grows without bound.
         self._offline_history: Optional[List[FrameSnapshot]] = None
+        # Normalised (x, y) for every pose landmark, per frame, kept only when
+        # playback was asked for. Enough to redraw the skeleton in a second
+        # pass without paying for pose detection twice.
+        self._offline_landmarks: Optional[List[Optional[List[Tuple[float, float]]]]] = None
+        # frame index -> (shot number, final phase label, score). Filled by
+        # `segment_offline`, which is the first moment any of it is known.
+        self._offline_overlay: Dict[int, Tuple[int, str, Optional[int]]] = {}
         # The tracker opens shots BACKWARDS from a detected release, so it needs
         # the recent past, and it re-scores the captured frames against the
         # refined coaching phases, so it needs this engine rather than one of
@@ -711,6 +719,14 @@ class ShotAnalysisPipeline:
         self._frame_buffer.push(snapshot)
         if self._offline_history is not None:
             self._offline_history.append(snapshot)
+        if self._offline_landmarks is not None:
+            marks = None
+            if detection_result and getattr(detection_result, "pose_landmarks", None):
+                marks = [
+                    (float(lm.x), float(lm.y))
+                    for lm in detection_result.pose_landmarks[0]
+                ]
+            self._offline_landmarks.append(marks)
 
         completed_shot = self._shot_tracker.update(
             phase,
@@ -1120,14 +1136,30 @@ class ShotAnalysisPipeline:
 
         return self._resolved_side
 
-    def enable_offline_segmentation(self) -> None:
+    def enable_offline_segmentation(self, keep_landmarks: bool = False) -> None:
         """Record every frame so the video can be segmented once, at the end.
 
         Call before the first frame. A caller that never calls this behaves
         exactly as before, which keeps live capture unchanged and unbounded
         memory opt-in.
+
+        `keep_landmarks` additionally stores each frame's pose landmarks, which
+        is what lets a viewer redraw the skeleton afterwards with the FINAL
+        phase labels on it. Those labels do not exist while the video is
+        playing -- a frame's phase is decided by where the knee bottomed out
+        and where the hand peaked, which are only known once the shot is over.
         """
         self._offline_history = []
+        self._offline_landmarks = [] if keep_landmarks else None
+        self._offline_overlay = {}
+
+    @property
+    def offline_landmarks(self):
+        return self._offline_landmarks
+
+    @property
+    def offline_overlay(self) -> Dict[int, Tuple[int, str, Optional[int]]]:
+        return self._offline_overlay
 
     def segment_offline(self) -> List[ShotSummary]:
         """Find and score every shot in the recorded video.
@@ -1149,14 +1181,26 @@ class ShotAnalysisPipeline:
         windows = segment(signal, fps)
 
         self._shot_tracker.reset()
+        self._offline_overlay = {}
         summaries: List[ShotSummary] = []
         for start, peak, end in windows:
             frames = self._offline_history[start:end + 1]
             summary = self._shot_tracker.finalize_window(
                 frames, peak_ms=self._offline_history[peak].timestamp_ms
             )
-            if summary is not None:
-                summaries.append(summary)
+            if summary is None:
+                continue
+            summaries.append(summary)
+            # Record the per-frame labels a viewer needs. These are the refined
+            # coaching phases, not the four detector states, so what is drawn
+            # on the video is what the report talks about.
+            labels = refine_phases(frames, peak - start)
+            for offset, label in enumerate(labels):
+                self._offline_overlay[start + offset] = (
+                    summary.shot_number,
+                    label,
+                    summary.score,
+                )
         return summaries
 
     def finalize_session(self) -> Optional[ShotSummary]:
