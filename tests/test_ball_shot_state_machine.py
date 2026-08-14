@@ -60,6 +60,7 @@ def _update(
     pose_phase=None,
     wrist_xy=None,
     observed=True,
+    ankle_y=None,
 ):
     detection, snapshot = _ball(
         x,
@@ -74,9 +75,16 @@ def _update(
         ball_snapshot=snapshot,
         rim_detection=_rim(frame, timestamp_ms),
         wrist_xy=wrist_xy,
+        ankle_y=ankle_y,
         pose_phase=pose_phase,
         timestamp_ms=timestamp_ms,
     )
+
+
+# Where the feet stand, in image pixels. Image y grows downward, so the floor
+# has a LARGER y than the ball. `ankle_release_fallback_px` is 300, so a ball at
+# y=400 is confirmed released against an ankle at y=700 and not before.
+_STANDING_ANKLE_Y = 700.0
 
 
 def _release(machine: BallShotStateMachine) -> None:
@@ -89,6 +97,7 @@ def _release(machine: BallShotStateMachine) -> None:
         (0, 0),
         pose_phase="rise",
         wrist_xy=(100, 500),
+        ankle_y=_STANDING_ANKLE_Y,
     )
     result = _update(
         machine,
@@ -99,6 +108,7 @@ def _release(machine: BallShotStateMachine) -> None:
         (500, -500),
         pose_phase="release",
         wrist_xy=(100, 500),
+        ankle_y=_STANDING_ANKLE_Y,
     )
     assert result.state == BallShotState.ASCENDING
 
@@ -211,7 +221,6 @@ def test_ball_flight_continues_when_pose_is_missing() -> None:
     assert made.state == BallShotState.MADE
 
 
-<<<<<<< HEAD
 def test_moving_camera_uses_ball_position_relative_to_rim() -> None:
     machine = BallShotStateMachine()
 
@@ -257,13 +266,16 @@ def test_moving_camera_uses_ball_position_relative_to_rim() -> None:
             ball_snapshot=snapshot,
             rim_detection=rim,
             wrist_xy=wrist_xy,
+            # The feet are part of the scene, so they pan with the camera
+            # exactly as the ball and the rim do.
+            ankle_y=_STANDING_ANKLE_Y + offset_y,
             pose_phase=pose_phase,
             timestamp_ms=timestamp_ms,
         )
 
     moving_update(
         (100, 500), (0, 0), 0, 0, (0, 0),
-        pose_phase="ball_lift", wrist_base_xy=(100, 500),
+        pose_phase="rise", wrist_base_xy=(100, 500),
     )
     released = moving_update(
         (200, 400), (20, 10), 1, 100, (700, -400),
@@ -282,12 +294,9 @@ def test_moving_camera_uses_ball_position_relative_to_rim() -> None:
     assert made.outcome.result == "made"
 
 
-def _body_snapshot(timestamp_ms: int, phase: str) -> FrameSnapshot:
-=======
 def _body_snapshot(timestamp_ms: int, phase: str, wrist_y: float = 1.0) -> FrameSnapshot:
     from phase_detection.features import KinematicFeatures
 
->>>>>>> pose-edits
     return FrameSnapshot(
         timestamp_ms=timestamp_ms,
         angles={},
