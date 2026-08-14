@@ -58,6 +58,14 @@ from utils.frame_buffer import FrameBuffer, FrameSnapshot
 from visualization.hud_display import HudDisplay, HudDisplaySmoother
 
 
+# How rarely a wrist may be trackable before that side is ruled out as the
+# shooting arm entirely. Measured on salah_video, where the player is filmed
+# from his right: the left wrist was reliable on 0 of 45 frames in every shot
+# while the right was reliable on 45 of 45, i.e. a ratio of 0. Anything below
+# this is not a weaker candidate, it is not a candidate.
+SIDE_VISIBILITY_RATIO = 0.15
+
+
 @dataclass
 class FrameResult:
     """Output of processing a single frame through the pipeline."""
@@ -182,6 +190,10 @@ class ShotAnalysisPipeline:
             )
         )
         self._resolved_side = "right"
+        # Evidence for which arm shoots, accumulated across the whole video
+        # rather than read off a single frame. See _resolve_shooting_side.
+        self._side_reliable = {"left": 0, "right": 0}
+        self._side_peak = {"left": float("-inf"), "right": float("-inf")}
         self._frame_index = 0
         self._fps = DEFAULT_FPS
         self._prev_timestamp_ms: Optional[int] = None
@@ -1138,14 +1150,50 @@ class ShotAnalysisPipeline:
             self._resolved_side = self._shooting_hand
             return self._resolved_side
 
-        left_wrist = world_landmarks.get("left_wrist")
-        right_wrist = world_landmarks.get("right_wrist")
+        # Accumulate evidence rather than deciding from this frame alone.
+        #
+        # This used to compare the two wrists on whatever frame it was given
+        # and, if either was unreliable, silently keep whatever it had decided
+        # before. Two failures compounded:
+        #
+        #   A momentary comparison decided it. One frame with the off hand
+        #   raised -- collecting a ball, waving -- was enough to flip it.
+        #
+        #   Then it LATCHED. Once flipped to a side whose wrist is never
+        #   reliable again, the `if` can never fire again, so the wrong answer
+        #   became permanent.
+        #
+        # Measured on salah_video: shots 3 and 4 resolved to `left` while the
+        # left elbow sat at visibility 0.15-0.19 and was rejected on all 45
+        # frames of each, and the right arm was tracked at 0.98 on all 45 of
+        # every shot in the video. The player is filmed from his right, so his
+        # left arm is occluded throughout -- it could not have been the
+        # shooting arm on any frame. Both shots lost every arm rule.
+        for side in ("left", "right"):
+            wrist = world_landmarks.get(f"{side}_wrist")
+            if wrist and wrist.get("is_reliable"):
+                self._side_reliable[side] += 1
+                height = float(wrist["position"][1])
+                if height > self._side_peak[side]:
+                    self._side_peak[side] = height
 
-        if left_wrist and right_wrist and left_wrist.get("is_reliable") and right_wrist.get("is_reliable"):
-            if left_wrist["position"][1] > right_wrist["position"][1]:
-                self._resolved_side = "left"
-            else:
-                self._resolved_side = "right"
+        left_seen = self._side_reliable["left"]
+        right_seen = self._side_reliable["right"]
+        if left_seen + right_seen == 0:
+            return self._resolved_side
+
+        # A side we cannot see cannot be the shooting side. This is not a
+        # preference between two candidates -- it is a statement that one of
+        # them was never a candidate.
+        stronger, weaker = ("left", "right") if left_seen >= right_seen else ("right", "left")
+        if self._side_reliable[weaker] < SIDE_VISIBILITY_RATIO * self._side_reliable[stronger]:
+            self._resolved_side = stronger
+        elif self._side_peak["left"] > self._side_peak["right"]:
+            # Both arms are trackable, so the shooting arm is the one that goes
+            # highest -- over the whole video so far, not on one frame.
+            self._resolved_side = "left"
+        else:
+            self._resolved_side = "right"
 
         return self._resolved_side
 

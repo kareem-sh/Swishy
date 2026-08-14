@@ -317,26 +317,50 @@ rules:
     message_low: "Straighten your elbow more at release. It's still bent when the ball leaves, and that flattens the arc."
     message_high: "You're snapping your elbow straight too hard. Reach toward the rim and let the arm finish soft."
     evidence: >
-      SUPPORTED WITH LIMITATIONS — and the strongest numeric anchor in this
-      file.
+      DIRECTION AND CENTRE supported by A3; THE BAND IS AN ENGINEERING
+      DECISION. It was previously labelled "SUPPORTED WITH LIMITATIONS - and
+      the strongest numeric anchor in this file", which was true only of
+      figures the corpus does not contain.
 
-      Cabarkapa et al. (2023), markerless mocap at 120 Hz, N=34 free-throw
-      shooters, elbow angle AT BALL RELEASE:
-          proficient (>=70% made, n=19)      159.6 deg (SD 1.4)
-          non-proficient (<70% made, n=15)   159.8 deg (SD 1.3)
+      CITATION CORRECTED. This block previously read:
+
+          "Cabarkapa et al. (2023), markerless mocap at 120 Hz, N=34
+           free-throw shooters ... proficient (>=70% made, n=19) 159.6 deg
+           (SD 1.4); non-proficient (<70% made, n=15) 159.8 deg (SD 1.3)
+           ... p=0.336 ... PMC10436204"
+
+      Not one of those figures survives a check against SOURCES.md. The
+      corpus's only elbow-at-release values are A3's -- 158.8 vs 159.3,
+      p=0.228, n=24, the 2026 THREE-POINT study -- and SOURCES.md Part E
+      names A3 as this rule's source explicitly. PMC10436204 is A2, whose
+      only elbow figure is PREPARATORY (78.0 vs 85.1, p=0.471). The
+      standard deviations 1.4 and 1.3, the subgroup sizes 19 and 15, the
+      >=70% proficiency criterion and p=0.336 appear nowhere in the corpus.
+
+      That mattered more than a wrong reference. The SD of 1.3-1.4 was the
+      load-bearing number: it justified calling this a convergence norm,
+      it produced the "+/-3 SD is 155.5-163.7" argument, and that argument
+      justified the ideal band the player is scored against. A band was
+      being defended with a dispersion figure we do not hold.
+
+      WHAT THE CORPUS ACTUALLY SUPPORTS (A3, n=24, three-point):
+          proficient       159.3 deg
+          non-proficient   158.8 deg     p=0.228 (n.s.)
 
       Two things follow, and they must not be confused.
 
       1. The value is a CONVERGENCE NORM, not a proficiency discriminator.
-         An SD of 1.3-1.4 deg across 34 shooters is extremely tight: everyone
-         releases near 160 deg. But the two groups are indistinguishable
-         (p=0.336 at the preparatory phase; the release means differ by
-         0.2 deg), so a player matching 160 deg has a NORMAL release, not a
-         good one. The rule may say "this is where the ball should leave";
-         it may NOT say "this is why you make shots".
+         The two groups are indistinguishable (p=0.228; the means differ by
+         0.5 deg), so a player reaching ~159 deg has a NORMAL release, not a
+         good one. The rule may say "this is roughly where the ball leaves";
+         it may NOT say "this is why you make shots". And SOURCES.md warns
+         that a non-significant result at n=24 from one lab is evidence of
+         low power, not of equivalence.
 
-      2. The literature band is far tighter than we can measure. +/-3 SD is
-         roughly 155.5-163.7 deg. We do not reproduce 1.4 deg precision:
+      2. THE BAND IS OURS. With no published dispersion in the corpus there
+         is no literature interval to narrow toward, so 142-180 and 152-168
+         are an ENGINEERING DECISION centred on A3's ~159 deg. We could not
+         reproduce a tight band in any case:
          release is located to within one frame at 24-30 fps, and
          single-camera elbow error is around 17 deg RMSD in a
          basketball-throwing validation. The ideal band is therefore
@@ -367,7 +391,7 @@ rules:
       true. Re-measure with scripts/measure_angle_uncertainty.py before
       revisiting. docs/LIMITS.md carries the full table.
 
-      resources.md A3, D4; Cabarkapa et al. 2023 (PMC10436204).
+      SOURCES.md A3 (Cabarkapa et al. 2026, PMC-pending), D4.
 
   index_alignment_release:
     name: "Finger Direction"
