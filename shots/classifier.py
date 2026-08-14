@@ -53,6 +53,13 @@ from shots.types import RejectionReason, ShotClassification, ShotType
 # labelled data.
 JUMP_VERTICAL_DISPLACEMENT_RATIO = 0.12
 
+# Above this the feet have left the floor at all; below 0.12 it is still a set
+# shot. Deliberately the SAME number as `min_takeoff_ratio` in
+# phase_model.yaml, which decides whether a `jump` phase is described -- the two
+# must agree, or a shot could be told its feet lifted while its timeline shows
+# no jump phase, or the reverse.
+SET_SHOT_FEET_LIFT_RATIO = 0.05
+
 # Horizontal: fraction of frame width the hips traverse during the attempt. A
 # stationary shooter sways within a narrow band; a driving player crosses the
 # frame. Purely empirical.
@@ -162,6 +169,30 @@ def classify(evidence: AttemptEvidence) -> ShotClassification:
         f"feet rose only {evidence.vertical_displacement_m:.3f} body-heights at the shooting "
         f"event (< {JUMP_VERTICAL_DISPLACEMENT_RATIO:.2f})"
     )
+
+    # BETWEEN THE TWO THRESHOLDS: a set shot the player did not stay down for.
+    #
+    # There are two elevation thresholds in this project and they answer
+    # different questions. `min_takeoff_ratio` (0.05, phase_model.yaml) asks
+    # whether the feet left the floor at all, and decides whether a `jump`
+    # PHASE is described. This one (0.12) asks whether the jump was big enough
+    # to make it a jump SHOT.
+    #
+    # A player between them has genuinely left the floor while shooting what is
+    # still, by every other measure, a set shot. Reporting only the type hides
+    # that, and it is the single most useful thing to say to this player: the
+    # rise is real, it is not enough to be a jump shot, and half-committing is
+    # the least repeatable of the three options.
+    #
+    # Measured on salah_video: four of five shots sit in this band, and the
+    # fifth (the one shot with the feet genuinely planted) does not -- which is
+    # what the player independently reported about their own footage.
+    if evidence.vertical_displacement_m >= SET_SHOT_FEET_LIFT_RATIO:
+        notes.append(
+            f"feet still left the floor ({evidence.vertical_displacement_m:.3f} "
+            f"body-heights, above {SET_SHOT_FEET_LIFT_RATIO:.2f})"
+        )
+
     margin = JUMP_VERTICAL_DISPLACEMENT_RATIO - evidence.vertical_displacement_m
     confidence = min(0.95, 0.6 + margin * 3.0)
     return ShotClassification(
