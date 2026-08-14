@@ -151,7 +151,8 @@ def _make_phase_score(phase: str, label: str, all_rules: List[RuleResult],
     return PhaseScore(
         phase=phase,
         label=label,
-        score=_weighted_score(all_rules, weights),
+        # None, not 0, when there is nothing here to score. See PhaseScore.
+        score=_weighted_score(all_rules, weights) if scored else None,
         rules=scored,
         measured=[r for r in all_rules if not r.scored],
         strengths=_notes(spoken, RuleOutcome.EXCELLENT),

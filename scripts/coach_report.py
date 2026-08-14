@@ -304,7 +304,8 @@ def _print_phase_notes(ph) -> None:
     """
     if not (ph.strengths or ph.refinements or ph.fixes or ph.measured):
         return
-    print(f"\n  --- {ph.label}  ({ph.score}/100) ---")
+    header = f"{ph.score}/100" if ph.score is not None else "not scored"
+    print(f"\n  --- {ph.label}  ({header}) ---")
     for msg in ph.strengths:
         print(f"    [ON TARGET] {msg}")
     for msg in ph.refinements:
@@ -366,6 +367,11 @@ def print_shot(summary: ShotSummary) -> None:
     print(f"  {'Phase':<22} {'Score':>5}  {'':<20}  Grade")
     print(f"  {'-' * 22} {'-' * 5}  {'-' * 20}  {'-' * 11}")
     for ph in summary.phase_scores:
+        if ph.score is None:
+            # Nothing scoreable in this phase. Printing 0 would read as a
+            # failed phase, which is a different and untrue statement.
+            print(f"  {ph.label:<22}    --  {'-' * 20}  {ph.grade}")
+            continue
         print(f"  {ph.label:<22} {ph.score:>3}/100  {_bar(ph.score)}  {ph.grade}")
 
     print("\n  NOTES BY PHASE")

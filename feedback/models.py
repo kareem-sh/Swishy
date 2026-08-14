@@ -26,7 +26,14 @@ class PhaseScore:
 
     phase: str
     label: str
-    score: int  # 0-100
+    # 0-100, or None when the phase carries nothing scoreable.
+    #
+    # None is NOT zero. A phase whose rules are all unscored (or which has no
+    # rules at all) has not been failed -- it has not been assessed. Emitting 0
+    # made `jump` read as a total failure on every shot the moment its last
+    # scored rule was withdrawn, which is the same class of error as letting an
+    # unobserved landmark report 0.0.
+    score: Optional[int]
     rules: List[RuleResult] = field(default_factory=list)
     strengths: List[str] = field(default_factory=list)
     refinements: List[str] = field(default_factory=list)
@@ -39,6 +46,8 @@ class PhaseScore:
 
     @property
     def grade(self) -> str:
+        if self.score is None:
+            return "not scored"
         if self.score >= 90:
             return "Excellent"
         if self.score >= 75:

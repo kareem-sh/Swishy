@@ -211,22 +211,57 @@ rules:
   trunk_posture:
     name: "Upper Body Posture"
     metric: trunk
-    aggregate: worst        # continuous: a posture that slipped, slipped
-    phases: [loading, ball_lift, jump, release]
+    aggregate: worst
+    phases: [release]
     min: 0
     max: 25
     ideal_min: 0
     ideal_max: 13
-    severity: warning
+    severity: info
     scored: true
-    message_excellent: "You stay tall and square the whole way through."
-    refine_high: "Your posture is good. Stay a little taller through the top of the shot to keep the ball on line."
-    message_high: "You're leaning your upper body through the shot, and it pulls the ball off line. Keep your chest facing the rim start to finish."
+    message_excellent: "You stay tall and square as the ball leaves."
+    refine_high: "Your posture is good. Keep your chest pointed at the rim as the ball goes."
+    message_high: "You're leaning your upper body as the ball leaves, and it pulls the shot off line. Keep your chest pointed at the rim through the release."
     evidence: >
-      SUPPORTED WITH LIMITATIONS. Reduced forward trunk lean at release
-      distinguished proficient free-throw shooters. Trunk lean is measured
-      against a fixed vertical axis, so it depends on the coordinate
-      convention — see docs/ACCEPTANCE_Y_AXIS.md. resources.md A2.
+      DIRECTION supported; THRESHOLD is an ENGINEERING DECISION. Those are two
+      different claims and were previously presented as one.
+
+      SCOPE NARROWED TO `release`. It ran across loading, ball_lift, jump and
+      release under a single threshold, which was wrong twice over.
+
+      First, `loading` is a preparation phase whose whole purpose is hip and
+      trunk flexion -- the player is MEANT to fold forward there. We already
+      score that mechanic separately and in the opposite direction with
+      hip_hinge_loading, so the two rules contradicted each other on the same
+      frames: one rewarding the hinge, the other penalising it. Measured on
+      salah_video shot 1, all three frames that failed this rule were in
+      `loading`, reading 25.1-25.3 deg against a limit of 25, across 0.10 s --
+      while the shot's MEDIAN trunk lean was 8.6 deg. A player who stayed
+      upright throughout scored zero for the natural lean of his own
+      countermovement.
+
+      Second, the published support is specifically about lean AT RELEASE.
+      Applying a release-derived direction to the dip extends it past its
+      evidence. ball_lift and jump are deliberately NOT re-added: there is no
+      phase-specific evidence for either, and one threshold covering four
+      different postures is how this rule went wrong to begin with.
+
+      ON THE THRESHOLD ITSELF -- 0-25 and 0-13 ARE OURS. No published trunk
+      angle appears anywhere in SOURCES.md. The corpus records A2's release
+      height, release angle, knee preparation and elbow preparation values,
+      and no trunk measurement at all; the lone "A2 (trunk lean)" citation in
+      the SOURCES rule table carries no number behind it. The previous label
+      SUPPORTED WITH LIMITATIONS therefore overstated what we hold.
+
+      And a proficient/non-proficient group difference, where one exists, is
+      still not a diagnostic cutoff. It says the groups differ on average. It
+      does not say an individual crossing a line shoots worse. Severity drops
+      to `info` accordingly -- the rule informs without carrying a warning's
+      weight behind a number we chose ourselves.
+
+      Trunk lean is measured against a FIXED vertical axis, so unlike the
+      three-landmark joint angles it depends on the coordinate convention
+      being right. See pose/landmarks.py and tests/test_coordinates.py.
 
   head_stability:
     name: "Eyes and Head"
