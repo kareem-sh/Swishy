@@ -1,7 +1,16 @@
-# Swichy — Evidence Map (`resources.md`)
+# Swichy — Evidence Map (`SOURCES.md`)
 
 **Single source of truth for every research claim in Swichy.**
-Last updated: 9 August 2026 · Branch: `pose-edits`
+Last updated: 14 August 2026 · Branch: `pose-edits`
+
+> **File-naming note.** This file was previously called `resources.md`, and
+> earlier working notes were split across `research.md`,
+> `docs/BIOMECHANICS_RESEARCH.md`, `docs/PRODUCT_ROADMAP.md`,
+> `docs/AUDIT_AND_PLAN.md` and `PAPER_LINKS.md`. **None of those files exist in
+> the repository any more.** Their content was either merged here or dropped.
+> Every "Used in" trail below now points at a file that is actually present; if
+> you find a reference to one of the deleted names anywhere in the repo, it is a
+> stale pointer, not a document you can go and read.
 
 **Project framing (v2):** Swichy is an **AI basketball shooting coach for practice**. It teaches technique and consistency. It is **not** a game-analytics system, **not** a defender/tactical analyser, and **not** a make/miss predictor.
 
@@ -61,7 +70,7 @@ Complete angle matrix by shot distance (prep phase): knee 121.5±8.8 / 116.7±7.
 n=10. **Single 2D camera** — so it is *not* a ground-truth reference for validating a 2D system. Shoulder SD ±26.9–31.4° (≈40% of mean).
 
 ### Used in
-`research.md` §2.1–2.4 · `config/biomechanics.yaml` (knee, hip, elbow rules) · set/jump classifier design
+`config/biomechanics.yaml` (`knee_flexion_loading`, `hip_hinge_loading`, `elbow_slot_ball_lift`) · `shots/classifier.py` (the 15.3 vs 26.9–31.2 cm displacement figures behind the set/jump threshold)
 
 ---
 
@@ -93,7 +102,7 @@ Do not read p=0.471 as evidence of elbow invariance (null-hypothesis fallacy —
 "Recreationally active males", not elite. Proprietary SwRI system limits replication.
 
 ### Used in
-`research.md` §2.3 · release-height rule · player-height normalisation argument
+`config/biomechanics.yaml` (`release_height`, `release_height_ratio`) · `player/profile.py` (height normalisation policy)
 
 ---
 
@@ -115,7 +124,7 @@ None reported.
 n=24. Contradicted by A1 (two-point, n.s.) and by the 2026 free-throw 2D study (n.s. after Bonferroni).
 
 ### Used in
-`research.md` §2.1 · **must be cited alongside its contradictions**
+`config/biomechanics.yaml` (`elbow_extension_release`; cited under `knee_flexion_loading` and `hip_hinge_loading` only alongside §D3) · **must be cited alongside its contradictions**
 
 ---
 
@@ -139,7 +148,7 @@ None directly, but establishes that launch angle **decreases with distance** —
 1996 instrumentation. n=5 per position group. ⚠️ Full text not retrieved.
 
 ### Used in
-`research.md` §2.3 · ball launch angle target band
+Ball launch angle target band. **Not currently wired to any rule** — Swichy does not yet measure ball launch angle (see §B1 blocking dependency).
 
 ---
 
@@ -155,7 +164,7 @@ None directly, but establishes that launch angle **decreases with distance** —
 **Indirect but important.** This is a *physics optimisation given release conditions*, so its output depends on release height — which depends on player height. It supports **computing** an optimal angle rather than looking one up.
 
 ### Used in
-`research.md` §2.3 · geometric personalisation argument (§B1)
+Geometric personalisation argument (§B1). **Not currently wired to any rule.**
 
 ---
 
@@ -174,7 +183,7 @@ n=18, 90 shots each, force plates + 200 Hz ball kinematics. Release height 2.02�
 **This is the single most important citation for scoping the product.** It is the evidence that Swichy must NOT claim make/miss prediction.
 
 ### Used in
-`research.md` §2.3 · Part 20 scoping · every "we do not predict makes" statement
+`docs/LIMITS.md` (Scope, Evidence limits) · `README.md` · every "we do not predict makes" statement
 
 ---
 
@@ -191,7 +200,7 @@ n=18, 90 shots each, force plates + 200 Hz ball kinematics. Release height 2.02�
 Any numerical value. Tier 3 venue — cite for the **model**, never for data.
 
 ### Used in
-`research.md` §2.4 · set/jump classifier rationale
+`shots/classifier.py` · `shots/elevation.py` — set/jump classifier rationale (the **model**, never a number)
 
 ---
 
@@ -207,7 +216,7 @@ n=10 experts. **"Increased distance of shooting did not change the maximum and m
 Its "ball release angle" values (78.92° → 65.60°) are **not comparable** to Miller & Bartlett's launch angle — a different construct. Do not pool.
 
 ### Used in
-`research.md` §2.4 (invariance prior) — **with the null-result caveat of §D2**
+`config/biomechanics.yaml` (`elbow_slot_ball_lift`, as the invariance prior) — **with the null-result caveat of §D2**
 
 ---
 
@@ -219,6 +228,65 @@ Its "ball release angle" values (78.92° → 65.60°) are **not comparable** to 
 
 ### Exact Swichy relevance
 Highest-quality *review* available; use for framing and for the phase decomposition, not for numbers.
+
+---
+
+## A10. Cabarkapa et al. 2023b — Female shooters (JFMK 8(3):129) — ⚠️ NOT VERIFIED
+
+- **Journal:** *Journal of Functional Morphology and Kinesiology* 8(3):129 · **PMC:** PMC10531893
+- **Evidence tier:** ⚠️ **not assessed** — indexing not checked, publication record not read
+- **Verification:** ⚠️ **NOT VERIFIED — no full text retrieved into this corpus, no number confirmed**
+
+### Why this entry exists at all
+
+`config/biomechanics.yaml` cites PMC10531893 in **three** rules —
+`knee_flexion_loading`, `hip_hinge_loading` and `shoulder_alignment_lift`, two
+of which are `scored: true` — and takes roughly a dozen numeric figures from it
+(group means, SDs, p-values, and distance trends). Until now this file recorded
+it in **one passing sentence in §B2** and **one bare link row in Part H**: no
+source ID, no numbers, no evidence class, no limitations. A paper cannot drive
+scored rules from a link row.
+
+### What is actually held here
+
+**Nothing numeric.** Not one of the figures quoted in `biomechanics.yaml` from
+this paper appears anywhere else in this corpus, and none has been checked
+against the paper's own results tables by anyone maintaining this file. The
+figures currently attributed to it in the rules are:
+
+| Rule | Figures attributed to this paper | Status |
+|---|---|---|
+| `knee_flexion_loading` | two-point N=18, 115.6 (10.9) vs 113.8 (6.3), p=0.672; three-point N=18, 109.6 (5.8) vs 109.2 (11.6), p=0.925; distance trend 114.8° at 5.10 m vs 109.4° at 6.32 m, p<0.001 | ⚠️ unverified |
+| `hip_hinge_loading` | N=18, 136.9 (6.2) vs 128.6 (10.0), p=0.048; distance trend 133.2° at 5.10 m vs 126.3° at 6.32 m, p<0.001 | ⚠️ unverified |
+| `shoulder_alignment_lift` | N=18, 52.3 (11.6) vs 63.8 (6.7), p=0.025; distance trend 57.4° at 5.10 m vs 54.2° at 6.32 m, p=0.006 | ⚠️ unverified |
+
+### ⚠️ A read-status contradiction inside this file
+
+Part H marks this paper `✅ / FULL` — "numbers taken from the paper's own
+results tables". No such numbers were ever transcribed into Part A, which is
+where transcribed numbers live. The `FULL` marker is therefore not supported by
+anything in the corpus and has been corrected to `—` in Part H. Treat the paper
+as unread until someone retrieves it and fills in this section.
+
+### Evidence class
+
+`NOT SUPPORTED` for any claim resting on its figures **as recorded here** —
+not because the paper is thought to be wrong, but because this corpus holds
+none of its content. The class is provisional and should be revisited the
+moment the full text is read.
+
+### Limitations (as far as they can be stated without the paper)
+
+n=18 by the rules' own account; same research group as A1–A3, so it inherits
+the single-lab dependency named in Part G #2 and adds no independent
+replication. A female cohort, while every other numeric source in this corpus
+is male or unstated — so pooling its means with A1/A2/A3 is not licensed.
+
+### Used in
+
+`config/biomechanics.yaml` — `knee_flexion_loading`, `hip_hinge_loading`,
+`shoulder_alignment_lift`. Every figure taken from it is marked unverified
+inside those `evidence:` blocks. **See F10.**
 
 ---
 
@@ -236,7 +304,7 @@ Optimal launch angle ≈ **45° + ½ × (angle between the ball at launch and th
 It converts "player height" from an **empirical category** into a **computable geometric input**. Swichy would not need a height→angle table; it could compute the target from measured release height + horizontal distance + 3.05 m rim height.
 
 ### ⚠️ Blocking dependency
-Swichy currently measures **neither** ball launch angle **nor** horizontal distance to the hoop. See `AUDIT_AND_PLAN.md` §12.
+Swichy currently measures **neither** ball launch angle **nor** horizontal distance to the hoop. Nothing in `angles/` or `ball/` produces either quantity, so no rule in `config/biomechanics.yaml` can use this geometry today.
 
 ### Evidence class
 `INFERRED` (geometry is sound; the specific numbers are secondary-sourced and unverified)
@@ -245,7 +313,7 @@ Swichy currently measures **neither** ball launch angle **nor** horizontal dista
 
 ## B2. Height normalisation precedent — Cabarkapa group
 
-Across A1, A2, A3 and the female study (JFMK 8(3):129), the group reports **release height and elbow height as ratios of body height**, never as raw metres.
+Across A1, A2, A3 and the female study (**A10**, JFMK 8(3):129 — ⚠️ not verified, see A10), the group reports **release height and elbow height as ratios of body height**, never as raw metres.
 
 ### Evidence class for "normalise release height by player height"
 `SUPPORTED WITH LIMITATIONS` — consistent precedent across 4 papers from **one group**. No independent replication found.
@@ -316,7 +384,7 @@ Verbatim definition quoted from A1 full text. **These are different physical qua
 
 ## D2. 🚨 CORRECTION — "Elbow invariance" is NOT proven
 
-`research.md` v1 claimed elbow invariance was supported by six comparisons. **The council rejected this, correctly.**
+An earlier version of the research notes (`research.md`, since deleted) claimed elbow invariance was supported by six comparisons. **That claim was rejected, correctly**, and must not be reintroduced.
 
 The supporting evidence is a set of **non-significant p-values** (0.471, 0.706, 0.228) from samples of n=10–34, **all from one research group**. Failing to reject the null hypothesis with a small sample is **not** evidence of no effect — it is evidence of low statistical power. No power analysis exists in any of these papers.
 
@@ -384,10 +452,10 @@ No coaching target can be asserted more precisely than the measurement supports.
 
 | Rule in `config/biomechanics.yaml` | Evidence | Class | **Action required** |
 |---|---|---|---|
-| `knee_flexion_loading` | D3 (contradictory) | `NOT SUPPORTED` | **Demote to displayed metric** |
-| `hip_hinge_loading` | A1, A3 | `SUPPORTED WITH LIMITATIONS` | Keep, widen band, distance-specific |
+| `knee_flexion_loading` | D3 (contradictory), A10 ⚠️ | `NOT SUPPORTED` | **Demote to displayed metric** |
+| `hip_hinge_loading` | A1, A3, A10 ⚠️ | `SUPPORTED WITH LIMITATIONS` | Keep, widen band, distance-specific |
 | `elbow_slot_ball_lift` | A1, A2, D2 | `ENGINEERING DECISION` | Keep as *tunable prior*; relabel rationale |
-| `shoulder_alignment_lift` | D4 (bias −16 to −26°) | `NOT SUPPORTED` (measurement) | **Remove from scoring** |
+| `shoulder_alignment_lift` | D4 (bias −16 to −26°), A10 ⚠️ | `NOT SUPPORTED` (measurement) | **Remove from scoring** |
 | `trunk_posture` | A2 (trunk lean), D4 | `SUPPORTED WITH LIMITATIONS` | **Currently 0% pass — Y-axis bug.** Fix first |
 | `release_height` | A2 (p=0.010), A6 | `SUPPORTED WITH LIMITATIONS` | **Currently 0% pass — Y-axis bug.** Then height-normalise |
 | `elbow_extension_release` | A3 (158.8–159.3°) | `SUPPORTED WITH LIMITATIONS` | Note: **not 180°** |
@@ -395,7 +463,25 @@ No coaching target can be asserted more precisely than the measurement supports.
 | `landing_balance` | — | `ENGINEERING DECISION` | Label as such |
 | `head_stability` | — | `ENGINEERING DECISION` | Label as such |
 
-**Code map:** `angles/calculator.py` (D1, D4) · `phase_detection/detector.py` (A7 set/jump) · `analysis/engine.py` (all rules) · `feedback/` (C1 external focus) · future `player/profile` (B2, B3)
+⚠️ **The "Action required" column records what this file recommends, not what
+the code does.** Two rows are still unapplied at the time of writing:
+
+- `knee_flexion_loading` is **`scored: true`** in `config/biomechanics.yaml`,
+  against "Demote to displayed metric" here and against §D3's "do not assert a
+  target and do not penalise". The conflict is recorded verbatim in that rule's
+  `evidence:` block so the maintainer can settle it deliberately; it has **not**
+  been silently resolved in either direction.
+- `hip_hinge_loading`'s band was not made distance-specific.
+
+`shoulder_alignment_lift` **is** applied — it is `scored: false`.
+
+The two **"Currently 0% pass — Y-axis bug"** notes predate the coordinate fix
+(`pose/landmarks.py`, covered by `tests/test_coordinates.py`). Both rules now
+pass on real footage; `trunk_posture` was additionally narrowed to the `release`
+phase. The notes are kept for the record of why those rules were re-examined,
+not as a current status.
+
+**Code map:** `angles/calculator.py` (D1, D4) · `shots/classifier.py`, `shots/elevation.py` (A7 set/jump) · `analysis/engine.py` (all rules) · `feedback/` (C1 external focus) · `player/profile.py` (B2, B3) · `scripts/measure_angle_uncertainty.py` and `docs/LIMITS.md` (D4, measured on our own footage)
 
 ---
 
@@ -412,6 +498,8 @@ No coaching target can be asserted more precisely than the measurement supports.
 | F7 | Wulf 2013 + free-throw focus study full texts | Currently abstract-only; **needed before C1 drives the feedback rewrite** |
 | F8 | Okubo & Hubbard 2018 full text | 403; conceptual claim only until resolved |
 | F9 | IJERPH current WoS status | Re-check Clarivate Master Journal List before submission |
+| F10 | **Cabarkapa 2023b (A10, PMC10531893) full text** | **Highest priority.** Roughly a dozen numeric figures in three rules — two of them scored — rest on a paper this corpus holds nothing of. Retrieve it, confirm or correct every figure listed in A10, then assign a tier and an evidence class |
+| F11 | A2's knee preparation p-value | §A2 records **p=0.183**; `knee_flexion_loading` quotes **p=0.549** for the same comparison (113.3 vs 107.3, N=34). One of the two is wrong. Resolve at PMC10436204 |
 
 ---
 
@@ -425,33 +513,28 @@ No coaching target can be asserted more precisely than the measurement supports.
 
 ---
 
-*Maintained alongside `research.md` and `docs/AUDIT_AND_PLAN.md`. Every claim in either document must resolve to an entry here.*
+*This file is the only evidence map. Every research claim in `README.md`,
+`docs/PHASES_AND_SCORING.md`, `docs/LIMITS.md`, `docs/SEGMENTATION.md` and the
+`evidence:` blocks of `config/biomechanics.yaml` must resolve to an entry here.*
 
 ---
 
 # PART H — RESOLVABLE LINKS
 
-A link for every source above. Merged from the former `PAPER_LINKS.md`
-so that one file answers both "what does this support?" and "where do
-I find it?".
+A resolvable link for every source cited anywhere in this repository. Merged
+from the former `PAPER_LINKS.md` (deleted) so that one file answers both "what
+does this support?" and "where do I find it?".
 
-**A resolvable link for every source cited anywhere in this repository.**
-
-This file is an *index*, not an evidence map. It answers one question: "where do
+This Part is an *index*, not an evidence map. It answers one question: "where do
 I actually find this paper?" For what each paper supports, how strongly, and
-what it must not be used for, read [`resources.md`](resources.md) — that file
-remains the single source of truth for every research claim.
+what it must not be used for, read **Parts A–G above** — they are the single
+source of truth for every research claim.
 
-Sources are spread across four files, and they do not all agree with each other.
-See [Known citation problems](#known-citation-problems) before sharing this
-corpus with anyone.
-
-| File | Role |
-|---|---|
-| [`resources.md`](resources.md) | Curated evidence map. Authoritative. |
-| [`research.md`](research.md) | Working research notes. |
-| [`docs/BIOMECHANICS_RESEARCH.md`](docs/BIOMECHANICS_RESEARCH.md) | **Older, superseded.** Contains two errors, below. |
-| [`docs/PRODUCT_ROADMAP.md`](docs/PRODUCT_ROADMAP.md) | Engineering prior art — other systems, not evidence. |
+Sources used to be spread across four files, which did not all agree with each
+other. **Three of those four no longer exist** (`research.md`,
+`docs/BIOMECHANICS_RESEARCH.md`, `docs/PRODUCT_ROADMAP.md`); this file is what
+survives. The disagreements they contained are recorded, as history, under
+[Known citation problems](#known-citation-problems).
 
 ---
 
@@ -459,14 +542,16 @@ corpus with anyone.
 
 | Marker | Meaning |
 |---|---|
-| ✅ | DOI, PMC or PMID recorded explicitly in `resources.md`. Link is a mechanical expansion of that identifier. |
-| 🔧 | **DOI constructed from the publisher's numbering pattern**, because the source file records journal + volume + article number but no DOI. Very likely correct, **not opened**. Verify before citing. |
+| ✅ | DOI, PMC or PMID recorded explicitly in Parts A–G. Link is a mechanical expansion of that identifier. |
+| 🔧 | **DOI constructed from the publisher's numbering pattern**, because the entry records journal + volume + article number but no DOI. Very likely correct, **not opened**. Verify before citing. |
 | ❌ | No identifier recorded anywhere. Must be located. |
 
-A second, independent axis is how much of each paper was actually read.
-`resources.md` tracks this and it is not flattering: **four papers were read in
-full**; most of the rest were read as abstracts only. That column is reproduced
-here as *Read*.
+A second, independent axis is how much of each paper was actually read. Parts
+A–G track this and it is not flattering: **four papers were read in full**; most
+of the rest were read as abstracts only. That column is reproduced here as
+*Read*. A `FULL` marker means the numbers appear in Parts A–G, transcribed from
+the paper's own results tables — if a paper's numbers are not written down
+above, it does not get a `FULL`.
 
 | Read | Meaning |
 |---|---|
@@ -489,15 +574,20 @@ here as *Read*.
 | A7 | Okubo & Hubbard 2018 — Set-shot vs jump-shot kinematics. *Proceedings* 2(6):201 | https://doi.org/10.3390/proceedings2060201 | ✅ | ABS |
 | A8 | Okazaki & Rodacki 2012 — Increased shooting distance. *J Sports Sci Med* 11:231–237 | *(no DOI recorded; open access, findable by title)* | ❌ | ABS |
 | A9 | Okazaki, Rodacki & Satern 2015 — Review of the basketball jump shot. *Sports Biomech* 14(2):190–205 | https://doi.org/10.1080/14763141.2015.1052541 | ✅ | ABS |
-| — | Cabarkapa et al. 2023b — Female shooters. *JFMK* 8(3):129 | https://pmc.ncbi.nlm.nih.gov/articles/PMC10531893/ | ✅ | FULL |
+| **A10** | Cabarkapa et al. 2023b — Female shooters. *JFMK* 8(3):129 ⚠️ **NOT VERIFIED — see §A10** | https://pmc.ncbi.nlm.nih.gov/articles/PMC10531893/ | ✅ | — |
 | — | Li 2025 — Arm-joint coordination variability, collegiate vs recreational, 3-pt | https://pmc.ncbi.nlm.nih.gov/articles/PMC12121896/ | ✅ | FULL |
 | — | Jovanović et al. 2022 — Made vs missed jump shots. *Biomechanics* 2(3):428–441 | https://doi.org/10.3390/biomechanics2030028 | ✅ | — |
 | — | Shot-type definitions | https://pmc.ncbi.nlm.nih.gov/articles/PMC4454648/ | ✅ | — |
 
-> **A3 is the priority gap.** It carries the *only* statistically significant
-> knee-depth result in the entire corpus (p<0.001), and it is also the finding
-> most contradicted elsewhere (see `resources.md` §D3). It needs a real DOI
-> before it is defensible.
+> **A3 is the priority gap for identifiers.** It carries the *only*
+> statistically significant knee-depth result in the entire corpus (p<0.001),
+> and it is also the finding most contradicted elsewhere (see §D3). It needs a
+> real DOI before it is defensible.
+>
+> **A10 is the priority gap for content.** Its link resolves and its `Read`
+> marker was previously `FULL`, but no number from it is recorded anywhere in
+> Parts A–G, while three rules — two of them scored — quote roughly a dozen of
+> its figures. The `Read` marker has been corrected to `—`. See §A10 and F10.
 
 ---
 
@@ -538,8 +628,8 @@ Drives the external-focus rewrite of every message in `config/biomechanics.yaml`
 |---|---|---|
 | Brancazio geometric rule — optimal angle ≈ 45° + ½ × (ball-to-basket angle) | *(primary publication never located; currently sourced from blog pages)* | ❌ |
 
-> `resources.md` §B1 marks this **`❌ UNVERIFIED`** and **"blocking for any
-> geometric personalisation claim."** Do not cite it until the primary is found.
+> §B1 marks this **`❌ UNVERIFIED`** and **"blocking for any geometric
+> personalisation claim."** Do not cite it until the primary is found.
 
 ---
 
@@ -557,12 +647,12 @@ Other systems, cited for approach — **not** as evidence for any biomechanical 
 
 ## F. Excluded sources
 
-Recorded so they are not accidentally reintroduced. See `resources.md` §D5.
+Recorded so they are not accidentally reintroduced. See §D5.
 
 | Source | Reason |
 |---|---|
 | Vencúrik et al. 2021, *IJERPH* 18(3):934 — https://doi.org/10.3390/ijerph18030934 | **Discontinued from Web of Science, 13 Feb 2023.** Citable for entry-angle data *only* with the delisting disclosed in a footnote. |
-| *Int. J. of Physiology, Sports and Physical Education* (Sparkling Press) — `10.33545/26647710.2025.v7.i2f.191` | No Scopus, WoS or PubMed listing. Matches a predatory-adjacent domain cluster. **Excluded entirely** — but still cited in `docs/BIOMECHANICS_RESEARCH.md`, see below. |
+| *Int. J. of Physiology, Sports and Physical Education* (Sparkling Press) — `10.33545/26647710.2025.v7.i2f.191` | No Scopus, WoS or PubMed listing. Matches a predatory-adjacent domain cluster. **Excluded entirely.** It was still cited in `docs/BIOMECHANICS_RESEARCH.md`; that file has since been deleted, and no citation to this DOI remains in the repository. |
 | iosrjournals.org free-throw release-angle paper | Unindexed. |
 | Wordpress "physics of basketball" pages | Used only to locate the Brancazio rule. Not citable. |
 
@@ -570,50 +660,59 @@ Recorded so they are not accidentally reintroduced. See `resources.md` §D5.
 
 ## Known citation problems
 
-Two live contradictions between `docs/BIOMECHANICS_RESEARCH.md` (older) and
-`resources.md` (authoritative). Both are in the repository right now.
+### Resolved by deletion — kept as history, not as live defects
 
-### 1. A misattributed citation — same article, two different papers
+`docs/BIOMECHANICS_RESEARCH.md` carried two contradictions against this file.
+**That document no longer exists in the repository**, and neither problem is
+live; both are recorded so that the errors are not reintroduced from an old
+copy of it.
 
-`docs/BIOMECHANICS_RESEARCH.md:172` records:
+**1. A misattributed citation — same article, two different papers.**
+The deleted file recorded A1's content as:
 
 > Jovanović, M., et al. (**2023**). Impact of Distance and Proficiency on
 > Shooting Kinematics. ***Sports***, 7(4), 78. `10.3390/sports7040078`
 
-`resources.md` §A1 records the same content as:
+§A1 records it as:
 
 > **Cabarkapa** et al. (**2022**). ***Journal of Functional Morphology and
 > Kinesiology***, 7(4):78. `10.3390/jfmk7040078`
 
 Same volume, same issue, same article number — **different journal, different
-authors, different year.** The `sports` vs `jfmk` DOI slug suggests the older
-file is the one in error.
+authors, different year.** The `sports` vs `jfmk` DOI slug indicates the deleted
+file was the one in error. §A1 is correct and is the only version that survives.
+This mattered more than the average citation slip: A1 is the source of the
+displacement figures behind the set-vs-jump threshold and of the
+distance-specific knee and hip targets.
 
-This matters more than the average citation slip: A1 is the source of the
-set-vs-jump classifier threshold and of the distance-specific knee and hip
-targets. Anyone checking that single DOI lands on a different article.
+**2. An excluded source was cited.** The deleted file cited
+`10.33545/26647710.2025.v7.i2f.191`, which §D5 excludes entirely as
+predatory-adjacent. Verified: that DOI now appears nowhere in the repository
+except in §D5 and in Part H section F, both times as an exclusion.
 
-### 2. An excluded source is still cited
+### Live
 
-`docs/BIOMECHANICS_RESEARCH.md` lines 59 and 173 still cite
-`10.33545/26647710.2025.v7.i2f.191`, which `resources.md` §D5 excludes entirely
-as predatory-adjacent. The older document contradicts the newer one, and both
-ship together.
+**A10 (Cabarkapa 2023b) drives scored rules on figures this corpus does not
+hold.** See §A10, F10. This is the outstanding citation defect.
+
+**§A2 and `knee_flexion_loading` disagree on a p-value** for the same
+comparison — 0.183 here, 0.549 in the rule. See F11.
 
 ---
 
 ## What still needs doing
 
-Mirrors `resources.md` Part F, reduced to the items that block a citation.
+Mirrors Part F, reduced to the items that block a citation.
 
 | # | Item | Why it blocks |
 |---|---|---|
-| 1 | Locate the DOI for **Cabarkapa 2026** (A3) | Carries the only significant knee-depth result |
-| 2 | Locate **Brancazio's** primary publication | Blocks every geometric personalisation claim |
-| 3 | Verify the four 🔧 DOIs in section B | They set the measurement-error ceiling for the whole system |
-| 4 | Resolve the two contradictions above | One is a wrong-article link on the most-used paper |
-| 5 | Retrieve full text for the nine `ABS` papers | Currently cited from abstracts |
+| 1 | Retrieve **Cabarkapa 2023b** (A10) and confirm its figures | Roughly a dozen numbers in three rules, two of them scored, rest on a paper held only as a link |
+| 2 | Locate the DOI for **Cabarkapa 2026** (A3) | Carries the only significant knee-depth result |
+| 3 | Locate **Brancazio's** primary publication | Blocks every geometric personalisation claim |
+| 4 | Verify the four 🔧 DOIs in section B | They set the measurement-error ceiling for the whole system |
+| 5 | Resolve the A2 knee p-value discrepancy (F11) | The same comparison is quoted two different ways in two places |
+| 6 | Retrieve full text for the nine `ABS` papers | Currently cited from abstracts |
 
 ---
 
-*Index only. Every claim must resolve to an entry in [`resources.md`](resources.md).*
+*Index only. Every claim must resolve to an entry in Parts A–G of this file.*

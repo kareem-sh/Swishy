@@ -19,7 +19,7 @@
 # produces better motor learning and retention than focusing on the limb
 # itself -- one of the most replicated findings in motor learning, tested on
 # basketball free throws specifically (constrained-action hypothesis; see
-# resources.md Part C).
+# SOURCES.md Part C).
 #
 #   internal (weaker):  "Bend your knees deeper"
 #   external (better):  "Drive the floor away as you rise"
@@ -30,7 +30,7 @@
 # ---------------------------------------------------------------------------
 # EVIDENCE LABELS
 # ---------------------------------------------------------------------------
-# Every rule carries `evidence:` naming its class, per resources.md Part E:
+# Every rule carries `evidence:` naming its class, per SOURCES.md Part E:
 #   DIRECTLY SUPPORTED / SUPPORTED WITH LIMITATIONS / INFERRED /
 #   ENGINEERING DECISION / NOT SUPPORTED
 # Thresholds labelled ENGINEERING DECISION are our choices, NOT published
@@ -66,32 +66,77 @@ rules:
     message_low: "You're bending your knees too deep, so there's a pause at the bottom. Come up a little higher and keep it flowing."
     message_high: "Bend your knees a bit deeper before you rise. Right now the arm is doing the work — let your legs send the ball up."
     evidence: >
-      NOT SUPPORTED as a proficiency discriminator. This is now the most
-      thoroughly contradicted claim in the project, and the position has
-      only hardened with additional sources.
+      NOT SUPPORTED as a proficiency discriminator. This is the most
+      thoroughly contradicted claim in the project.
 
-      Non-significant in three independent samples at the preparatory phase:
+      ⚠️ UNRESOLVED CONFLICT — THIS RULE IS SCORED AGAINST THE CORPUS'S OWN
+      INSTRUCTION. SOURCES.md Part E gives this rule the class NOT SUPPORTED
+      and the action, verbatim:
+
+          "Demote to displayed metric"
+
+      and SOURCES.md D3, verbatim:
+
+          "`knee_flexion_loading` must be demoted from a scored rule to a
+           displayed metric. Show the number and its trend across reps; do not
+           assert a target and do not penalise. This also removes an unfair
+           penalty on shorter/longer-limbed players."
+
+      The rule is nevertheless `scored: true` today, so a player IS penalised
+      against a target the evidence map says must not be asserted. That is a
+      live contradiction, recorded here rather than settled quietly: flipping
+      `scored` changes every score this project has produced, so it is the
+      maintainer's decision to take deliberately, not a documentation edit.
+      Until it is taken, this rule's contribution to the score has no evidential
+      basis. `severity: info` limits the damage; it does not remove it.
+
+      ⚠️ FIGURES BELOW ARE UNVERIFIED AGAINST OUR CORPUS. Of the three samples
+      quoted as "independent", SOURCES.md contains one:
+
           free throw,  N=34  113.3 (9.1) vs 107.3 (14.9)   p=0.549
+              MEANS AND SDs MATCH SOURCES.md A2 (PMC10436204). THE P-VALUE DOES
+              NOT: A2 records p=0.183 for this comparison, not 0.549. One of the
+              two is wrong and neither has been re-checked against the paper.
+              SOURCES.md F11.
+
           two-point,   N=18  115.6 (10.9) vs 113.8 (6.3)   p=0.672
           three-point, N=18  109.6 (5.8) vs 109.2 (11.6)   p=0.925
-      Against that: proficient shooters loaded deeper at 3-point range in one
-      earlier sample (p<0.001), and one report associates LOWER preparatory
-      flexion with successful shooting — the opposite direction again.
+              NOT IN THE CORPUS. Both are attributed to Cabarkapa et al. 2023b
+              (PMC10531893, female shooters), which SOURCES.md A10 records as
+              NOT VERIFIED: no full text retrieved, no number confirmed. These
+              figures exist in this file and nowhere else. Do not cite them.
+              SOURCES.md A10, F10.
 
-      DO NOT read the three non-significant p-values as proof of "no
-      difference". At n=18-34 they are evidence of low statistical power, not
-      of equivalence. The honest statement is that no consistent proficiency
-      effect has been demonstrated in either direction.
+      Note also that they are not three INDEPENDENT samples in the sense that
+      word usually carries. All three come from the same research group, which
+      is the single-lab dependency SOURCES.md Part G #2 calls "the largest
+      credibility risk in this corpus".
 
-      What IS consistent is the RANGE. Every sample lands between roughly
-      107 and 116 deg at the preparatory phase, and knee angle deepens
-      reliably with shooting distance (114.8 deg at 5.10 m vs 109.4 deg at
-      6.32 m, p<0.001). So the band is defensible as a description of what
-      shooters do; it is not defensible as a description of what wins.
+      Against those nulls: proficient shooters loaded deeper at 3-point range in
+      A3 (113.2 vs 94.3 deg, p<0.001, n=24 — this one IS in the corpus), and one
+      report associates LOWER preparatory flexion with successful shooting, the
+      opposite direction again. SOURCES.md D3 counts four findings in three
+      directions.
 
-      Band is an ENGINEERING DECISION spanning published values (94-122 deg),
-      kept at `info` severity so it informs without penalising.
-      resources.md D3; PMC10436204, PMC10531893.
+      DO NOT read the non-significant p-values as proof of "no difference". At
+      n=18-34 they are evidence of low statistical power, not of equivalence.
+      The honest statement is that no consistent proficiency effect has been
+      demonstrated in either direction.
+
+      What is consistent across the quoted samples is the RANGE — roughly
+      107 to 116 deg at the preparatory phase. The distance trend once cited
+      here (114.8 deg at 5.10 m vs 109.4 deg at 6.32 m, p<0.001) is ⚠️ ALSO
+      FROM PMC10531893 AND UNVERIFIED. The corpus's own distance evidence is
+      A1's prep-phase knee series, 121.5 / 116.7 / 112.5 deg by increasing
+      distance, which is consistent in direction but is a set of means, not a
+      significance test of the trend.
+
+      So the band is defensible as a rough description of what shooters do; it
+      is not defensible as a description of what wins. It is an ENGINEERING
+      DECISION spanning published values (94-122 deg), kept at `info` severity
+      so it informs without carrying a warning's weight.
+
+      SOURCES.md D3, Part E, A2, A3, A10, F10, F11.
 
   hip_hinge_loading:
     name: "Hip Drive"
@@ -110,28 +155,58 @@ rules:
     message_low: "You're folding forward at the waist. Keep your chest up toward the rim as you sink."
     message_high: "Your hips stay too upright to build power. Push them back as you lower, like you're sitting onto a high stool."
     evidence: >
-      SUPPORTED WITH LIMITATIONS — the best-supported LOWER-BODY rule here,
-      and notably better supported than the knee.
+      DIRECTION is contested; THE BAND IS AN ENGINEERING DECISION. This block
+      previously opened "SUPPORTED WITH LIMITATIONS — the best-supported
+      LOWER-BODY rule here, and notably better supported than the knee". The
+      comparison was doing more work than the evidence allows: most of what made
+      it look better supported than the knee is a set of figures the corpus does
+      not contain.
 
-      Hip angle at the preparatory phase separated proficiency in a second,
-      independent sample: Cabarkapa et al. (2023), N=18 female players,
-      two-point range 5.10 m —
-          proficient (>=50% made)      136.9 deg (SD 6.2)
-          non-proficient (<50% made)   128.6 deg (SD 10.0)   p=0.048
-      i.e. the better shooters were LESS folded at the hip, not more.
+      ⚠️ UNVERIFIED AGAINST OUR CORPUS. The headline result quoted here —
 
-      It also separated proficiency at 3-point range in the earlier sample
-      (143.1 vs 155.9 deg, p<0.001), and it deepens systematically with
-      distance (133.2 deg at 5.10 m vs 126.3 deg at 6.32 m, p<0.001), which
-      is a dose-response pattern rather than a one-off difference.
+          Cabarkapa et al. (2023), N=18 female players, two-point range 5.10 m
+              proficient (>=50% made)      136.9 deg (SD 6.2)
+              non-proficient (<50% made)   128.6 deg (SD 10.0)   p=0.048
 
-      LIMITATIONS: p=0.048 is marginal; n=18; one research group; and the two
-      samples disagree on DIRECTION (the female two-point sample favours a
-      more open hip, the earlier 3-point sample a more closed one). That
-      disagreement is why the band stays wide and severity stays `info`
-      rather than being tightened around either mean.
+      — appears nowhere in SOURCES.md. It is attributed to PMC10531893, which
+      SOURCES.md A10 records as NOT VERIFIED: no full text retrieved, no number
+      confirmed, no evidence class assigned. The same applies to the distance
+      trend once cited here (133.2 deg at 5.10 m vs 126.3 deg at 6.32 m,
+      p<0.001) — ⚠️ ALSO FROM PMC10531893, ALSO UNVERIFIED. Neither figure may
+      be cited outside this file until F10 is closed.
 
-      resources.md A1, A3; PMC10531893, PMC10436204.
+      WHAT THE CORPUS ACTUALLY HOLDS FOR THE HIP:
+
+          A3 (Cabarkapa 2026, n=24, three-point, prep phase)
+              non-proficient   155.9 deg
+              proficient       143.1 deg      p<0.001
+          A1 (Cabarkapa 2022, n=10 professional males, prep phase)
+              143.9 / 141.1 / 135.5 deg by increasing shooting distance,
+              with NO significant proficiency difference at any distance.
+
+      That is one significant proficiency result, at one distance, from one
+      laboratory, plus a set of means showing the hip closes with distance.
+      SOURCES.md Part G #2 records that no independent replication of this
+      group's shooting kinematics exists.
+
+      THE TWO SAMPLES DISAGREE ON DIRECTION, and this survives the
+      verification problem: A3 has the better shooters MORE folded at the hip
+      (143.1 vs 155.9), while the unverified female two-point sample has them
+      LESS folded (136.9 vs 128.6). A rule cannot coach toward both. That
+      disagreement is why the band stays wide, why it is not tightened around
+      either mean, and why severity stays `info`.
+
+      AND A GROUP MEAN IS NOT AN INDIVIDUAL CUTOFF. Even taking A3 at face
+      value, it says two groups differ on average at one distance. It does not
+      say that an individual crossing a line shoots worse, and nothing in the
+      corpus reports the within-group spread needed to turn a mean into a
+      threshold. 110-168 and 125-152 are ours: they span the published means
+      with room for our own measurement error (hip disagreement between
+      MediaPipe's full and heavy models is 6.2 deg mean, docs/LIMITS.md), and
+      no published interval was narrowed toward, because none exists in the
+      corpus to narrow toward.
+
+      SOURCES.md A1, A3, A10, Part G; F10.
 
   # -------------------------------------------------------------- ball lift
   elbow_slot_ball_lift:
@@ -157,7 +232,7 @@ rules:
       values do not vary systematically with distance or skill, but that
       rests on non-significant results (p=0.471, p=0.706) from samples of
       10-34 in one laboratory — which is low statistical power, NOT
-      demonstrated invariance. Treated as a tunable prior. resources.md D2.
+      demonstrated invariance. Treated as a tunable prior. SOURCES.md D2.
 
   shoulder_alignment_lift:
     name: "Shoulder Elevation"
@@ -172,22 +247,34 @@ rules:
     message_low: "Shoulder elevation, for reference — this one isn't scored."
     message_high: "Shoulder elevation, for reference — this one isn't scored."
     evidence: >
-      NOT SUPPORTED FOR SCORING — held back by MEASUREMENT, not by biology.
-      This distinction matters, because the biomechanical evidence here is
-      now stronger than for the knee, which IS scored.
+      NOT SUPPORTED FOR SCORING — held back by MEASUREMENT first, and by an
+      unverified citation second.
 
-      Shoulder angle at the preparatory phase separated proficiency:
-      Cabarkapa et al. (2023), N=18 female players, two-point range —
-          proficient (>=50% made)      52.3 deg (SD 11.6)
-          non-proficient (<50% made)   63.8 deg (SD 6.7)    p=0.025
-      i.e. better shooters carried a LOWER shoulder. It also decreases with
-      distance (57.4 deg at 5.10 m vs 54.2 deg at 6.32 m, p=0.006).
+      ⚠️ UNVERIFIED AGAINST OUR CORPUS. The proficiency result quoted here —
 
-      WHY IT STAYS UNSCORED ANYWAY: single-camera shoulder angle carries a
-      bias of -16 to -26 deg and RMSE of 24-36 deg depending on camera
-      azimuth. The published proficiency gap is 11.5 deg — roughly half our
-      measurement error. We would be scoring noise. Displayed for
-      observability only.
+          Cabarkapa et al. (2023), N=18 female players, two-point range
+              proficient (>=50% made)      52.3 deg (SD 11.6)
+              non-proficient (<50% made)   63.8 deg (SD 6.7)    p=0.025
+
+      — i.e. better shooters carrying a LOWER shoulder, and the distance trend
+      beside it (57.4 deg at 5.10 m vs 54.2 deg at 6.32 m, p=0.006), are both
+      attributed to PMC10531893. SOURCES.md A10 records that paper as NOT
+      VERIFIED: no full text retrieved, no number confirmed. Neither figure
+      appears anywhere else in the corpus.
+
+      This block previously argued from those figures that "the biomechanical
+      evidence here is now stronger than for the knee, which IS scored". That
+      comparison is withdrawn: it rested entirely on numbers the corpus does
+      not hold. What the corpus does hold for the shoulder is A1's preparatory
+      means (78.9 / 72.7 / 65.8 deg by increasing distance, SD 26.4-31.4 —
+      roughly 40% of the mean), with NO significant proficiency difference.
+
+      WHY IT STAYS UNSCORED REGARDLESS: this rule would be excluded on
+      measurement grounds even if every figure above were confirmed tomorrow.
+      Single-camera shoulder angle carries a bias of -16 to -26 deg and RMSE of
+      24-36 deg depending on camera azimuth (SOURCES.md D4, which IS verified).
+      The claimed proficiency gap is 11.5 deg — roughly half that measurement
+      error. We would be scoring noise. Displayed for observability only.
 
       CONFIRMED ON OUR OWN FOOTAGE. The published figure above came from the
       literature; it has now been reproduced here. Measured on salah_video.mp4,
@@ -198,15 +285,16 @@ rules:
       is therefore ours by measurement, not only by citation.
       scripts/measure_angle_uncertainty.py; docs/LIMITS.md.
 
-      NOTE ON THE RANGE: min/max 55-135 predates this evidence and implies
-      that a high shoulder is acceptable while a low one is not, which is
-      backwards relative to the finding above (proficient mean 52.3 sits
-      BELOW our minimum). The range is left unchanged on purpose, because
-      changing display bounds on an unscored rule would alter what the
-      report shows without improving what it knows. Revisit together with
-      the camera-geometry limitation, not before.
+      NOTE ON THE RANGE: min/max 55-135 is an ENGINEERING DECISION that
+      predates all of the above. It implies a high shoulder is acceptable while
+      a low one is not, which is backwards relative to the unverified finding
+      above (its proficient mean of 52.3 sits BELOW our minimum) and is not
+      obviously right against A1's much higher means either. The range is left
+      unchanged on purpose, because changing display bounds on an unscored rule
+      would alter what the report shows without improving what it knows.
+      Revisit together with the camera-geometry limitation and F10, not before.
 
-      resources.md D4; PMC10531893.
+      SOURCES.md D4 (verified), A1, A10 (⚠️ unverified), F10.
 
   trunk_posture:
     name: "Upper Body Posture"
@@ -449,11 +537,46 @@ rules:
     message_low: "You're letting it go too early, low in the motion. Release at the top of your rise, not on the way up."
     message_high: "You're over-reaching at release and losing control. Let it go a touch earlier."
     evidence: >
-      SUPPORTED WITH LIMITATIONS. Release height was the only variable that
-      separated proficient from non-proficient free-throw shooters (p=0.010),
-      while release ANGLE did not (p=0.179); independently replicated. This
-      metric is measured relative to the head, so it is scale-free and works
-      without a recorded player height. resources.md A2, A6.
+      DIRECTION supported from a single laboratory; THE THRESHOLDS ARE AN
+      ENGINEERING DECISION with no counterpart in any cited source.
+
+      "INDEPENDENTLY REPLICATED" WAS WRONG AND IS WITHDRAWN. This block used to
+      claim it. SOURCES.md Part G #2 states the opposite, verbatim:
+
+          "No independent replication of the Cabarkapa group's shooting
+           kinematics exists. Single-lab dependency is the largest credibility
+           risk in this corpus."
+
+      docs/LIMITS.md records the same thing. The proficiency finding behind this
+      rule — release height separated proficient from non-proficient free-throw
+      shooters (p=0.010) while release ANGLE did not (p=0.179) — is A2 alone,
+      n=34, recreationally active males, one lab, one proprietary 3D system.
+      A6 is a different group and also found release height higher on successful
+      shots, but it measures MADE versus MISSED attempts within shooters, not
+      proficient versus non-proficient shooters, and it reports R-squared of
+      0.005-0.012 between biomechanical parameters and accuracy. It supports the
+      direction; it does not replicate the finding.
+
+      THE NUMBERS IN THIS RULE ARE NOT FROM ANY SOURCE. 0.06 / 0.16 / 0.46 /
+      0.62 m are measured HEAD-RELATIVE — the ball's release point relative to
+      the player's head — and no source in the corpus reports that quantity in
+      any form. A2 reports release height only as a RATIO OF BODY HEIGHT (1.12
+      non-proficient vs 1.17 proficient). A6 and A8 report absolute height above
+      the floor (2.02-2.13 m; 2.46 down to 2.33 m with distance). There is no
+      published interval to narrow toward here and no conversion between those
+      units and ours, so the band is ours, chosen to span what this pipeline
+      measures.
+
+      The head-relative construction is deliberate and is the rule's one real
+      advantage: it is scale-free, so it works without a recorded player height.
+      `release_height_ratio` carries the body-height comparison that the
+      literature actually supports, and is skipped when no height is given.
+
+      A group mean is also not an individual cutoff. A2 says two groups of
+      recreational adults differed on average by 0.05 body heights. It does not
+      say a player crossing a line shoots worse.
+
+      SOURCES.md A2, A6, Part G #2; docs/LIMITS.md.
 
   release_height_ratio:
     name: "Release Height (relative to your height)"
@@ -473,11 +596,28 @@ rules:
     message_low: "Your release is low for your height. Let it go at the top of your rise to get more arc."
     message_high: "That release reads unusually high for your height — check your whole body is in frame."
     evidence: >
-      SUPPORTED WITH LIMITATIONS. Published release heights are reported ONLY
-      as a ratio of body height (1.12 non-proficient vs 1.17 proficient,
-      p=0.010), which is why this rule exists alongside the head-relative one.
+      DIRECTION supported from a single laboratory; THE BAND IS AN ENGINEERING
+      DECISION.
+
+      The Cabarkapa group reports release height ONLY as a ratio of body
+      height, never as raw metres — A2 gives 1.12 non-proficient vs 1.17
+      proficient, p=0.010 — and that consistent precedent across four of its
+      papers is why this rule exists alongside the head-relative one.
+      SOURCES.md B2 classes the normalisation itself SUPPORTED WITH
+      LIMITATIONS, on the explicit ground that all four papers come from one
+      group with no independent replication (Part G #2). Other groups report
+      release height in absolute metres (A6 2.02-2.13 m; A8 2.46 down to
+      2.33 m with distance), which is not comparable across players and is not
+      what this rule measures.
+
+      THE BAND IS OURS. 1.02-1.58 and 1.14-1.46 are centred on A2's two group
+      means, which differ by 0.05 body heights. No published dispersion for
+      this ratio is recorded in the corpus, so there was no interval to narrow
+      toward, and a two-group mean difference is not an individual cutoff in
+      any case.
+
       SKIPPED ENTIRELY when no player height is provided — never estimated
-      from the camera. resources.md A2, B2, B3.
+      from the camera. SOURCES.md A2, A6, A8, B2, B3, Part G #2.
 
   # --------------------------------------------------------- follow-through
   follow_through_elbow:

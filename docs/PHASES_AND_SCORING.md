@@ -37,16 +37,23 @@ over an array cannot get stuck. A live velocity threshold can, and did.
 
 | # | Phase | Located by | Rules |
 |---|---|---|---:|
-| 1 | `ready_stance` | before the knee starts to bend | 1 |
-| 2 | `loading` | `argmin` of knee angle = bottom of the dip | 4 |
-| 3 | `ball_lift` | dip bottom → take-off | 4 |
-| 4 | `jump` | body rise ≥ 0.05 body heights (absent for a set shot) | 3 |
+| 1 | `ready_stance` | before the knee starts to bend | 0 |
+| 2 | `loading` | `argmin` of knee angle = bottom of the dip | 3 |
+| 3 | `ball_lift` | dip bottom → take-off | 3 |
+| 4 | `jump` | body rise ≥ 0.05 body heights (absent for a set shot) | 2 |
 | 5 | `release` | the shooting event, from the segmenter | **6** |
 | 6 | `follow_through` | release → hand drops | 2 |
 | 7 | `landing` | ankles back to baseline | 1 |
 
-`release` carries almost half the rules, which matches the evidence: release
-height is the strongest proficiency correlate in `SOURCES.md`.
+Counted from `phases:` in `config/biomechanics.yaml`. The first four dropped by
+one when `trunk_posture` was narrowed to `release` alone — it had been running
+under a single threshold across four postures, and in `loading` it penalised the
+same forward hinge that `hip_hinge_loading` rewards.
+
+`release` carries almost half the rules. That reflects where the evidence is
+thickest, not a proven ranking: release height is the only variable that
+separated proficient from non-proficient shooters in the one study that tested
+it (`SOURCES.md` A2, n=34, single laboratory, no independent replication).
 
 `knee_flexion` was removed. It carried the same two rules as `loading`, so one
 dip was reported twice under two headings, sometimes with contradictory
@@ -54,11 +61,11 @@ readings because the deepest bend fell in one and a shallower one in the other.
 
 ### Phases without their own rules
 
-`ready_stance` and `jump` have **no rule unique to them** — everything they
-measure (`trunk_posture`, `head_stability`, `shoulder_alignment_lift`) is also
-measured elsewhere. That is the same argument that justified deleting
-`knee_flexion`, and merging them would shorten the report without losing a
-measurement.
+`ready_stance` now has **no rule at all**, and `jump` has **no rule unique to
+it** — both of the rules it evaluates (`head_stability`,
+`shoulder_alignment_lift`) are also evaluated elsewhere, and both are unscored.
+That is the same argument that justified deleting `knee_flexion`, and merging
+them would shorten the report without losing a measurement.
 
 Not done yet, deliberately: after segmentation was fixed, phase capture went
 from 22/35 to 31/35 on `salah_video`, so this is now a clarity change rather
@@ -80,10 +87,21 @@ governs everything downstream: a shot bounded at 0.63 s captures `release`
 alone, scores 6 of 13 rules, and reports a number that looks like a judgement
 of the player but is a judgement of the window.
 
-Two rules are **measured and displayed but not scored** — the shoulder
-elevation rules. MediaPipe's shoulder-angle error reaches 26° depending on
-camera azimuth (`SOURCES.md` §D4), which is larger than the difference being
-measured. Showing them is honest; scoring them would not be.
+Four rules are **measured and displayed but not scored**:
+`shoulder_alignment_lift`, `head_stability`, `index_alignment_release` and
+`follow_through_index`. Each is withheld for a measured reason, recorded in its
+`evidence:` block — MediaPipe's shoulder-angle error reaches 26° depending on
+camera azimuth (`SOURCES.md` §D4), larger than the difference being measured;
+the two finger-line rules carry 39° of model-to-model disagreement against an
+18–20° band; `head_velocity` is measured relative to the hips rather than to the
+scene. Showing them is honest; scoring them would not be.
+
+One rule is scored **against this project's own evidence map**:
+`knee_flexion_loading` is `scored: true` while `SOURCES.md` Part E and §D3 both
+say it must be demoted to a displayed metric. The conflict is written into that
+rule's `evidence:` block rather than resolved silently, because flipping the
+flag changes every score produced so far. Until it is settled, that rule's
+contribution to the score has no evidential basis.
 
 ---
 
@@ -92,10 +110,20 @@ measured. Showing them is honest; scoring them would not be.
 `shots/elevation.py` and `shots/classifier.py`.
 
 How far the feet rose at the shooting event, in body heights, against a
-threshold of **0.12** — from the literature's 15.3 ± 5.1 cm for free throws
-versus 26.9–31.2 cm for jump shots.
+threshold of **0.12**.
 
-The threshold was right all along. What was wrong was the reference under it.
+**0.12 is calibrated, not derived.** It is an engineering decision measured
+against this project's footage, and `shots/classifier.py` labels it that way at
+the constant itself. The literature only sets its order of magnitude: A1 reports
+vertical displacement of 15.3 ± 5.1 cm for free throws against 26.9–31.2 cm for
+jump shots, which for a ~1.8 m player is roughly 0.085 versus 0.15–0.17 body
+heights, so the classes separate somewhere near 0.12. That study measured
+posterior-calcaneus-to-ground while we measure ankle-landmark rise above a
+standing baseline — related quantities, not interchangeable ones, so no
+threshold can be read off it.
+
+Changing the baseline did not vindicate the number; it left the number alone and
+fixed the reference underneath it, after which the number worked on our clips.
 
 **The baseline is local, taken from the player's own stance seconds before the
 shot.** The floor is not a horizontal line in an image — it is a plane in
