@@ -12,6 +12,13 @@ from geometry.vectors import angle_from_vertical, angle_between_vectors, midpoin
 from pose.visibility import VisibilityGate
 
 
+_SIDE_KEYS = ("elbow", "knee", "ankle_flexion", "hip", "shoulder", "index_align")
+
+# Angles of the LEGS, which belong to the player rather than to the shooting
+# hand. See compute_all for why only these may be measured on the other side.
+_LEG_KEYS = frozenset({"knee", "hip", "ankle_flexion"})
+
+
 @dataclass
 class AngleResult:
     name: str
@@ -73,21 +80,40 @@ class AngleCalculator:
         """
         results: Dict[str, AngleResult] = {}
 
-        side_keys = (
-            "elbow",
-            "knee",
-            "ankle_flexion",
-            "hip",
-            "shoulder",
-            "index_align",
-        )
-        for key in side_keys:
+        other_side = "left" if shooting_side == "right" else "right"
+
+        for key in _SIDE_KEYS:
             chain_name = f"{shooting_side}_{key}"
-            results[chain_name] = self.compute_joint_angle(
-                world_landmarks,
-                JOINT_CHAINS[chain_name],
-                chain_name,
+            result = self.compute_joint_angle(
+                world_landmarks, JOINT_CHAINS[chain_name], chain_name
             )
+
+            # LEG angles fall back to the other leg. Arm angles never do.
+            #
+            # A shooter loads BOTH legs, so which knee we measure is a question
+            # about visibility, not about handedness -- while the elbow, the
+            # shoulder and the finger line belong to the shooting arm and
+            # nothing else, so substituting the other arm would report a
+            # different movement under the same name.
+            #
+            # Binding the legs to the shooting side threw away perfectly good
+            # data. Measured on salah_video shots 3 and 4: the shooting side was
+            # read as `left`, so the LEFT knee was measured at visibility 0.48
+            # and rejected on all 45 frames -- while the RIGHT knee sat at 0.95
+            # and was reliable on all 45. From this camera the far leg is
+            # occluded by the near one, so the far knee is unusable whichever
+            # hand shoots. Both shots lost their knee AND hip rules, scored on 4
+            # rules instead of 9, and came out at 20 and 35 -- for a load the
+            # player had performed and the camera had recorded.
+            if key in _LEG_KEYS and not result.is_valid:
+                fallback_name = f"{other_side}_{key}"
+                fallback = self.compute_joint_angle(
+                    world_landmarks, JOINT_CHAINS[fallback_name], chain_name
+                )
+                if fallback.is_valid:
+                    result = fallback
+
+            results[chain_name] = result
 
         results["trunk"] = self._compute_trunk_angle(world_landmarks)
         return results

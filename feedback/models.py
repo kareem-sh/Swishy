@@ -80,6 +80,11 @@ class ShotSummary:
     entry_phase: Optional[str] = None
     missing_phases: List[str] = field(default_factory=list)
     capture_note: str = ""
+    # Seconds the shooting arm stayed up after release, or None if it never
+    # came down inside the clip. Measured directly from the arm, NOT from the
+    # length of the `follow_through` phase -- see phase_refiner.hold_duration_s
+    # for why that phase cannot answer this.
+    hold_duration_s: Optional[float] = None
     # What to work on next, and the drills for it. `performance_actions` used
     # to sit here too, holding `next_rep_focus` with a "Fix X:" prefix on each
     # line -- it was written on every shot and read by nothing.

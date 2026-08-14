@@ -377,6 +377,14 @@ def print_shot(summary: ShotSummary) -> None:
     print("\n  NOTES BY PHASE")
     for ph in summary.phase_scores:
         _print_phase_notes(ph)
+
+    # Shown, never scored. There is no published norm for how long a
+    # follow-through should be held, and inventing a threshold here would
+    # repeat the mistake this measurement exists to correct.
+    if summary.hold_duration_s is not None:
+        print(f"\n    [MEASURED]  Finish held: {summary.hold_duration_s:.2f}s "
+              "after release (not scored)")
+
     _print_next_steps(summary)
 
     if summary.capture_note:

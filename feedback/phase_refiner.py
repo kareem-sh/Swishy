@@ -298,6 +298,54 @@ def _hand_has_dropped(f) -> bool:
     return False
 
 
+def hold_duration_s(
+    frames: Sequence,
+    event_index: Optional[int] = None,
+) -> Optional[float]:
+    """Seconds the shooting arm stayed up after the ball left.
+
+    WHY THIS IS NOT THE LENGTH OF THE `follow_through` PHASE
+    -------------------------------------------------------
+    Measured on salah_video, that phase was exactly 5 frames -- 0.17 s -- on
+    every single shot. Not approximately: identically, five out of five. It is
+    pinned to `min_follow_through_s` (0.15 s) at one end and to the LANDING at
+    the other, and for a shot with any elevation the feet start coming down
+    immediately, so the phase closes at the first frame it is allowed to.
+
+    That makes the phase a poor witness for the thing it is named after. A
+    player who holds the finish for two seconds and one who drops the arm at
+    once produce the same 0.17 s window, and `follow_through_elbow` therefore
+    measures the elbow shortly after release rather than whether anything was
+    held.
+
+    The arm and the feet are independent. This measures the arm directly: from
+    the shooting event until the shooting hand falls back below the shoulder,
+    searched across every frame captured after the release regardless of which
+    phase they were labelled.
+
+    Returns None when the hand never came down inside the captured window --
+    "still up when the clip ended" is not a duration, and reporting the clip
+    length instead would turn a cut-off recording into a good follow-through.
+    """
+    n = len(frames)
+    if n == 0:
+        return None
+
+    wrist = [_wrist_level(s.features) for s in frames]
+    start, _ = _release_span(frames, wrist, event_index)
+    if start >= n:
+        return None
+
+    release_ms = frames[start].timestamp_ms
+    for i in range(start + 1, n):
+        f = frames[i].features
+        if f is None:
+            continue
+        if _hand_has_dropped(f):
+            return max(0.0, (frames[i].timestamp_ms - release_ms) / 1000.0)
+    return None
+
+
 def refine_phases(frames: Sequence, event_index: Optional[int] = None) -> List[str]:
     """Coaching phase for every frame of one captured shot."""
     return compute_cuts(frames, event_index).as_labels()

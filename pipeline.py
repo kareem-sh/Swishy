@@ -51,7 +51,7 @@ from phase_detection.phases import PHASE_LABELS
 from player.profile import PlayerProfile, load_player_profile
 from pose.landmarks import extract_all_landmarks
 from pose.visibility import VisibilityGate
-from feedback.phase_refiner import refine_phases
+from feedback.phase_refiner import hold_duration_s, refine_phases
 from shots.segmenter import explain_absence, segment
 from utils.config_loader import load_yaml
 from utils.frame_buffer import FrameBuffer, FrameSnapshot
@@ -1210,6 +1210,10 @@ class ShotAnalysisPipeline:
             )
             if summary is None:
                 continue
+            # Measured here because this is where the shot's frames and its
+            # event index are both in hand. It deliberately ignores the phase
+            # labels: the arm's hold and the feet's landing are independent.
+            summary.hold_duration_s = hold_duration_s(frames, peak - start)
             summaries.append(summary)
             # Record the per-frame labels a viewer needs. These are the refined
             # coaching phases, not the four detector states, so what is drawn

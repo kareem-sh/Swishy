@@ -136,3 +136,49 @@ if __name__ == "__main__":
     test_presence_gates_high_visibility_low_presence()
     test_shoe_tip_supports_visibility_gated_ankle_flexion()
     print("All tests passed.")
+
+
+def test_leg_angles_fall_back_to_the_visible_leg():
+    """A knee is a property of the player, not of the shooting hand.
+
+    Regression for salah_video shots 3 and 4. The shooting side was read as
+    `left`, so the LEFT knee was measured at visibility 0.48 and rejected on
+    all 45 frames, while the RIGHT knee sat at 0.95 and was reliable on all 45
+    -- the far leg is occluded by the near one from that camera whichever hand
+    shoots. Both shots lost their knee and hip rules, were scored on 4 rules
+    instead of 9, and reported 20 and 35 for a load the player had performed
+    and the camera had recorded.
+    """
+    import numpy as np
+    from angles.calculator import AngleCalculator
+    from pose.visibility import VisibilityGate
+
+    def lm(x, y, z=0.0, vis=1.0):
+        return {"position": np.array([x, y, z], float), "visibility": vis,
+                "presence": vis, "is_stable": True, "is_reliable": vis >= 0.6,
+                "confidence": vis}
+
+    # Left leg unreadable, right leg clean and bent to 90 degrees.
+    world = {
+        "left_hip": lm(-0.1, 0.0, 0.0, 0.2),
+        "left_knee": lm(-0.1, -0.4, 0.0, 0.2),
+        "left_ankle": lm(-0.1, -0.8, 0.0, 0.2),
+        "left_shoulder": lm(-0.1, 0.5, 0.0, 0.2),
+        "right_hip": lm(0.1, 0.0, 0.0),
+        "right_knee": lm(0.1, -0.4, 0.0),
+        "right_ankle": lm(0.1, -0.4, 0.4),
+        "right_shoulder": lm(0.1, 0.5, 0.0),
+    }
+    calc = AngleCalculator(VisibilityGate())
+    angles = calc.compute_all(world, "left")
+
+    knee = angles["left_knee"]
+    assert knee.is_valid, "the visible right knee should have been used"
+    assert abs(knee.degrees - 90.0) < 1.0, knee.degrees
+
+    # The ARM must NOT fall back: the other arm is a different movement.
+    world["left_elbow"] = lm(-0.3, 0.3, 0.0, 0.2)
+    world["left_wrist"] = lm(-0.3, 0.6, 0.0, 0.2)
+    world["right_elbow"] = lm(0.3, 0.3, 0.0)
+    world["right_wrist"] = lm(0.3, 0.6, 0.0)
+    assert not calc.compute_all(world, "left")["left_elbow"].is_valid
