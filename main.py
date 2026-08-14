@@ -45,7 +45,7 @@ from scripts.coach_report import (  # noqa: E402
 # WHAT TO ANALYSE
 # ==================================
 
-VIDEO = "assets/videos/salah_video.mp4"
+VIDEO = "assets/videos/video8.mov"
 
 # Your height in centimetres, or None. Never estimated from the camera: a
 # single lens cannot separate a tall player from a near one. Without it, the
