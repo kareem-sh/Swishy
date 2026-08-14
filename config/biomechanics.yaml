@@ -296,6 +296,87 @@ rules:
 
       SOURCES.md D4 (verified), A1, A10 (⚠️ unverified), F10.
 
+  # -------------------------------------------------------------------- jump
+  jump_elevation:
+    name: "Elevation"
+    metric: takeoff_elevation
+    phases: [jump]
+    shot_types: [jump_shot]   # a set shot has no flight to assess
+    aggregate: max            # the highest the body got
+    min: 0.12
+    max: 0.50
+    ideal_min: 0.15
+    ideal_max: 0.30
+    unit: ""
+    severity: info
+    scored: false          # measured and displayed, never scored — see below
+    message_excellent: "Elevation, for reference — this one isn't scored."
+    refine_low: "Elevation, for reference — this one isn't scored."
+    refine_high: "Elevation, for reference — this one isn't scored."
+    message_low: "Elevation, for reference — this one isn't scored."
+    message_high: "Elevation, for reference — this one isn't scored."
+    evidence: >
+      THE MEASUREMENT IS SOUND; THE BAND IS NOT YET EARNED. Those are separate
+      claims and only the first is settled, which is why this is displayed and
+      not scored.
+
+      WHY THE PHASE HAD NOTHING TRUSTWORTHY IN IT BEFORE. `jump` carried
+      exactly two rules, `shoulder_alignment_lift` and `head_stability`, and
+      both are withdrawn from scoring on measured grounds recorded in their own
+      blocks: single-camera shoulder angle carries RMSE 24-36 deg against an
+      11.5 deg effect, and head velocity is computed from hip-centred landmarks
+      where it reads the head's motion relative to the hips rather than in
+      space. So the phase was fully measured on every shot -- 5 to 31 frames,
+      zero unmeasurable -- and still could not be scored, because nothing in it
+      was worth scoring. This rule adds the phase's first trustworthy number.
+
+      THE SIGNAL. `body_rise_ratio`, in IMAGE space, as a fraction of the
+      player's own on-screen height. Not `ankle_rise` and not
+      `vertical_displacement`: both of those ask this question of hip-centred
+      world landmarks, where the hip is the origin and whole-body translation
+      is invisible. The shot classifier and the phase refiner already decide
+      whether the feet left the floor from this same signal, so scoring against
+      it keeps three components describing one event.
+
+      IT REPRODUCES A1 WITH NO ENTERED HEIGHT. Measured across 16 shots:
+
+          set shots (15)      0.011 .. 0.108 body heights
+          jump shot  (1)      0.211
+
+      Taking nose-to-ankle as roughly 0.87 of stature, those are near 14 cm and
+      33 cm for a ~1.8 m player, against A1's published 15.3 cm for free throws
+      and 26.9-31.2 cm for jump shots. That is corroboration of the
+      MEASUREMENT. It is not permission to report centimetres: the conversion
+      needs a stature we do not have, so the value stays in body heights.
+
+      WHY IT IS NOT SCORED YET, AND WHAT WOULD CHANGE THAT.
+
+      1. n=1. `shots/elevation.py` states it plainly -- "only ONE labelled jump
+         shot has been measured this way. Set-shot detection is well evidenced;
+         jump detection is not yet." A band drawn through one point is a band
+         drawn through nothing.
+
+      2. `min: 0.12` COULD NOT FAIL. It is the classifier's own threshold, and
+         this rule only runs on shots the classifier already called jump shots
+         -- so every shot reaching it has cleared 0.12 by construction. Scoring
+         a rule that cannot fail would add a guaranteed 100 to the phase and
+         inflate every jump shot's overall score. The bounds are kept because
+         they are the validated ones (14/14 correct, `scripts/peak_probe.py`),
+         and honest as display bounds; they are not a scoring band.
+
+      3. HIGHER IS NOT KNOWN TO BE BETTER. A6 found successful shots had
+         significantly greater jump height, but it compares made against missed
+         attempts WITHIN shooters and reports R-squared of 0.005-0.012 between
+         biomechanical parameters and accuracy. That supports a direction far
+         too weakly to coach toward, and no source in the corpus reports an
+         elevation a player should aim for.
+
+      To score this, we need labelled jump shots in numbers -- enough to see
+      the spread, not just the centre -- and a reason to believe some part of
+      the range shoots better than another. Until then the number is shown, the
+      phase reports honestly that it was observed and not judged, and nobody is
+      penalised for our sample size. SOURCES.md A1, A6; shots/elevation.py.
+
   trunk_posture:
     name: "Upper Body Posture"
     metric: trunk
@@ -589,13 +670,67 @@ rules:
     ideal_max: 1.46
     unit: ""
     severity: info
-    scored: true
-    message_excellent: "Strong release height for your build."
-    refine_low: "Good release height for your build. A little more lift would steepen the arc further."
-    refine_high: "Your release is high for your build. Keep it repeatable rather than pushing higher."
-    message_low: "Your release is low for your height. Let it go at the top of your rise to get more arc."
-    message_high: "That release reads unusually high for your height — check your whole body is in frame."
+    scored: false          # measured and displayed, never scored — see below
+    message_excellent: "Release height relative to your build, for reference — this one isn't scored."
+    refine_low: "Release height relative to your build, for reference — this one isn't scored."
+    refine_high: "Release height relative to your build, for reference — this one isn't scored."
+    message_low: "Release height relative to your build, for reference — this one isn't scored."
+    message_high: "Release height relative to your build, for reference — this one isn't scored."
     evidence: >
+      NOT SUPPORTED FOR SCORING — withdrawn on MEASUREMENT grounds, exactly as
+      shoulder_alignment_lift and index_alignment_release were. The direction
+      below is unchanged and still supported; what is withdrawn is the claim
+      that THIS pipeline measures it well enough to penalise anyone for it.
+
+      IT FAILED 15 OF 15 ATTEMPTS. Measured across every clip in the corpus —
+      salah_video.mp4 (5 shots), video8 (10 shots), video9 (1 shot):
+
+          observed  0.65 .. 0.97      band starts at 1.02
+          failures  15/15 = 100%
+
+      A rule that no observed human has ever passed is not measuring the
+      player. Compare release_height, the head-relative sibling, on the same
+      frames: 0 failures in 15, observed 0.13-0.28 m inside a 0.06-0.62 band.
+      Same concept, same footage, opposite verdict — so the discrepancy is in
+      this metric, not in the shooting.
+
+      WHY IT READS LOW, STRUCTURALLY. The subtraction behind it is NOT
+      same-frame: `wrist_y` is this frame's hip-relative wrist, while
+      `ankle_baseline_y` was averaged while the player stood still before the
+      shot. In hip-centred world coordinates the origin therefore does not
+      cancel, because the hip itself moved between the two moments.
+      `analysis/engine.py` adds `body_rise_ratio` back to restore the missing
+      elevation term, and even so the result lands a full 0.05-0.37 below the
+      published floor. The correction is not sufficient, and the reason it is
+      needed at all is that the quantity is assembled from two different
+      instants in a coordinate frame that is blind to whole-body translation.
+
+      IT ALSO PENALISED HONESTY. This was the ONLY height-dependent scored
+      rule, so entering a height could only ever lower a score:
+
+          salah_video  height=None   92, 90, 79, 85, 83
+          salah_video  height=185    85, 83, 73, 79, 77
+
+      Six to seven points on every shot, for supplying correct information.
+      A player who told us the truth about themselves was scored worse than
+      one who left the field blank, which inverts the incentive the height
+      field exists to create.
+
+      THE CONCEPT IS NOT LOST. `release_height` carries the same coaching idea
+      head-relative, same-frame, scale-free, needs no entered height, and
+      passes on real footage. Nothing the player is told changes by withdrawing
+      this rule from the score; it is still measured and still displayed.
+
+      TO RESTORE IT, the ratio must be rebuilt in IMAGE space against the
+      player's own on-screen height, the way `wrist_height_ratio` and
+      `body_rise_ratio` already are, and the band re-derived from what that
+      produces. Do not simply widen the band downward to fit: 1.02-1.58 is
+      centred on A2's published means, and moving it to admit values a broken
+      subtraction happens to emit would keep the citation while discarding what
+      it says. scripts/ phase audit, 15 shots across 9 videos.
+
+      ---- the original evidence, unchanged, for whenever it is rebuilt ----
+
       DIRECTION supported from a single laboratory; THE BAND IS AN ENGINEERING
       DECISION.
 
@@ -618,6 +753,10 @@ rules:
 
       SKIPPED ENTIRELY when no player height is provided — never estimated
       from the camera. SOURCES.md A2, A6, A8, B2, B3, Part G #2.
+
+      The head-relative construction in `release_height` is what makes that
+      rule scale-free; this one is the version the literature actually reports,
+      and it is the one that needs a height. That trade is why both exist.
 
   # --------------------------------------------------------- follow-through
   follow_through_elbow:

@@ -621,7 +621,9 @@ class ShotTracker:
         return timestamp_ms - self._ball_outcome_timestamp_ms >= self._body_grace_ms
 
     # ---------------------------------------------------------- finalising
-    def _refined_frames(self, c: _Candidate) -> List[FrameSnapshot]:
+    def _refined_frames(
+        self, c: _Candidate, shot_type=None
+    ) -> List[FrameSnapshot]:
         """Relabel the captured frames with coaching phases and re-score them.
 
         The live pass evaluated rules against the four detector states, so a
@@ -629,16 +631,23 @@ class ShotTracker:
         the engine against the refined labels is what puts those rules back --
         and it does so with the whole shot in view, which is strictly more
         information than the live pass had.
+
+        `shot_type` is the settled classification. It is what lets a rule
+        declare `shot_types:` and be skipped for a shot that never performs the
+        mechanic -- a set shot has no flight to assess, and scoring one against
+        a jump-shot rule would invent a verdict rather than withhold it.
         """
         if not c.frames:
             return []
         labels = refine_phases(c.frames, c.event_index)
+        type_name = getattr(shot_type, "value", shot_type)
         out: List[FrameSnapshot] = []
         for snap, label in zip(c.frames, labels):
             analysis = snap.analysis
             if self._analyzer is not None:
                 analysis = self._analyzer.evaluate(
-                    label, snap.angles, snap.features, snap.shooting_side
+                    label, snap.angles, snap.features, snap.shooting_side,
+                    shot_type=type_name,
                 )
             out.append(replace(snap, phase=label, analysis=analysis))
         return out
@@ -719,7 +728,10 @@ class ShotTracker:
             return None
 
         classification = classify(c.evidence())
-        frames = self._refined_frames(c)
+        # The classification is settled BEFORE the rules are re-run, so a rule
+        # scoped to one kind of shot can be evaluated against the shot it
+        # actually was rather than against a guess made while it was happening.
+        frames = self._refined_frames(c, classification.shot_type)
 
         self.shot_count += 1
         if not classification.is_implemented:

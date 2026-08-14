@@ -29,6 +29,7 @@ class BiomechanicsEngine:
         angles: dict,
         features: KinematicFeatures,
         shooting_side: str,
+        shot_type: Optional[str] = None,
     ) -> AnalysisResult:
         active: List[RuleResult] = []
         violations: List[RuleResult] = []
@@ -38,6 +39,8 @@ class BiomechanicsEngine:
         for rule_id, rule in self._rules.items():
             phases = rule.get("phases", [])
             if phase not in phases:
+                continue
+            if not self._applies_to(rule, shot_type):
                 continue
 
             result = self._evaluate_rule(rule_id, rule, angles, features, shooting_side, phase)
@@ -58,6 +61,26 @@ class BiomechanicsEngine:
             passed_count=passed,
             total_count=total,
         )
+
+    @staticmethod
+    def _applies_to(rule: dict, shot_type: Optional[str]) -> bool:
+        """Does this rule run for this kind of shot?
+
+        A rule with no `shot_types` runs for every shot, which is what almost
+        all of them want: a knee bend is a knee bend. A rule that names them
+        runs only for those, so a mechanic that exists in one shot type can be
+        assessed without inventing a verdict for a shot that never performs it.
+
+        `shot_type is None` means the caller could not tell us -- the live path,
+        where the classification is not settled until the attempt closes. A
+        scoped rule is SKIPPED there rather than guessed at, because running a
+        jump-shot rule on an unclassified attempt is exactly the kind of quiet
+        assumption that turns "not observed" into a measurement.
+        """
+        allowed = rule.get("shot_types")
+        if not allowed:
+            return True
+        return shot_type is not None and shot_type in allowed
 
     def _evaluate_rule(
         self,
@@ -247,6 +270,31 @@ class BiomechanicsEngine:
             if ratio is None:
                 return None
             return ratio + max(0.0, features.body_rise_ratio or 0.0)
+
+        if metric == "takeoff_elevation":
+            # How far the whole body left the floor, as a fraction of the
+            # player's own on-screen height.
+            #
+            # IMAGE SPACE, deliberately. `ankle_rise` and
+            # `vertical_displacement` below both ask this question of
+            # hip-centred world landmarks, where the hip IS the origin and
+            # whole-body translation is therefore invisible -- what they
+            # actually return is the hip-to-ankle distance changing, i.e. the
+            # legs folding. This is the same signal the shot classifier and the
+            # phase refiner already trust to decide whether the feet left the
+            # floor at all, so scoring against it keeps the three components
+            # describing one event rather than three.
+            #
+            # Corroborated against A1 without any entered height. Measured
+            # across 16 shots, peak elevation was 0.011-0.108 body heights for
+            # set shots and 0.211 for the one labelled jump shot. Taking
+            # nose-to-ankle as roughly 0.87 of stature, those land near 14 cm
+            # and 33 cm for a ~1.8 m player -- against A1's published 15.3 cm
+            # for free throws and 26.9-31.2 cm for jump shots. The agreement is
+            # a check on the measurement, NOT a licence to report centimetres:
+            # the conversion needs a stature we do not have, so the value stays
+            # in body heights, which is what we actually observe.
+            return features.body_rise_ratio
 
         if metric == "wrist_height":
             return features.wrist_y

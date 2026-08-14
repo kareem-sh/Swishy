@@ -45,12 +45,12 @@ from scripts.coach_report import (  # noqa: E402
 # WHAT TO ANALYSE
 # ==================================
 
-VIDEO = "assets/videos/salah_video.mp4"
+VIDEO = "assets/videos/single_shot/video8_shot02_set.mp4"
 
 # Your height in centimetres, or None. Never estimated from the camera: a
 # single lens cannot separate a tall player from a near one. Without it, the
 # height-relative metrics are skipped and everything else still runs.
-HEIGHT_CM = 178
+HEIGHT_CM = 185
 
 # "auto" picks the shooting hand from the footage.
 SHOOTING_HAND = "auto"
