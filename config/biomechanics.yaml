@@ -807,34 +807,67 @@ rules:
   # ---------------------------------------------------------------- landing
   landing_balance:
     name: "Landing"
-    metric: ankle_rise
+    metric: landing_settle
     phases: [landing]
-    aggregate: worst        # any moment of imbalance is the finding
-    min: -0.06
-    max: 0.06
-    ideal_min: -0.03
-    ideal_max: 0.03
-    unit: "m"
+    # min: the LOWEST the body got. That is the question -- did you come back
+    # down, and how far did you absorb? `worst` cannot ask it: a landing phase
+    # opens while the player is still descending, so its early frames are
+    # legitimately high, and the worst of them would penalise every genuine
+    # jump shot for the part of the landing that is still a fall.
+    aggregate: min
+    min: -0.10
+    max: 0.02
+    unit: ""
     severity: info
     scored: true
     message_excellent: "You land settled, with your legs back under you."
-    refine_low: "Settled landing. Let the knees absorb a little more on the way down."
-    refine_high: "Settled landing. Let the knees absorb a little more on the way down."
-    message_low: "You're still sinking when the shot ends. Absorb the landing and come back to a balanced stance."
-    message_high: "You land stiff, without absorbing. Let the knees give a little as you come down."
+    message_low: "You're sinking a long way past your stance on the landing. Absorb it and come back to a balanced position."
+    message_high: "You finish the shot without settling back onto the floor. Come down under control and find your stance again."
     evidence: >
-      ENGINEERING DECISION. Thresholds are ours; no published value was found.
+      ENGINEERING DECISION, but with a PRINCIPLED ZERO. Thresholds are ours;
+      no published value was found.
 
-      CORRECTED CLAIM: this rule previously said "you're drifting on the
-      landing — land where you took off". That is a HORIZONTAL claim, but the
-      metric `ankle_rise` is VERTICAL (ankle height minus standing baseline),
-      so the message described something the rule never measured. The wording
-      now matches the measurement.
+      THE METRIC WAS REPLACED, NOT RETUNED. It was `ankle_rise`, computed from
+      hip-centred world landmarks where the hip IS the origin -- so it could
+      not see the body return to the floor at all. What it actually tracked was
+      the hip-to-ankle distance changing, i.e. the legs folding, which it then
+      reported as a balance fault. `phase_detection/features.py` states the
+      general form of this in its own comment: "whole-body vertical motion is
+      measured in image space (`body_rise_ratio`), because hip-centred world
+      coordinates are blind to it."
 
-      KNOWN LIMITATION: `ankle_rise` is computed from hip-centred world
-      landmarks, where it tracks leg extension rather than the body's height
-      above the floor. It is a weak proxy for "settled". Measuring genuine
-      take-off-to-landing drift needs the horizontal image-space signal
-      (`hip_x_ratio`) compared across the jump and landing phases, which the
-      per-frame rule engine cannot express today. Severity is `info` partly
-      for this reason.
+      MEASURED CONSEQUENCE. Across 18 shots the old metric read -0.246 to
+      +0.045 with no relation to shot type, and failed 11 of 13 attempts
+      outside salah_video while failing only 1 of 5 inside it. Same rule, same
+      band, two unrelated distributions -- the rule was measuring the framing,
+      not the player.
+
+      WHY THE NEW ZERO IS NOT A CHOICE. `body_rise_ratio` is measured against
+      the player's own stance in the seconds before this attempt, so "back
+      where you started" is 0 by construction. The band does not have to be
+      fitted to a sample; only its WIDTH does, and that width is a measurement
+      of our own noise: the set shots never left the floor and must therefore
+      read exactly 0, and they read -0.009 to +0.034. That is the instrument's
+      spread, and the bounds sit outside it.
+
+      THE BOUNDS ARE ASYMMETRIC ON PURPOSE. Sinking below the stance is
+      absorption, which is normal and coached for, so the lower bound is
+      generous at -0.10. Staying ABOVE the stance means the player never came
+      back down, so the upper bound is tight at +0.02, just outside the noise.
+
+      NO IDEAL SUB-BAND. Declaring one would invent a gradation between
+      "settled" and "very settled" that the measurement cannot support at this
+      resolution. Inside the band is the target; see the note at the top of
+      this file on how a rule with no ideal band is classified.
+
+      RESULT ON THE SAME 18 SHOTS: one failure, `video8_shot10_jump`, whose
+      landing frames read +0.048 rising to +0.064 -- the clip ends before the
+      player is back on the floor. That is a true statement about the footage.
+      Whether a truncated clip should cost a score is a separate question,
+      tracked with the capture notes, not with this rule.
+
+      STILL NOT MEASURED: horizontal drift, "did you land where you took off".
+      That needs `hip_x_ratio` compared across the jump and landing phases,
+      which the per-frame rule engine cannot express. Observed drift ranged
+      0.008-0.180 body heights over the same shots, so there is a real signal
+      there for whenever the engine can carry cross-phase state.

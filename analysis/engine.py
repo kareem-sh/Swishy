@@ -271,7 +271,7 @@ class BiomechanicsEngine:
                 return None
             return ratio + max(0.0, features.body_rise_ratio or 0.0)
 
-        if metric == "takeoff_elevation":
+        if metric in ("takeoff_elevation", "landing_settle"):
             # How far the whole body left the floor, as a fraction of the
             # player's own on-screen height.
             #
@@ -294,6 +294,12 @@ class BiomechanicsEngine:
             # a check on the measurement, NOT a licence to report centimetres:
             # the conversion needs a stature we do not have, so the value stays
             # in body heights, which is what we actually observe.
+            #
+            # `landing_settle` reads the SAME signal at the other end of the
+            # shot. Its zero is not a chosen threshold: `body_rise_ratio` is
+            # measured against the player's own stance before this attempt, so
+            # "back where you started" IS zero by construction. That is what
+            # makes a band around it principled rather than fitted.
             return features.body_rise_ratio
 
         if metric == "wrist_height":
