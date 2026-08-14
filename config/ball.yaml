@@ -10,10 +10,10 @@ detector:
   hf_file: BODD_yolov8n_0001.pt
 
   # Recall-oriented thresholds; temporal tracking filters short false hits.
-  min_confidence: 0.05
+  min_confidence: 0.20
   min_confidence_rim: 0.08
-  min_radius_px: 2
-  max_radius_px: 140
+  min_radius_px: 3
+  max_radius_px: 80
 
   # E-BARD was trained at 704px. Alternate 704/512 while acquiring the rim.
   imgsz: 960
@@ -48,13 +48,13 @@ visual_tracking:
   cuda_fp16: false
   backbone_path: models/nanotrack/nanotrack_backbone_sim.onnx
   neckhead_path: models/nanotrack/nanotrack_head_sim.onnx
-  yolo_correction_interval: 10
-  yolo_reinitialize_confidence: 0.05
-  yolo_override_confidence: 0.15
-  yolo_max_correction_distance_px: 180
-  maximum_center_jump_px: 180
-  minimum_box_size_px: 12
-  initial_box_scale: 1.35
+  yolo_correction_interval: 5
+  yolo_reinitialize_confidence: 0.20
+  yolo_override_confidence: 0.35
+  yolo_max_correction_distance_px: 100
+  maximum_center_jump_px: 100
+  minimum_box_size_px: 8
+  initial_box_scale: 1.15
 
 # Follow the hoop on every frame when the camera pans, shakes, or zooms.
 # YOLO corrects NanoTrack periodically; geometry gates reject oversized boxes.

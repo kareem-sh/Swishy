@@ -28,11 +28,18 @@ class TrajectoryComparison:
     target_release_speed_m_s: Optional[float]
     observed_release_speed_m_s: Optional[float]
     release_speed_error_m_s: Optional[float]
+    observed_kinematics_source: str
+    early_kinematics_status: str
     release_height_m: Optional[float]
     rim_height_m: Optional[float]
     horizontal_distance_m: Optional[float]
+    horizontal_distance_source: str
     vertical_distance_m: Optional[float]
     straight_line_distance_m: Optional[float]
+    release_to_rim_time_s: Optional[float]
+    release_to_rim_displacement_m: Optional[float]
+    release_to_rim_path_length_m: Optional[float]
+    release_to_rim_average_speed_m_s: Optional[float]
     meters_per_pixel_at_release: Optional[float]
     velocity_calibration: str
     release_anchor_source: str
@@ -106,6 +113,46 @@ def required_release_speed(
     if denominator <= 0.0:
         return None
     return math.sqrt(float(gravity_m_s2) * distance * distance / denominator)
+
+
+def distance_adaptive_release_angle_deg(
+    horizontal_distance_m: float,
+    *,
+    close_distance_m: float = 1.5,
+    close_angle_deg: float = 65.0,
+    midrange_distance_m: float = 3.0,
+    midrange_angle_deg: float = 55.0,
+    three_point_distance_m: float = 6.75,
+    three_point_angle_deg: float = 45.0,
+) -> float:
+    """Interpolate a launch angle through close, midrange and 3PT anchors."""
+    distance = max(0.0, float(horizontal_distance_m))
+    close_distance = max(0.0, float(close_distance_m))
+    midrange_distance = max(close_distance + 1e-6, float(midrange_distance_m))
+    three_point_distance = max(
+        midrange_distance + 1e-6,
+        float(three_point_distance_m),
+    )
+
+    if distance <= close_distance:
+        return float(close_angle_deg)
+    if distance <= midrange_distance:
+        fraction = (
+            (distance - close_distance)
+            / (midrange_distance - close_distance)
+        )
+        return float(close_angle_deg) + fraction * (
+            float(midrange_angle_deg) - float(close_angle_deg)
+        )
+    if distance <= three_point_distance:
+        fraction = (
+            (distance - midrange_distance)
+            / (three_point_distance - midrange_distance)
+        )
+        return float(midrange_angle_deg) + fraction * (
+            float(three_point_angle_deg) - float(midrange_angle_deg)
+        )
+    return float(three_point_angle_deg)
 
 
 def estimate_release_height_m(
@@ -209,6 +256,7 @@ def ideal_physical_trajectory_pixels(
     vertical_difference_m: float,
     release_angle_deg: float = 45.0,
     samples: int = 80,
+    meters_per_pixel: Optional[float] = None,
 ) -> List[Point]:
     """Project a metric projectile path between its two image endpoints."""
     release_x, release_y = map(float, release_xy)
@@ -229,6 +277,15 @@ def ideal_physical_trajectory_pixels(
         )
 
     theta = math.radians(float(release_angle_deg))
+    metric_projection = (
+        meters_per_pixel is not None
+        and math.isfinite(float(meters_per_pixel))
+        and float(meters_per_pixel) > 1e-9
+    )
+    endpoint_correction_y = 0.0
+    if metric_projection:
+        raw_target_y = release_y - vertical_m / float(meters_per_pixel)
+        endpoint_correction_y = target_y - raw_target_y
     points: List[Point] = []
     for fraction in np.linspace(0.0, 1.0, max(2, int(samples))):
         fraction_f = float(fraction)
@@ -238,11 +295,18 @@ def ideal_physical_trajectory_pixels(
             - 9.81 * x_m * x_m
             / (2.0 * speed * speed * math.cos(theta) ** 2)
         )
+        projected_y = (
+            release_y
+            - height_m / float(meters_per_pixel)
+            + fraction_f * endpoint_correction_y
+            if metric_projection
+            else release_y
+            - height_m * (release_y - target_y) / vertical_m
+        )
         points.append(
             (
                 release_x + (target_x - release_x) * fraction_f,
-                release_y
-                - height_m * (release_y - target_y) / vertical_m,
+                projected_y,
             )
         )
     return points
@@ -255,21 +319,60 @@ class IdealTrajectoryTracker:
         self,
         *,
         release_angle_deg: float = 45.0,
+        angle_mode: str = "fixed",
+        close_distance_m: float = 1.5,
+        close_angle_deg: float = 65.0,
+        midrange_distance_m: float = 3.0,
+        midrange_angle_deg: float = 55.0,
+        three_point_distance_m: float = 6.75,
+        three_point_angle_deg: float = 45.0,
         samples: int = 80,
         rim_diameter_m: float = 0.457,
         rim_height_m: float = 3.05,
         minimum_vertical_difference_m: float = 0.25,
-        velocity_fit_points: int = 5,
+        minimum_wrist_vertical_difference_m: float = 0.05,
+        velocity_fit_points: int = 7,
+        velocity_fit_outlier_threshold_rim_radii: float = 0.75,
+        velocity_min_toward_rim_m_s: float = 0.25,
+        velocity_min_upward_m_s: float = 0.25,
+        velocity_max_speed_m_s: float = 20.0,
         comparison_min_points: int = 3,
     ) -> None:
         self.release_angle_deg = float(release_angle_deg)
+        self.angle_mode = str(angle_mode).strip().lower()
+        self.close_distance_m = float(close_distance_m)
+        self.close_angle_deg = float(close_angle_deg)
+        self.midrange_distance_m = float(midrange_distance_m)
+        self.midrange_angle_deg = float(midrange_angle_deg)
+        self.three_point_distance_m = float(three_point_distance_m)
+        self.three_point_angle_deg = float(three_point_angle_deg)
         self.samples = max(2, int(samples))
         self.rim_diameter_m = max(1e-6, float(rim_diameter_m))
         self.rim_height_m = max(1e-6, float(rim_height_m))
         self.minimum_vertical_difference_m = max(
             0.0, float(minimum_vertical_difference_m)
         )
+        self.minimum_wrist_vertical_difference_m = max(
+            0.0,
+            float(minimum_wrist_vertical_difference_m),
+        )
         self.velocity_fit_points = max(2, int(velocity_fit_points))
+        self.velocity_fit_outlier_threshold_rim_radii = max(
+            0.05,
+            float(velocity_fit_outlier_threshold_rim_radii),
+        )
+        self.velocity_min_toward_rim_m_s = max(
+            0.0,
+            float(velocity_min_toward_rim_m_s),
+        )
+        self.velocity_min_upward_m_s = max(
+            0.0,
+            float(velocity_min_upward_m_s),
+        )
+        self.velocity_max_speed_m_s = max(
+            1.0,
+            float(velocity_max_speed_m_s),
+        )
         self.comparison_min_points = max(2, int(comparison_min_points))
         self.reset()
 
@@ -277,11 +380,15 @@ class IdealTrajectoryTracker:
         self._release: Optional[_RelativePoint] = None
         self._observed: List[_RelativePoint] = []
         self._crossing_relative_x: Optional[float] = None
+        self._crossing_timestamp_ms: Optional[int] = None
         self._target_relative_xy: Point = (0.0, 0.0)
         self._release_height_m: Optional[float] = None
         self._meters_per_pixel_at_release: Optional[float] = None
         self._release_rim_radius_px: Optional[float] = None
+        self._horizontal_distance_override_m: Optional[float] = None
+        self._kinematics_start_timestamp_ms: Optional[int] = None
         self._release_anchor_source = "ball"
+        self._active_release_angle_deg = self.release_angle_deg
         self._active = False
 
     @property
@@ -297,6 +404,8 @@ class IdealTrajectoryTracker:
         meters_per_pixel_at_release: Optional[float] = None,
         rim_radius_px: Optional[float] = None,
         release_relative_xy: Optional[Point] = None,
+        kinematics_start_timestamp_ms: Optional[int] = None,
+        horizontal_distance_m_override: Optional[float] = None,
     ) -> None:
         """Start from release-backtracked rim-relative observations."""
         self.reset()
@@ -307,6 +416,14 @@ class IdealTrajectoryTracker:
             float(target_relative_xy[1]),
         )
         if (
+            horizontal_distance_m_override is not None
+            and math.isfinite(float(horizontal_distance_m_override))
+            and float(horizontal_distance_m_override) > 0.0
+        ):
+            self._horizontal_distance_override_m = float(
+                horizontal_distance_m_override
+            )
+        if (
             release_height_m is not None
             and meters_per_pixel_at_release is not None
             and rim_radius_px is not None
@@ -315,7 +432,11 @@ class IdealTrajectoryTracker:
             and math.isfinite(float(rim_radius_px))
             and 0.0 <= float(release_height_m)
             and self.rim_height_m - float(release_height_m)
-            >= self.minimum_vertical_difference_m
+            >= (
+                self.minimum_wrist_vertical_difference_m
+                if release_relative_xy is not None
+                else self.minimum_vertical_difference_m
+            )
             and float(meters_per_pixel_at_release) > 0.0
             and float(rim_radius_px) > 0.0
         ):
@@ -339,6 +460,22 @@ class IdealTrajectoryTracker:
             "wrist_proxy" if release_relative_xy is not None else "ball"
         )
         self._observed = relative
+        self._kinematics_start_timestamp_ms = (
+            int(kinematics_start_timestamp_ms)
+            if kinematics_start_timestamp_ms is not None
+            else relative[0].timestamp_ms
+        )
+        physical = self._physical_distances()
+        if self.angle_mode == "distance_adaptive" and physical is not None:
+            self._active_release_angle_deg = distance_adaptive_release_angle_deg(
+                physical[0],
+                close_distance_m=self.close_distance_m,
+                close_angle_deg=self.close_angle_deg,
+                midrange_distance_m=self.midrange_distance_m,
+                midrange_angle_deg=self.midrange_angle_deg,
+                three_point_distance_m=self.three_point_distance_m,
+                three_point_angle_deg=self.three_point_angle_deg,
+            )
         self._active = True
 
     def update(
@@ -350,6 +487,7 @@ class IdealTrajectoryTracker:
         rim_center_xy: Optional[Point],
         rim_radius: Optional[float],
         crossing_xy: Optional[Point] = None,
+        crossing_timestamp_ms: Optional[int] = None,
     ) -> None:
         geometry = self._valid_geometry(rim_center_xy, rim_radius)
         observed = snapshot is not None and not snapshot.is_interpolated
@@ -363,6 +501,7 @@ class IdealTrajectoryTracker:
                 )
                 self._release = relative
                 self._observed.append(relative)
+                self._kinematics_start_timestamp_ms = relative.timestamp_ms
 
         elif self._active and geometry and observed:
             relative = self._relative_point(
@@ -374,10 +513,20 @@ class IdealTrajectoryTracker:
             ):
                 self._observed.append(relative)
 
-        if self._active and geometry and crossing_xy is not None:
+        if (
+            self._active
+            and geometry
+            and crossing_xy is not None
+            and self._crossing_relative_x is None
+        ):
             self._crossing_relative_x = (
                 float(crossing_xy[0]) - float(rim_center_xy[0])
             ) / float(rim_radius)
+            self._crossing_timestamp_ms = (
+                int(crossing_timestamp_ms)
+                if crossing_timestamp_ms is not None
+                else snapshot.timestamp_ms if snapshot is not None else None
+            )
 
         if shot_finished:
             self._active = False
@@ -414,13 +563,14 @@ class IdealTrajectoryTracker:
                 target_xy,
                 horizontal_m,
                 vertical_m,
-                self.release_angle_deg,
+                self._active_release_angle_deg,
                 self.samples,
+                self._meters_per_pixel_at_release,
             )
         return ideal_trajectory_pixels(
             release_xy,
             target_xy,
-            self.release_angle_deg,
+            self._active_release_angle_deg,
             self.samples,
         )
 
@@ -458,21 +608,52 @@ class IdealTrajectoryTracker:
             rim_radius_m = self.rim_diameter_m / 2.0
             horizontal_radii = abs(target_x - release.x)
             vertical_radii = release.y - target_y
-            horizontal_m = horizontal_radii * rim_radius_m
+            horizontal_m = (
+                self._horizontal_distance_override_m
+                if self._horizontal_distance_override_m is not None
+                else horizontal_radii * rim_radius_m
+            )
             vertical_m = vertical_radii * rim_radius_m
             velocity_scale_m = rim_radius_m
+        horizontal_distance_source = (
+            "fiba_court_location"
+            if self._horizontal_distance_override_m is not None
+            else "player_height_image"
+            if calibrated
+            else "rim_diameter_fallback"
+        )
         straight_m = math.hypot(horizontal_m, vertical_m)
         target_speed = required_release_speed(
             horizontal_m,
             vertical_m,
-            self.release_angle_deg,
+            self._active_release_angle_deg,
         )
 
-        observed_angle, observed_speed = self._observed_release_kinematics(
-            velocity_scale_m
-        )
+        (
+            release_to_rim_time_s,
+            release_to_rim_displacement_m,
+            release_to_rim_path_length_m,
+            release_to_rim_average_speed_m_s,
+        ) = self._release_to_rim_average_speed(velocity_scale_m)
+        (
+            observed_angle,
+            observed_speed,
+            early_kinematics_status,
+        ) = self._observed_release_kinematics(velocity_scale_m)
+        observed_kinematics_source = "early_post_release_fit"
+        if observed_angle is None or observed_speed is None:
+            flight_kinematics = self._release_to_rim_ballistic_kinematics(
+                vertical_m,
+                release_to_rim_time_s,
+                velocity_scale_m,
+            )
+            if flight_kinematics is not None:
+                observed_angle, observed_speed = flight_kinematics
+                observed_kinematics_source = "release_to_rim_ballistic"
+            else:
+                observed_kinematics_source = "unavailable"
         angle_error = (
-            observed_angle - self.release_angle_deg
+            observed_angle - self._active_release_angle_deg
             if observed_angle is not None
             else None
         )
@@ -490,17 +671,26 @@ class IdealTrajectoryTracker:
         )
 
         return TrajectoryComparison(
-            target_release_angle_deg=self.release_angle_deg,
+            target_release_angle_deg=self._active_release_angle_deg,
             observed_release_angle_deg=observed_angle,
             release_angle_error_deg=angle_error,
             target_release_speed_m_s=target_speed,
             observed_release_speed_m_s=observed_speed,
             release_speed_error_m_s=speed_error,
+            observed_kinematics_source=observed_kinematics_source,
+            early_kinematics_status=early_kinematics_status,
             release_height_m=self._release_height_m if calibrated else None,
-            rim_height_m=self.rim_height_m if calibrated else None,
+            rim_height_m=self.rim_height_m,
             horizontal_distance_m=horizontal_m,
+            horizontal_distance_source=horizontal_distance_source,
             vertical_distance_m=vertical_m,
             straight_line_distance_m=straight_m,
+            release_to_rim_time_s=release_to_rim_time_s,
+            release_to_rim_displacement_m=release_to_rim_displacement_m,
+            release_to_rim_path_length_m=release_to_rim_path_length_m,
+            release_to_rim_average_speed_m_s=(
+                release_to_rim_average_speed_m_s
+            ),
             meters_per_pixel_at_release=(
                 self._meters_per_pixel_at_release if calibrated else None
             ),
@@ -521,30 +711,207 @@ class IdealTrajectoryTracker:
         )
 
     def _observed_release_kinematics(
-        self, rim_radius_m: float
-    ) -> Tuple[Optional[float], Optional[float]]:
-        points = self._observed[: self.velocity_fit_points]
-        if len(points) < 2:
-            return None, None
+        self, velocity_scale_m: float
+    ) -> Tuple[Optional[float], Optional[float], str]:
+        if not self._observed:
+            return None, None, "no_observed_points"
+
+        start_timestamp_ms = (
+            self._kinematics_start_timestamp_ms
+            if self._kinematics_start_timestamp_ms is not None
+            else self._observed[0].timestamp_ms
+        )
+        eligible = [
+            point
+            for point in self._observed
+            if point.timestamp_ms >= start_timestamp_ms
+        ]
+        points = eligible[: self.velocity_fit_points]
+        if len(points) < self.velocity_fit_points:
+            return None, None, "insufficient_post_release_points"
+
         times = np.asarray(
             [(point.timestamp_ms - points[0].timestamp_ms) / 1000.0 for point in points],
             dtype=np.float64,
         )
         if times[-1] <= 0.0 or len(np.unique(times)) < 2:
-            return None, None
+            return None, None, "invalid_timestamps"
 
-        vx_radii_s = float(np.polyfit(times, [p.x for p in points], 1)[0])
-        vy_radii_s = float(np.polyfit(times, [p.y for p in points], 1)[0])
+        x_values = np.asarray([point.x for point in points], dtype=np.float64)
+        y_values = np.asarray([point.y for point in points], dtype=np.float64)
+        inliers = np.ones(len(points), dtype=bool)
+        minimum_inliers = max(2, int(math.ceil(len(points) * 0.6)))
+
+        # A linear horizontal fit and quadratic vertical fit estimate velocity
+        # at the first post-separation point. Iterative rejection prevents one
+        # NanoTrack/YOLO correction from dominating that short launch window.
+        for _ in range(3):
+            inlier_count = int(np.count_nonzero(inliers))
+            if inlier_count < minimum_inliers:
+                return None, None, "too_few_fit_inliers"
+            y_degree = 2 if inlier_count >= 3 else 1
+            x_coefficients = np.polyfit(times[inliers], x_values[inliers], 1)
+            y_coefficients = np.polyfit(
+                times[inliers],
+                y_values[inliers],
+                y_degree,
+            )
+            predicted_x = np.polyval(x_coefficients, times)
+            predicted_y = np.polyval(y_coefficients, times)
+            residuals = np.hypot(
+                x_values - predicted_x,
+                y_values - predicted_y,
+            )
+            median = float(np.median(residuals[inliers]))
+            mad = float(np.median(np.abs(residuals[inliers] - median)))
+            robust_sigma = max(1.4826 * mad, 0.01)
+            threshold = max(
+                self.velocity_fit_outlier_threshold_rim_radii,
+                median + 3.5 * robust_sigma,
+            )
+            updated_inliers = residuals <= threshold
+            if int(np.count_nonzero(updated_inliers)) < minimum_inliers:
+                return None, None, "outlier_rejection_failed"
+            if np.array_equal(updated_inliers, inliers):
+                break
+            inliers = updated_inliers
+
+        inlier_count = int(np.count_nonzero(inliers))
+        y_degree = 2 if inlier_count >= 3 else 1
+        x_coefficients = np.polyfit(times[inliers], x_values[inliers], 1)
+        y_coefficients = np.polyfit(times[inliers], y_values[inliers], y_degree)
+        vx_radii_s = float(x_coefficients[0])
+        vy_radii_s = float(
+            y_coefficients[-2] if y_degree == 2 else y_coefficients[0]
+        )
         target_x = self._target_relative_xy[0]
         direction_to_rim = 1.0 if target_x >= self._release.x else -1.0
-        velocity_toward_rim = direction_to_rim * vx_radii_s
-        observed_angle = None
-        if velocity_toward_rim > 1e-6:
-            observed_angle = math.degrees(
-                math.atan2(-vy_radii_s, velocity_toward_rim)
+        velocity_toward_rim_m_s = (
+            direction_to_rim * vx_radii_s * velocity_scale_m
+        )
+        velocity_upward_m_s = -vy_radii_s * velocity_scale_m
+        observed_speed = math.hypot(
+            velocity_toward_rim_m_s,
+            velocity_upward_m_s,
+        )
+        if velocity_toward_rim_m_s < self.velocity_min_toward_rim_m_s:
+            return None, None, "not_moving_toward_rim"
+        if velocity_upward_m_s < self.velocity_min_upward_m_s:
+            return None, None, "not_moving_upward"
+        if observed_speed > self.velocity_max_speed_m_s:
+            return None, None, "speed_above_plausible_limit"
+
+        observed_angle = math.degrees(
+            math.atan2(velocity_upward_m_s, velocity_toward_rim_m_s)
+        )
+        return observed_angle, observed_speed, "accepted"
+
+    def _release_to_rim_ballistic_kinematics(
+        self,
+        vertical_difference_m: float,
+        flight_time_s: Optional[float],
+        velocity_scale_m: float,
+    ) -> Optional[Tuple[float, float]]:
+        """Reconstruct launch velocity from release and rim-crossing events."""
+        if (
+            flight_time_s is None
+            or flight_time_s <= 1e-6
+            or self._release is None
+            or self._crossing_relative_x is None
+        ):
+            return None
+
+        horizontal_m = (
+            self._horizontal_distance_override_m
+            if self._horizontal_distance_override_m is not None
+            else abs(self._crossing_relative_x - self._release.x)
+            * velocity_scale_m
+        )
+        if horizontal_m <= 1e-6:
+            return None
+        vx_m_s = horizontal_m / flight_time_s
+        vy_m_s = (
+            float(vertical_difference_m)
+            + 0.5 * 9.81 * flight_time_s * flight_time_s
+        ) / flight_time_s
+        speed_m_s = math.hypot(vx_m_s, vy_m_s)
+        if (
+            vx_m_s < self.velocity_min_toward_rim_m_s
+            or vy_m_s < self.velocity_min_upward_m_s
+            or speed_m_s > self.velocity_max_speed_m_s
+        ):
+            return None
+        return math.degrees(math.atan2(vy_m_s, vx_m_s)), speed_m_s
+
+    def _release_to_rim_average_speed(
+        self,
+        velocity_scale_m: float,
+    ) -> Tuple[
+        Optional[float],
+        Optional[float],
+        Optional[float],
+        Optional[float],
+    ]:
+        """Flight time, displacement, path length, and mean path speed."""
+        if (
+            self._crossing_relative_x is None
+            or self._crossing_timestamp_ms is None
+            or not self._observed
+        ):
+            return None, None, None, None
+
+        start_timestamp_ms = (
+            self._kinematics_start_timestamp_ms
+            if self._kinematics_start_timestamp_ms is not None
+            else self._observed[0].timestamp_ms
+        )
+        start = next(
+            (
+                point
+                for point in self._observed
+                if point.timestamp_ms >= start_timestamp_ms
+            ),
+            None,
+        )
+        if start is None:
+            return None, None, None, None
+
+        elapsed_s = (
+            self._crossing_timestamp_ms - start.timestamp_ms
+        ) / 1000.0
+        if elapsed_s <= 1e-6:
+            return None, None, None, None
+
+        displacement_radii = math.hypot(
+            self._crossing_relative_x - start.x,
+            -start.y,
+        )
+        displacement_m = displacement_radii * velocity_scale_m
+        flight_points = [
+            point
+            for point in self._observed
+            if start.timestamp_ms
+            <= point.timestamp_ms
+            <= self._crossing_timestamp_ms
+        ]
+        path_coordinates = [(point.x, point.y) for point in flight_points]
+        crossing_point = (self._crossing_relative_x, 0.0)
+        if not path_coordinates or path_coordinates[-1] != crossing_point:
+            path_coordinates.append(crossing_point)
+        path_radii = sum(
+            math.hypot(x2 - x1, y2 - y1)
+            for (x1, y1), (x2, y2) in zip(
+                path_coordinates,
+                path_coordinates[1:],
             )
-        observed_speed = math.hypot(vx_radii_s, vy_radii_s) * rim_radius_m
-        return observed_angle, observed_speed
+        )
+        path_length_m = path_radii * velocity_scale_m
+        return (
+            elapsed_s,
+            displacement_m,
+            path_length_m,
+            path_length_m / elapsed_s,
+        )
 
     def _path_comparison(
         self,
@@ -557,7 +924,7 @@ class IdealTrajectoryTracker:
         direction = 1.0 if target_x >= release.x else -1.0
         distance = abs(target_x - release.x)
         height_to_target = release.y - target_y
-        theta = math.radians(self.release_angle_deg)
+        theta = math.radians(self._active_release_angle_deg)
         physical = self._physical_distances()
         curvature = (
             distance * math.tan(theta) - height_to_target
@@ -613,15 +980,23 @@ class IdealTrajectoryTracker:
             or self._release_rim_radius_px is None
         ):
             return None
-        horizontal_pixels = (
-            abs(self._target_relative_xy[0] - self._release.x)
-            * self._release_rim_radius_px
-        )
-        horizontal_m = horizontal_pixels * self._meters_per_pixel_at_release
+        if self._horizontal_distance_override_m is not None:
+            horizontal_m = self._horizontal_distance_override_m
+        else:
+            horizontal_pixels = (
+                abs(self._target_relative_xy[0] - self._release.x)
+                * self._release_rim_radius_px
+            )
+            horizontal_m = horizontal_pixels * self._meters_per_pixel_at_release
         vertical_m = self.rim_height_m - self._release_height_m
+        minimum_vertical_m = (
+            self.minimum_wrist_vertical_difference_m
+            if self._release_anchor_source == "wrist_proxy"
+            else self.minimum_vertical_difference_m
+        )
         if (
             horizontal_m <= 1e-6
-            or vertical_m < self.minimum_vertical_difference_m
+            or vertical_m < minimum_vertical_m
         ):
             return None
         return horizontal_m, vertical_m
@@ -647,7 +1022,7 @@ class IdealTrajectoryTracker:
         speed = required_release_speed(
             horizontal_m,
             vertical_m,
-            self.release_angle_deg,
+            self._active_release_angle_deg,
         )
         if speed is None or vertical_m <= 1e-6:
             return release.y
@@ -657,7 +1032,24 @@ class IdealTrajectoryTracker:
             - 9.81 * x_m * x_m
             / (2.0 * speed * speed * math.cos(theta) ** 2)
         )
-        return release.y - height_m * (release.y - target_y) / vertical_m
+        metric_scale_m_per_radius = (
+            float(self._release_rim_radius_px)
+            * float(self._meters_per_pixel_at_release)
+            if self._release_rim_radius_px is not None
+            and self._meters_per_pixel_at_release is not None
+            else None
+        )
+        if metric_scale_m_per_radius is None or metric_scale_m_per_radius <= 1e-9:
+            return release.y - height_m * (release.y - target_y) / vertical_m
+
+        fraction = progress_radii / distance_radii
+        raw_target_y = release.y - vertical_m / metric_scale_m_per_radius
+        endpoint_correction_y = target_y - raw_target_y
+        return (
+            release.y
+            - height_m / metric_scale_m_per_radius
+            + fraction * endpoint_correction_y
+        )
 
     @staticmethod
     def _valid_geometry(

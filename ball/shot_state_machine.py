@@ -71,6 +71,7 @@ class BallStateUpdate:
     rim_center_xy: Optional[Tuple[float, float]] = None
     rim_inner_radius: Optional[float] = None
     crossing_xy: Optional[Tuple[float, float]] = None
+    crossing_timestamp_ms: Optional[int] = None
 
 
 class BallShotStateMachine:
@@ -175,6 +176,7 @@ class BallShotStateMachine:
         self.release_timestamp_ms: Optional[int] = None
         self.release_frame: Optional[int] = None
         self.entry_frame: Optional[int] = None
+        self.entry_timestamp_ms: Optional[int] = None
         self.previous_snapshot: Optional[BallSnapshot] = None
         self.previous_observed_snapshot: Optional[BallSnapshot] = None
         self.previous_rim_center: Optional[Tuple[float, float]] = None
@@ -498,6 +500,21 @@ class BallShotStateMachine:
                     crossed = True
                     self.crossing_xy = (crossing_x, rim_y)
                     self.entry_frame = snapshot.frame_index
+                    crossing_ratio = self._interpolate_crossing_ratio(
+                        previous_relative_y,
+                        current_relative_y,
+                    )
+                    self.entry_timestamp_ms = (
+                        int(
+                            round(
+                                previous.timestamp_ms
+                                + crossing_ratio
+                                * (snapshot.timestamp_ms - previous.timestamp_ms)
+                            )
+                        )
+                        if crossing_ratio is not None
+                        else snapshot.timestamp_ms
+                    )
                     crossing_offset = abs(crossing_relative_x)
                     contact_limit = (
                         self.rim_inner_radius * self.rim_contact_channel_scale
@@ -838,6 +855,18 @@ class BallShotStateMachine:
             return None
         return previous_x + ratio * (current_x - previous_x)
 
+    @staticmethod
+    def _interpolate_crossing_ratio(
+        previous_y: float,
+        current_y: float,
+    ) -> Optional[float]:
+        """Return where in a frame interval the rim plane was crossed."""
+        dy = current_y - previous_y
+        if abs(dy) < 1e-6:
+            return None
+        ratio = -previous_y / dy
+        return ratio if 0.0 <= ratio <= 1.0 else None
+
     def _check_timeouts(
         self,
         timestamp_ms: int,
@@ -927,6 +956,7 @@ class BallShotStateMachine:
             release_frame=self.release_frame,
             release_timestamp_ms=self.release_timestamp_ms,
             entry_frame=self.entry_frame,
+            entry_timestamp_ms=self.entry_timestamp_ms,
             outcome_timestamp_ms=timestamp_ms,
             evidence=list(self.evidence),
             timeseries_summary={
@@ -938,6 +968,7 @@ class BallShotStateMachine:
                     self.saw_contact_center_inside_opening
                 ),
                 "crossing_xy": self.crossing_xy,
+                "crossing_timestamp_ms": self.entry_timestamp_ms,
                 "below_confirmation_count": self.below_confirmation_count,
                 "miss_confirmation_count": self.miss_confirmation_count,
             },
@@ -959,6 +990,7 @@ class BallShotStateMachine:
             rim_center_xy=self.rim_center,
             rim_inner_radius=self.rim_inner_radius,
             crossing_xy=self.crossing_xy,
+            crossing_timestamp_ms=self.entry_timestamp_ms,
         )
 
     def _remember_pose_phase(self, pose_phase: Optional[str]) -> None:

@@ -9,9 +9,21 @@ gravity: 9.81
 # 3.05 m. Player height remains user-provided in config/player.yaml.
 rim_height_m: 3.05
 
+# Optional FIBA half-court location supplied by the mobile app.
+# Coordinate system:
+#   origin [0, 0] = midpoint of the basket-side endline
+#   x = lateral court position (-7.5 left to +7.5 right)
+#   y = distance from that endline toward half court (0 to 14)
+# The basket centre is 1.575 m from the endline. Set shot_xy_m to null to
+# preserve the current image/player-height distance estimate.
+fiba_half_court:
+  shot_xy_m: [0.0, 5.80]
+  rim_center_xy_m: [0.0, 1.575]
+
 # Print one copyable calibration line per detected release. This is separate
 # from the made/missed state-machine debug output in ball.yaml.
 debug_trajectory: true
+debug_trajectory_comparison: true
 
 # MediaPipe measures nose-to-ankle rather than full head-to-floor height.
 # These fractions convert that visible span and ankle landmark to floor height.
@@ -21,6 +33,10 @@ ankle_to_floor_height_fraction: 0.04
 # Reject metric projection when a supposed release is almost level with the
 # rim. This normally means the first detected ball was already in mid-flight.
 minimum_release_to_rim_height_m: 0.25
+# A wrist/fingertip proxy is a trusted anatomical release anchor and can
+# legitimately be close to rim height for a tall player. Keep the stricter
+# value above for a ball acquired late in flight.
+minimum_wrist_release_to_rim_height_m: 0.05
 
 # A ball release anchor must be close to the wrist stored on that same frame.
 # The base distance comes from ball_state_machine.release_distance_px.

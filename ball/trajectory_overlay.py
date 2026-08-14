@@ -58,6 +58,7 @@ class ObservedTrajectoryRecorder:
         self._preroll: Deque[_RelativeTrajectoryPoint] = deque(
             maxlen=max(2, int(release_preroll_points))
         )
+        self._kinematics_start_timestamp_ms: Optional[int] = None
         self._active = False
         self._gap_before_next_point = False
 
@@ -68,6 +69,7 @@ class ObservedTrajectoryRecorder:
     def reset(self) -> None:
         self._segments.clear()
         self._preroll.clear()
+        self._kinematics_start_timestamp_ms = None
         self._active = False
         self._gap_before_next_point = False
 
@@ -123,6 +125,12 @@ class ObservedTrajectoryRecorder:
             selected = self._release_preroll(float(release_distance_px))
             if selected:
                 self._segments.append(list(selected))
+                self._kinematics_start_timestamp_ms = (
+                    self._release_kinematics_start(
+                        selected,
+                        float(release_distance_px),
+                    )
+                )
             self._active = True
         elif not self._active:
             return
@@ -148,6 +156,10 @@ class ObservedTrajectoryRecorder:
             return None, None
         release = self._segments[0][0]
         return release.wrist_relative_xy, release.wrist_distance_px
+
+    def release_kinematics_start_timestamp_ms(self) -> Optional[int]:
+        """First observed frame after the ball has separated from the hand."""
+        return self._kinematics_start_timestamp_ms
 
     def screen_segments(
         self,
@@ -289,6 +301,25 @@ class ObservedTrajectoryRecorder:
                 selected_index = index
                 break
         return points[selected_index:]
+
+    @staticmethod
+    def _release_kinematics_start(
+        points: Sequence[_RelativeTrajectoryPoint],
+        release_distance_px: float,
+    ) -> int:
+        """Choose the first post-separation point, excluding drawing preroll."""
+        separation_limit = max(1.0, release_distance_px)
+        for point in points:
+            if (
+                point.wrist_distance_px is not None
+                and point.wrist_distance_px >= separation_limit
+            ):
+                return point.timestamp_ms
+
+        # Missing/low-confidence wrist landmarks must not make the pre-release
+        # hand motion look like launch velocity. The confirmation frame is the
+        # safest fallback because the ball FSM has already accepted release.
+        return points[-1].timestamp_ms
 
     def _trim_oldest_points(self) -> None:
         excess = sum(len(segment) for segment in self._segments) - self.max_points

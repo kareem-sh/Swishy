@@ -161,6 +161,9 @@ def test_release_confirmation_backtracks_to_last_near_wrist_point() -> None:
     assert wrist_relative == (-10.0, 5.0)
     assert wrist_distance is not None
     assert math.isclose(wrist_distance, math.sqrt(200.0), rel_tol=1e-9)
+    # Drawing keeps the near-hand point, but launch velocity starts only once
+    # the ball is at least one release-distance away from the wrist.
+    assert recorder.release_kinematics_start_timestamp_ms() == 66
 
 
 def test_robust_fit_ignores_one_jitter_outlier() -> None:

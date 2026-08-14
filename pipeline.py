@@ -2,6 +2,7 @@
 Central analysis pipeline: detect -> filter -> gate -> angles -> phases -> rules -> score.
 """
 
+import math
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
@@ -88,6 +89,7 @@ class FrameResult:
     stabilized_rim_center_xy: Optional[Tuple[float, float]] = None
     stabilized_rim_inner_radius: Optional[float] = None
     rim_crossing_xy: Optional[Tuple[float, float]] = None
+    rim_crossing_timestamp_ms: Optional[int] = None
     observed_ball_path_segments: List[List[Tuple[float, float]]] = field(
         default_factory=list
     )
@@ -133,6 +135,25 @@ class ShotAnalysisPipeline:
         display_cfg = load_yaml("display.yaml")
         ball_cfg = load_yaml("ball.yaml")
         physics_cfg = load_yaml("physics.yaml")
+        court_cfg = physics_cfg.get("fiba_half_court", {})
+        self._court_shot_xy_m = self._parse_court_xy(
+            court_cfg.get("shot_xy_m"),
+            label="shot_xy_m",
+            enforce_half_court=True,
+        )
+        self._court_rim_xy_m = self._parse_court_xy(
+            court_cfg.get("rim_center_xy_m", [0.0, 1.575]),
+            label="rim_center_xy_m",
+            enforce_half_court=False,
+        ) or (0.0, 1.575)
+        self._court_shot_distance_m = (
+            math.hypot(
+                self._court_shot_xy_m[0] - self._court_rim_xy_m[0],
+                self._court_shot_xy_m[1] - self._court_rim_xy_m[1],
+            )
+            if self._court_shot_xy_m is not None
+            else None
+        )
 
         self._filter_bank = LandmarkFilterBank(
             min_cutoff=filter_cfg.get("min_cutoff", FILTER_MIN_CUTOFF),
@@ -174,6 +195,8 @@ class ShotAnalysisPipeline:
         self._prev_image: Optional[dict] = None
         self._ankle_baseline_y = 0.0
         self._ankle_image_baseline = 0.0
+        self._last_pose_chain_px: Optional[float] = None
+        self._last_standing_ankle_y_px: Optional[float] = None
         self._still_threshold = float(
             phase_cfg.get("thresholds", {}).get("ready_max_velocity", 0.15)
         )
@@ -209,6 +232,29 @@ class ShotAnalysisPipeline:
             release_angle_deg=float(
                 trajectory_display_cfg.get("ideal_release_angle_deg", 45.0)
             ),
+            angle_mode=str(
+                trajectory_display_cfg.get("ideal_angle_mode", "fixed")
+            ),
+            close_distance_m=float(
+                trajectory_display_cfg.get("ideal_close_distance_m", 1.5)
+            ),
+            close_angle_deg=float(
+                trajectory_display_cfg.get("ideal_close_angle_deg", 65.0)
+            ),
+            midrange_distance_m=float(
+                trajectory_display_cfg.get("ideal_midrange_distance_m", 3.0)
+            ),
+            midrange_angle_deg=float(
+                trajectory_display_cfg.get("ideal_midrange_angle_deg", 55.0)
+            ),
+            three_point_distance_m=float(
+                trajectory_display_cfg.get(
+                    "ideal_three_point_distance_m", 6.75
+                )
+            ),
+            three_point_angle_deg=float(
+                trajectory_display_cfg.get("ideal_three_point_angle_deg", 45.0)
+            ),
             samples=int(trajectory_display_cfg.get("ideal_samples", 80)),
             rim_diameter_m=float(
                 physics_cfg.get(
@@ -220,8 +266,29 @@ class ShotAnalysisPipeline:
             minimum_vertical_difference_m=float(
                 physics_cfg.get("minimum_release_to_rim_height_m", 0.25)
             ),
+            minimum_wrist_vertical_difference_m=float(
+                physics_cfg.get(
+                    "minimum_wrist_release_to_rim_height_m", 0.05
+                )
+            ),
             velocity_fit_points=int(
-                trajectory_display_cfg.get("velocity_fit_points", 5)
+                trajectory_display_cfg.get("velocity_fit_points", 7)
+            ),
+            velocity_fit_outlier_threshold_rim_radii=float(
+                trajectory_display_cfg.get(
+                    "velocity_fit_outlier_threshold_rim_radii", 0.75
+                )
+            ),
+            velocity_min_toward_rim_m_s=float(
+                trajectory_display_cfg.get(
+                    "velocity_min_toward_rim_m_s", 0.25
+                )
+            ),
+            velocity_min_upward_m_s=float(
+                trajectory_display_cfg.get("velocity_min_upward_m_s", 0.25)
+            ),
+            velocity_max_speed_m_s=float(
+                trajectory_display_cfg.get("velocity_max_speed_m_s", 20.0)
             ),
             comparison_min_points=int(
                 trajectory_display_cfg.get("comparison_min_points", 3)
@@ -243,6 +310,12 @@ class ShotAnalysisPipeline:
         self._debug_trajectory_physics = bool(
             physics_cfg.get("debug_trajectory", False)
         )
+        self._debug_trajectory_comparison = bool(
+            physics_cfg.get("debug_trajectory_comparison", False)
+        )
+        self._release_calibration_debug: Dict[str, object] = {}
+        self._release_comparison_debug_printed = False
+        self._final_comparison_debug_printed = False
         self._release_anchor_max_wrist_distance_scale = max(
             0.1,
             float(
@@ -416,6 +489,35 @@ class ShotAnalysisPipeline:
         if fps > 0:
             self._fps = fps
 
+    @staticmethod
+    def _parse_court_xy(
+        value,
+        *,
+        label: str,
+        enforce_half_court: bool,
+    ) -> Optional[Tuple[float, float]]:
+        """Validate a mobile/YAML FIBA half-court coordinate."""
+        if value is None:
+            return None
+        if not isinstance(value, (list, tuple)) or len(value) != 2:
+            print(f"Warning: {label} must be [x_m, y_m]; using vision distance")
+            return None
+        try:
+            x_m, y_m = float(value[0]), float(value[1])
+        except (TypeError, ValueError):
+            print(f"Warning: {label} must contain numbers; using vision distance")
+            return None
+        if not math.isfinite(x_m) or not math.isfinite(y_m):
+            print(f"Warning: {label} must be finite; using vision distance")
+            return None
+        if enforce_half_court and not (-7.5 <= x_m <= 7.5 and 0.0 <= y_m <= 14.0):
+            print(
+                f"Warning: {label}={value!r} is outside the 15x14 m "
+                "FIBA half court; using vision distance"
+            )
+            return None
+        return x_m, y_m
+
     def _process_ball(
         self,
         bgr_frame: Optional[np.ndarray],
@@ -584,8 +686,8 @@ class ShotAnalysisPipeline:
                 ball_state_update,
                 wrist_xy=None,
                 rim_detection=rim,
-                player_height_px=None,
-                standing_ankle_y_px=None,
+                player_height_px=self._last_pose_chain_px,
+                standing_ankle_y_px=self._last_standing_ankle_y_px,
             )
             completed_shot = self._shot_tracker.update_ball_outcome(
                 ball_state_update.outcome,
@@ -661,6 +763,16 @@ class ShotAnalysisPipeline:
             self._still_threshold,
         )
         features.ankle_baseline_y = self._ankle_baseline_y
+        pose_chain_px = pose_nose_to_ankle_length_px(raw["image"])
+        standing_ankle_y_px = (
+            self._ankle_image_baseline * height
+            if self._ankle_image_baseline > 0.0
+            else ankle_y_px
+        )
+        if pose_chain_px is not None and pose_chain_px > 1.0:
+            self._last_pose_chain_px = pose_chain_px
+        if standing_ankle_y_px > 0.0:
+            self._last_standing_ankle_y_px = standing_ankle_y_px
 
         phase = self._phase_detector.update(features, timestamp_ms=timestamp_ms)
         phase_label = PHASE_LABELS.get(phase, phase)
@@ -687,11 +799,9 @@ class ShotAnalysisPipeline:
             ball_state_update,
             wrist_xy=wrist_xy,
             rim_detection=rim,
-            player_height_px=pose_nose_to_ankle_length_px(raw["image"]),
+            player_height_px=pose_chain_px or self._last_pose_chain_px,
             standing_ankle_y_px=(
-                self._ankle_image_baseline * height
-                if self._ankle_image_baseline > 0.0
-                else ankle_y_px
+                standing_ankle_y_px or self._last_standing_ankle_y_px
             ),
         )
 
@@ -792,6 +902,8 @@ class ShotAnalysisPipeline:
             release_distance_px=self._ball_shot_fsm.release_distance_px,
         )
         if update.released_this_frame:
+            self._release_comparison_debug_printed = False
+            self._final_comparison_debug_printed = False
             points = self._observed_trajectory.relative_points()
             (
                 historical_wrist_relative_xy,
@@ -820,6 +932,11 @@ class ShotAnalysisPipeline:
                 meters_per_pixel_at_release=meters_per_pixel,
                 rim_radius_px=update.rim_inner_radius,
                 release_relative_xy=release_relative_xy,
+                kinematics_start_timestamp_ms=(
+                    self._observed_trajectory
+                    .release_kinematics_start_timestamp_ms()
+                ),
+                horizontal_distance_m_override=self._court_shot_distance_m,
             )
             if self._debug_trajectory_physics:
                 self._print_trajectory_physics_debug(
@@ -836,8 +953,33 @@ class ShotAnalysisPipeline:
                 rim_center_xy=update.rim_center_xy,
                 rim_radius=update.rim_inner_radius,
                 crossing_xy=update.crossing_xy,
+                crossing_timestamp_ms=update.crossing_timestamp_ms,
             )
         comparison = self._ideal_trajectory.comparison()
+        if self._debug_trajectory_comparison and comparison is not None:
+            release_comparison_ready = (
+                comparison.observed_point_count
+                >= self._ideal_trajectory.velocity_fit_points
+                and comparison.observed_release_angle_deg is not None
+                and comparison.observed_release_speed_m_s is not None
+            )
+            if (
+                release_comparison_ready
+                and not self._release_comparison_debug_printed
+            ):
+                self._print_trajectory_comparison_debug(
+                    "release",
+                    comparison,
+                    outcome=None,
+                )
+                self._release_comparison_debug_printed = True
+            if update.outcome is not None and not self._final_comparison_debug_printed:
+                self._print_trajectory_comparison_debug(
+                    "final",
+                    comparison,
+                    outcome=update.outcome.result,
+                )
+                self._final_comparison_debug_printed = True
         if update.outcome is not None and comparison is not None:
             update.outcome.timeseries_summary["trajectory_comparison"] = (
                 comparison.to_dict()
@@ -857,6 +999,14 @@ class ShotAnalysisPipeline:
         Optional[float],
         Optional[Tuple[float, float]],
     ]:
+        self._release_calibration_debug = {
+            "ball_release_height_m": None,
+            "ball_gap_to_rim_m": None,
+            "wrist_release_height_m": None,
+            "wrist_gap_to_rim_m": None,
+            "selected_release_source": "none",
+            "calibration_reason": "missing_required_input",
+        }
         if (
             not points
             or self._player.height_m is None
@@ -878,7 +1028,21 @@ class ShotAnalysisPipeline:
             nose_to_ankle_height_fraction=self._nose_to_ankle_height_fraction,
             ankle_to_floor_height_fraction=self._ankle_to_floor_height_fraction,
         )
+        ball_gap_to_rim_m = (
+            self._ideal_trajectory.rim_height_m - release_height_m
+            if release_height_m is not None
+            else None
+        )
+        self._release_calibration_debug.update(
+            {
+                "ball_release_height_m": release_height_m,
+                "ball_gap_to_rim_m": ball_gap_to_rim_m,
+            }
+        )
         minimum_vertical_m = self._ideal_trajectory.minimum_vertical_difference_m
+        minimum_wrist_vertical_m = (
+            self._ideal_trajectory.minimum_wrist_vertical_difference_m
+        )
         maximum_wrist_distance_px = (
             self._ball_shot_fsm.release_distance_px
             * self._release_anchor_max_wrist_distance_scale
@@ -893,6 +1057,12 @@ class ShotAnalysisPipeline:
             >= minimum_vertical_m
             and ball_was_near_historical_wrist
         ):
+            self._release_calibration_debug.update(
+                {
+                    "selected_release_source": "ball",
+                    "calibration_reason": "ball_near_wrist_and_plausible",
+                }
+            )
             return release_height_m, meters_per_pixel, None
 
         # If ball acquisition began in mid-flight, its first observed point is
@@ -913,6 +1083,9 @@ class ShotAnalysisPipeline:
                 (float(wrist_xy[1]) - float(rim_y)) / radius,
             )
         else:
+            self._release_calibration_debug["calibration_reason"] = (
+                "wrist_context_unavailable"
+            )
             return None, None, None
         wrist_height_m, meters_per_pixel = estimate_release_height_m(
             float(wrist_for_calibration[1]),
@@ -922,12 +1095,32 @@ class ShotAnalysisPipeline:
             nose_to_ankle_height_fraction=self._nose_to_ankle_height_fraction,
             ankle_to_floor_height_fraction=self._ankle_to_floor_height_fraction,
         )
+        wrist_gap_to_rim_m = (
+            self._ideal_trajectory.rim_height_m - wrist_height_m
+            if wrist_height_m is not None
+            else None
+        )
+        self._release_calibration_debug.update(
+            {
+                "wrist_release_height_m": wrist_height_m,
+                "wrist_gap_to_rim_m": wrist_gap_to_rim_m,
+            }
+        )
         if (
             wrist_height_m is None
             or self._ideal_trajectory.rim_height_m - wrist_height_m
-            < minimum_vertical_m
+            < minimum_wrist_vertical_m
         ):
+            self._release_calibration_debug["calibration_reason"] = (
+                "wrist_height_outside_safe_range"
+            )
             return None, None, None
+        self._release_calibration_debug.update(
+            {
+                "selected_release_source": "wrist_proxy",
+                "calibration_reason": "wrist_height_selected",
+            }
+        )
         return wrist_height_m, meters_per_pixel, wrist_relative
 
     def _print_trajectory_physics_debug(
@@ -983,11 +1176,40 @@ class ShotAnalysisPipeline:
                 if comparison is not None
                 else None
             ),
+            "ball_release_height_m": self._release_calibration_debug.get(
+                "ball_release_height_m"
+            ),
+            "ball_gap_to_rim_m": self._release_calibration_debug.get(
+                "ball_gap_to_rim_m"
+            ),
+            "wrist_release_height_m": self._release_calibration_debug.get(
+                "wrist_release_height_m"
+            ),
+            "wrist_gap_to_rim_m": self._release_calibration_debug.get(
+                "wrist_gap_to_rim_m"
+            ),
+            "selected_release_source": self._release_calibration_debug.get(
+                "selected_release_source", "none"
+            ),
+            "calibration_reason": self._release_calibration_debug.get(
+                "calibration_reason", "unknown"
+            ),
             "horizontal_m": (
                 comparison.horizontal_distance_m
                 if comparison is not None
                 else None
             ),
+            "horizontal_distance_source": (
+                comparison.horizontal_distance_source
+                if comparison is not None
+                else "none"
+            ),
+            "court_shot_xy_m": (
+                str(self._court_shot_xy_m)
+                if self._court_shot_xy_m is not None
+                else "none"
+            ),
+            "court_rim_xy_m": str(self._court_rim_xy_m),
             "release_height_m": (
                 comparison.release_height_m
                 if comparison is not None
@@ -1028,6 +1250,66 @@ class ShotAnalysisPipeline:
                 rendered.append(f"{key}={number(value, digits)}")
         print("[TRAJECTORY PHYSICS] " + " ".join(rendered))
 
+    def _print_trajectory_comparison_debug(
+        self,
+        stage: str,
+        comparison,
+        *,
+        outcome: Optional[str],
+    ) -> None:
+        """Print ideal-versus-observed launch and complete-arc measurements."""
+        def number(value: Optional[float]) -> str:
+            if value is None:
+                return "none"
+            return f"{float(value):.3f}"
+
+        values = {
+            "stage": stage,
+            "outcome": outcome or "pending",
+            "target_angle_deg": comparison.target_release_angle_deg,
+            "observed_angle_deg": comparison.observed_release_angle_deg,
+            "angle_error_deg": comparison.release_angle_error_deg,
+            "target_speed_m_s": comparison.target_release_speed_m_s,
+            "observed_speed_m_s": comparison.observed_release_speed_m_s,
+            "speed_error_m_s": comparison.release_speed_error_m_s,
+            "observed_kinematics_source": (
+                comparison.observed_kinematics_source
+            ),
+            "early_kinematics_status": comparison.early_kinematics_status,
+            "release_height_m": comparison.release_height_m,
+            "rim_height_m": comparison.rim_height_m,
+            "horizontal_m": comparison.horizontal_distance_m,
+            "horizontal_distance_source": (
+                comparison.horizontal_distance_source
+            ),
+            "vertical_m": comparison.vertical_distance_m,
+            "release_to_rim_time_s": comparison.release_to_rim_time_s,
+            "release_to_rim_displacement_m": (
+                comparison.release_to_rim_displacement_m
+            ),
+            "release_to_rim_path_length_m": (
+                comparison.release_to_rim_path_length_m
+            ),
+            "release_to_rim_average_speed_m_s": (
+                comparison.release_to_rim_average_speed_m_s
+            ),
+            "observed_apex_radii": comparison.observed_apex_height_rim_radii,
+            "ideal_apex_radii": comparison.ideal_apex_height_rim_radii,
+            "apex_error_radii": comparison.apex_height_error_rim_radii,
+            "path_rmse_radii": comparison.path_rmse_rim_radii,
+            "rim_crossing_error_radii": comparison.rim_crossing_error_rim_radii,
+            "points": comparison.observed_point_count,
+            "calibration": comparison.velocity_calibration,
+            "anchor": comparison.release_anchor_source,
+        }
+        rendered = []
+        for key, value in values.items():
+            if isinstance(value, (int, str)):
+                rendered.append(f"{key}={value}")
+            else:
+                rendered.append(f"{key}={number(value)}")
+        print("[TRAJECTORY COMPARISON] " + " ".join(rendered))
+
     def _ideal_rim_target_relative_xy(
         self,
         update: BallStateUpdate,
@@ -1059,6 +1341,7 @@ class ShotAnalysisPipeline:
             "stabilized_rim_center_xy": update.rim_center_xy,
             "stabilized_rim_inner_radius": update.rim_inner_radius,
             "rim_crossing_xy": update.crossing_xy,
+            "rim_crossing_timestamp_ms": update.crossing_timestamp_ms,
             "observed_ball_path_segments": (
                 self._observed_trajectory.screen_segments(
                     update.rim_center_xy,
@@ -1115,7 +1398,28 @@ class ShotAnalysisPipeline:
 
     def finalize_session(self) -> Optional[ShotSummary]:
         """Close any shot still in progress (e.g. video ended mid-rep)."""
-        return self._shot_tracker.finalize_in_progress()
+        summary = self._shot_tracker.finalize_in_progress()
+        comparison = self._ideal_trajectory.comparison()
+        outcome = summary.outcome if summary is not None else None
+
+        if outcome is not None and comparison is not None:
+            outcome.timeseries_summary["trajectory_comparison"] = (
+                comparison.to_dict()
+            )
+
+        if (
+            self._debug_trajectory_comparison
+            and comparison is not None
+            and not self._final_comparison_debug_printed
+        ):
+            self._print_trajectory_comparison_debug(
+                "final",
+                comparison,
+                outcome=outcome.result if outcome is not None else None,
+            )
+            self._final_comparison_debug_printed = True
+
+        return summary
 
     def reset(self):
         self._filter_bank.reset()
@@ -1130,11 +1434,16 @@ class ShotAnalysisPipeline:
         self._prev_timestamp_ms = None
         self._ankle_baseline_y = 0.0
         self._ankle_image_baseline = 0.0
+        self._last_pose_chain_px = None
+        self._last_standing_ankle_y_px = None
         self._ball_tracker.reset()
         self._ball_buffer.clear()
         self._ball_shot_fsm.reset()
         self._observed_trajectory.reset()
         self._ideal_trajectory.reset()
+        self._release_calibration_debug = {}
+        self._release_comparison_debug_printed = False
+        self._final_comparison_debug_printed = False
         self._last_rim = None
         self._last_yolo_frame = -1
         self._last_rim_yolo_frame = -self._rim_yolo_correction_interval

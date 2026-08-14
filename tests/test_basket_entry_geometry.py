@@ -86,8 +86,10 @@ def test_clean_entry_requires_downward_contour_fit_then_below_confirmation():
 
     assert crossing.crossed_rim_this_frame
     assert crossing.state == BallShotState.CROSSED_INSIDE
+    assert crossing.crossing_timestamp_ms is not None
     assert made.state == BallShotState.MADE
     assert made.outcome is not None and made.outcome.result == "made"
+    assert made.outcome.entry_timestamp_ms == crossing.crossing_timestamp_ms
 
 
 def test_clean_entry_can_continue_diagonally_without_a_net():
