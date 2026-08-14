@@ -186,25 +186,67 @@ class BiomechanicsEngine:
         if metric == "head_velocity":
             return abs(features.nose_velocity_y)
 
+        # Both release metrics are built from `wrist_y`, which is fabricated as
+        # 0.0 when the visibility gate rejects the wrist -- and in hip-centred
+        # world coordinates 0.0 reads as "the wrist is exactly at hip height",
+        # a perfectly plausible number that nothing downstream can question.
+        #
+        # `release` is the worst phase for this: it is the fastest-moving and
+        # most motion-blurred part of the shot, so it is where the gate is most
+        # likely to reject. The failure would read as "released far too low"
+        # and produce a whole coaching sentence out of a landmark nobody saw.
+        #
+        # `wrist_world_valid` exists precisely for this and is checked at every
+        # other read site in the project. These two were the exceptions.
+        if metric in ("release_height", "release_height_ratio"):
+            if not features.wrist_world_valid:
+                return None
+
         if metric == "release_height":
-            # Body-relative: how far the hand clears the head. This is already
-            # scale-free, so it works for every player with or without a
-            # recorded height.
+            # Body-relative: how far the hand clears the head. Both landmarks
+            # come from the SAME frame, so the hip-centred origin cancels and
+            # the result is a true body-relative height, scale-free and usable
+            # with or without a recorded player height.
             if features.nose_y == 0:
                 return None
             return features.wrist_y - features.nose_y
 
         if metric == "release_height_ratio":
-            # Floor-relative release height as a fraction of standing height —
-            # the representation used in the literature (Cabarkapa et al. 2023,
-            # resources.md A2), where it was the only variable that separated
-            # proficient from non-proficient free-throw shooters (p=0.010).
+            # Floor-relative release height as a fraction of standing height,
+            # the representation the literature uses (SOURCES.md A2).
             #
-            # Requires a user-provided height. Returns None otherwise, which
-            # makes the engine skip the rule instead of inventing a value.
-            return self._player.normalized(
+            # THIS SUBTRACTION IS NOT SAME-FRAME, and that is why the ankle
+            # reference has to come from image space.
+            #
+            # `wrist_y` is this frame's hip-relative wrist. `ankle_baseline_y`
+            # is a hip-relative ankle height averaged while the player stood
+            # still BEFORE the shot. Subtracting one from the other does not
+            # cancel the origin, because the two are measured against the hip
+            # at different moments -- and between those moments the hip itself
+            # rose. The result is `arm_reach + leg_length`, with the jump term
+            # missing entirely: structurally blind to the elevation, which is
+            # the one thing a release height is supposed to capture.
+            #
+            # Measured consequence on salah_video: all five shots read 0.4-0.9
+            # against a band starting at 1.02 and published values of
+            # 1.12-1.17. The rule failed 100% of attempts and told every player
+            # they release too low.
+            #
+            # `takeoff_ratio` is the same elevation the shot classifier uses,
+            # measured in IMAGE space where whole-body translation is visible
+            # at all, in body-height units. Adding it back restores the term
+            # the world-space subtraction discards.
+            # Added AFTER normalising, because `body_rise_ratio` is already a
+            # fraction of the player's on-screen height -- the same unit
+            # `normalized` produces. Converting it to metres first would need
+            # `height_m`, which is None whenever no height was entered, and
+            # would reintroduce a division this term does not require.
+            ratio = self._player.normalized(
                 features.wrist_y - features.ankle_baseline_y
             )
+            if ratio is None:
+                return None
+            return ratio + max(0.0, features.body_rise_ratio or 0.0)
 
         if metric == "wrist_height":
             return features.wrist_y

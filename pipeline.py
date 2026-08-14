@@ -675,10 +675,20 @@ class ShotAnalysisPipeline:
         dt_s = self._compute_dt(timestamp_ms)
         prev_snapshot = self._frame_buffer.latest
 
-        ankle_y = 0.0
-        ankle_avg = _avg_y(world, ("left_ankle", "right_ankle"))
-        if ankle_avg is not None:
-            ankle_y = ankle_avg
+        # Kept as Optional all the way into update_ankle_baseline.
+        #
+        # This used to collapse to 0.0 when neither ankle was reliable, and
+        # 0.0 in hip-centred coordinates means "ankles level with the hips" --
+        # not "ankles not seen". On a still frame that fabricated value was
+        # blended straight into the long-lived standing baseline, or seeded it
+        # outright on the first still frame. Footage that crops the feet, which
+        # is common when filming shooting form, would drag the floor reference
+        # up toward hip height and then compare real ankles against it.
+        #
+        # The image-space sibling `update_ankle_image_baseline` has guarded
+        # this from the start, with a comment describing exactly this failure.
+        # The world-space one never received it.
+        ankle_y = _avg_y(world, ("left_ankle", "right_ankle"))
 
         features = extract_features(
             world_landmarks=world,

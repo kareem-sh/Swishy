@@ -399,8 +399,25 @@ def update_ankle_image_baseline(
     return 0.9 * current_baseline + 0.1 * ankle_y
 
 
-def update_ankle_baseline(current_baseline: float, ankle_y: float, total_velocity: float, still_threshold: float) -> float:
-    """Track standing ankle height when the player is relatively still."""
+def update_ankle_baseline(
+    current_baseline: float,
+    ankle_y: Optional[float],
+    total_velocity: float,
+    still_threshold: float,
+) -> float:
+    """Track standing ankle height when the player is relatively still.
+
+    `ankle_y` is Optional, and None means the ankles were not seen. It must
+    not be replaced by 0.0 anywhere upstream: in hip-centred world coordinates
+    0.0 means "ankles level with the hips", which is a real posture, so the
+    baseline cannot tell it apart from a missing reading and would blend it in
+    -- or seed itself with it outright on the first still frame.
+
+    This is the guard `update_ankle_image_baseline` below has always had. This
+    function did not, and the caller collapsed None to 0.0 before reaching it.
+    """
+    if ankle_y is None:
+        return current_baseline
     if total_velocity < still_threshold:
         if current_baseline == 0.0:
             return ankle_y

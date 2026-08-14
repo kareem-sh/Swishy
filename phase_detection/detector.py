@@ -484,7 +484,20 @@ class ShotPhaseDetector:
                 f.index_align_angle is not None
                 and f.index_align_angle > t("follow_through_index_align_min", 160)
             )
-            if f.wrist_velocity_y < t("follow_through_wrist_down_velocity", -0.02):
+            # `self._wrist_falling(f)`, not the raw comparison it used to
+            # inline. The helper is defined a few lines above, is used at the
+            # other call site in this same method, and carries the
+            # `wrist_world_valid` guard that the inline version dropped.
+            #
+            # Without it: `wrist_velocity_y` is computed as
+            # `(wrist_y - prev_wrist) / dt`, and `wrist_y` is fabricated as 0.0
+            # when the gate rejects the landmark. One rejected frame directly
+            # after a valid high reading therefore produces a large negative
+            # "velocity" out of nothing, which satisfies this condition
+            # immediately and ends the release on a frame where the wrist was
+            # never observed to fall -- truncating the follow-through window
+            # that `follow_through_elbow` and `hold_duration_s` are measured in.
+            if self._wrist_falling(f):
                 return "recovery"
             if f.elbow_angle is not None and f.elbow_angle > t(
                 "follow_through_elbow_min", 155
