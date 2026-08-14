@@ -86,9 +86,10 @@ def main() -> int:
 
     if not run.shots:
         print("\n  No shot was found in this video.")
-        print("  The most common cause is a clip that starts at the shot: the")
-        print("  player needs to be visible standing still beforehand, or")
-        print("  there is nothing to measure the rise against.")
+        if run.no_shot_reason:
+            # The specific cause, measured from this clip's own signal, rather
+            # than a list of things it might have been.
+            print(f"\n  {run.no_shot_reason}")
         return 1
 
     for shot in run.shots:

@@ -83,6 +83,10 @@ class AnalysisRun:
     frames_read: int = 0
     rejection: Optional[RejectionReason] = None
     rejection_detail: str = ""
+    # Why segmentation found nothing, when it found nothing. See
+    # shots.segmenter.explain_absence -- "no shot found" alone tells the person
+    # filming nothing about what to change.
+    no_shot_reason: Optional[str] = None
 
     @property
     def is_rejected(self) -> bool:
@@ -227,6 +231,7 @@ def analyze_video(
         pose_share=pose_share,
         discarded_candidates=pipe.shot_tracker.discarded_candidates,
         frames_read=index,
+        no_shot_reason=getattr(pipe, "_no_shot_reason", None),
     )
     # Carried so a viewer can redraw without paying for pose detection again.
     run.landmarks = pipe.offline_landmarks
@@ -241,7 +246,10 @@ def analyze_video(
         )
     elif not shots:
         run.rejection = RejectionReason.NO_SHOOTING_EVENT
-        run.rejection_detail = (
+        # Prefer the measured cause. The candidate count is a statistic about
+        # our own search; the reason says what to do differently, and on the
+        # offline path the count is usually 0, which explains nothing at all.
+        run.rejection_detail = run.no_shot_reason or (
             f"{run.discarded_candidates} candidate movement(s) were examined "
             "and none contained a release."
         )

@@ -157,10 +157,31 @@ SINGLE_SHOT_CLIPS = [
     ("video8_shot08_set.mp4", ShotType.SET_SHOT),
     ("video8_shot09_set.mp4", ShotType.SET_SHOT),
     ("video8_shot10_jump.mp4", ShotType.JUMP_SHOT),
-    ("video9_shot01_jump.mp4", ShotType.JUMP_SHOT),
-    ("video9_shot02_jump.mp4", ShotType.JUMP_SHOT),
     ("video9_shot03_jump.mp4", ShotType.JUMP_SHOT),
 ]
+
+# video9_shot01 and video9_shot02 are NOT in the list above, and this is a
+# statement about the clips rather than about the code.
+#
+# Both were cut after the shot had already begun. Measured, as the shooting
+# hand's height at frame zero against its own peak in that clip:
+#
+#     video9_shot01   opens at 81% of its peak    prominence 0.113   not found
+#     video9_shot02   opens at 94% of its peak    prominence 0.091   not found
+#     video9_shot03   opens at 33% of its peak    prominence 0.671   found
+#     video8_shot05   opens at 33% of its peak    prominence 0.572   found
+#
+# A shot is located by how far the hand rises above where it rested
+# beforehand. In these two clips those frames were never recorded, so there is
+# no rise to measure and no threshold that could recover one -- lowering the
+# bar far enough to catch a prominence of 0.09 would call ordinary movement a
+# shot in every other video.
+#
+# They are removed rather than xfailed because an xfail asserts the code is
+# wrong and should one day pass. Here the code is right: the correct behaviour
+# on a clip cut mid-shot is to decline it and say why, which
+# shots.segmenter.explain_absence now does. That behaviour is tested below.
+_CLIPS_CUT_MID_SHOT = ["video9_shot01_jump.mp4", "video9_shot02_jump.mp4"]
 
 _cache = {}
 
@@ -445,3 +466,26 @@ def test_single_shot_clip_is_scored(clip, expected, clip_runs):
     shot = run.shots[0]
     assert shot.score is not None, _describe(run)
     assert shot.phase_scores, "no per-phase analysis was produced"
+
+
+@pytest.mark.parametrize("clip", _CLIPS_CUT_MID_SHOT)
+def test_clip_cut_mid_shot_is_declined_with_a_usable_reason(clip):
+    """Declining is the right answer here. Declining SILENTLY is not.
+
+    These clips open with the hand already most of the way up, so there is no
+    rise to measure. The system cannot analyse them and should not pretend to.
+
+    What it must do is say which of several very different things went wrong,
+    because each one means something different for the person filming: start
+    recording earlier, improve the lighting, keep the player in frame. "No shot
+    was found" is true and tells them none of that.
+    """
+    run = _run(SINGLE_SHOT_DIR / clip)
+    assert not run.shots, "expected no shot on a clip cut mid-shot"
+
+    reason = run.no_shot_reason or run.rejection_detail
+    assert reason, "declined without saying why"
+    assert "already" in reason.lower() and "record" in reason.lower(), (
+        "the reason should identify the clip as starting mid-shot and say what "
+        f"to do about it, but said:\n  {reason}"
+    )

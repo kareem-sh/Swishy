@@ -293,3 +293,70 @@ def segment(
         start, end = window_for(signal, peak, pad, minimum)
         out.append((start, peak, end))
     return out
+
+
+# How much of its own peak height the hand may already have at frame zero
+# before the clip is judged to start mid-shot. Measured on the two clips that
+# fail this way: the hand opens at 81% and 93% of its eventual peak, against
+# 26-39% on clips that segment correctly.
+_ALREADY_UP_FRACTION = 0.60
+
+
+def explain_absence(
+    wrist_height_ratio: Sequence[Optional[float]],
+    fps: float,
+) -> str:
+    """Why no shot was found. Never called unless `segment` returned nothing.
+
+    "No shot was found" is true and useless. Every cause below is a different
+    thing for the person filming to do next, and each is separable from the
+    signal we already have, so reporting them costs nothing but saying so.
+
+    Ordered most specific first: a clip can be both short AND cut mid-shot, and
+    the mid-shot diagnosis is the more actionable of the two.
+    """
+    values = [v for v in (wrist_height_ratio or []) if v is not None]
+    if not values:
+        return ("No pose was tracked. The player needs to be fully in frame, "
+                "one person at a time.")
+
+    seen = len(values) / max(1, len(wrist_height_ratio))
+    if seen < 0.5:
+        return (f"The player was only tracked in {seen * 100:.0f}% of frames. "
+                "Check lighting, and that the whole body stays in shot.")
+
+    signal = interpolate(wrist_height_ratio)
+    peak_value = max(signal)
+    rise = peak_value - min(signal)
+
+    if peak_value > 0 and signal[0] >= _ALREADY_UP_FRACTION * peak_value:
+        return (
+            "The clip starts with the shooting hand already raised "
+            f"({signal[0] / peak_value * 100:.0f}% of the way to its highest "
+            "point), so the shot was already under way when recording began. "
+            "A shot is found by how far the hand rises above where it rested "
+            "beforehand, and those frames are not in this clip. Start "
+            "recording about a second earlier, with the player standing still."
+        )
+
+    if rise < SINGLE_SHOT_MIN_PROMINENCE:
+        return (
+            f"The shooting hand only rose {rise:.2f} body heights in this clip, "
+            "which is less than a shooting motion. If a shot was attempted, "
+            "the hand was probably out of frame or hidden at its highest point."
+        )
+
+    duration = len(signal) / fps if fps > 0 else 0.0
+    if duration > SINGLE_SHOT_MAX_S:
+        return (
+            "The hand rose and fell, but never far enough above the "
+            "surrounding movement to stand out as a shot. On a long clip this "
+            "usually means the player was moving with the ball throughout. Try "
+            "a shorter clip around a single attempt."
+        )
+
+    return (
+        "The hand rose and fell, but not sharply enough to be separated from "
+        "the rest of the movement. The most common cause is a clip that starts "
+        "too close to the shot."
+    )

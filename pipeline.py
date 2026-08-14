@@ -52,7 +52,7 @@ from player.profile import PlayerProfile, load_player_profile
 from pose.landmarks import extract_all_landmarks
 from pose.visibility import VisibilityGate
 from feedback.phase_refiner import refine_phases
-from shots.segmenter import segment
+from shots.segmenter import explain_absence, segment
 from utils.config_loader import load_yaml
 from utils.frame_buffer import FrameBuffer, FrameSnapshot
 from visualization.hud_display import HudDisplay, HudDisplaySmoother
@@ -163,6 +163,8 @@ class ShotAnalysisPipeline:
         # frame index -> (shot number, final phase label, score). Filled by
         # `segment_offline`, which is the first moment any of it is known.
         self._offline_overlay: Dict[int, Tuple[int, str, Optional[int]]] = {}
+        # Set by segment_offline when it finds nothing; see explain_absence.
+        self._no_shot_reason: Optional[str] = None
         # The tracker opens shots BACKWARDS from a detected release, so it needs
         # the recent past, and it re-scores the captured frames against the
         # refined coaching phases, so it needs this engine rather than one of
@@ -1190,6 +1192,13 @@ class ShotAnalysisPipeline:
             for f in self._offline_history
         ]
         windows = segment(signal, fps)
+
+        # Why nothing was found, kept for the report. Computed here because
+        # this is the only place that still holds the signal it is derived
+        # from; recovering it later would mean re-running the whole pass.
+        self._no_shot_reason = (
+            None if windows else explain_absence(signal, fps)
+        )
 
         self._shot_tracker.reset()
         self._offline_overlay = {}
