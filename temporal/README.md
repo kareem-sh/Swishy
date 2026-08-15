@@ -12,11 +12,46 @@ one holding code is a mistake waiting to happen.
 
 ```
 temporal/
-  reference/     code recovered from the deleted ml/ dir, kept for reading only
-  data/          generated feature arrays and manifests   (gitignored)
-  checkpoints/   trained weights                          (gitignored)
-  artifacts/     evaluation output, confusion matrices    (gitignored)
+  dataset.py               inventory -> labels -> groups -> split -> manifest.json
+  preprocess.py            crop + upscale the clips the detector struggles with
+  extract_shots.py         manifest -> shots.json, the actual training index
+  compare_preprocessing.py A/B the preprocessing stage against raw footage
+  evaluate.py              score a model's predictions without flattering them
+  reference/               code recovered from the deleted ml/, read-only
+  data/                    manifests and shot records; clips/ is gitignored
+  checkpoints/             trained weights                 (gitignored)
+  artifacts/               evaluation output               (gitignored)
 ```
+
+## Order of operations
+
+```
+venv/Scripts/python.exe temporal/dataset.py          # manifest + split
+venv/Scripts/python.exe temporal/preprocess.py       # render data/clips/
+venv/Scripts/python.exe temporal/extract_shots.py    # data/shots.json
+```
+
+`dataset.py` rebuilds the manifest from scratch each run and carries
+`prepared_path` forward from the previous one, so re-running it does not
+silently send extraction back to the raw footage.
+
+To re-check whether preprocessing still earns its place:
+
+```
+venv/Scripts/python.exe temporal/extract_shots.py --raw
+venv/Scripts/python.exe temporal/compare_preprocessing.py
+```
+
+## The unit of this dataset is a SHOT, not a clip
+
+`salah_video.mp4` is one file and five shots. A manifest keyed by filename
+cannot be the training index, which is why `shots.json` exists and why every
+key is `<clip>#<shot_number>`.
+
+And the count that matters is not the clip count. **Under half of the detected
+shots carry a usable elevation at all** — the rest are missing for stated
+reasons recorded per shot in `no_elevation_reason`, never filled in with a
+zero. Read that number before deciding what size of model is justified.
 
 Weights, logs and feature arrays are **never committed**. They are rebuilt from
 the videos and the pipeline, and a checkpoint in git goes stale the moment a
@@ -80,3 +115,78 @@ three:
 So the split is by **group**, where a group is (source video, player), and
 duplicate sets are pinned to a single side. A held-out test set is chosen once
 and not looked at until the end.
+
+Grouping is **transitive**, computed by union-find. An earlier version applied
+the three rules in priority order and split one player across three groups; the
+leakage check passed by luck, not by construction. `leakage_report()` now
+refuses to write a manifest at all if any group spans a split.
+
+A correct split can still be a useless one. The first test set held out two
+whole players — sound against leakage, and silent about the fact that both were
+broadcast footage with a panning camera, so five of its eight shots had no
+measurable target. Both properties have to hold at once: **disjoint by group,
+and measurable.**
+
+## Why preprocessing crops but never tracks
+
+`preprocess.py` renders a static crop around the shooter, upscaled. The crop is
+computed **once per clip and never moves**, and that is the whole design.
+
+`body_rise_ratio` and `takeoff_elevation` measure the ankle's displacement from
+a standing baseline in image space. A crop that tracked the shooter frame by
+frame would subtract exactly the vertical translation those features exist to
+measure — and it would do it silently, turning every jump shot into a plausible
+set shot rather than an obvious failure.
+
+The crop also **preserves the source aspect ratio**, and that is load-bearing.
+Landmarks are normalised per axis — x by frame width, y by frame height — and
+the project compares across the two: hip travel is a fraction of WIDTH while
+the body height normalising everything else is a fraction of HEIGHT. An
+anisotropic crop rescales the axes differently and silently changes what those
+numbers mean. Cropping `video8_shot04` to 224×343 from 1280×720 turned 0.084
+frame-widths of hip travel into roughly 0.48, past the 0.18 driving threshold;
+the clip was reclassified `LAYUP`, rejected, and seven siblings went with it.
+The footage and the classifier were both fine.
+
+The A/B against raw footage is in `compare_preprocessing.py`, and the number to
+watch is **class changed**: of the shots detected both ways, none moved across
+the jump/set boundary. That is the evidence the crop is not distorting the
+measurement. If a future change to this stage makes that number non-zero, the
+change is wrong no matter what it does to the totals.
+
+### Known, not fixed: the driving test is not scale-invariant
+
+`DRIVING_HORIZONTAL_TRAVEL_RATIO` (0.18, `shots/classifier.py`) compares hip
+travel to **frame width**, while every other measurement in the project is
+normalised by the player's own on-screen height precisely so it survives zoom
+and camera distance. So the same physical sway reads differently depending on
+how tight the camera is: zoom in and a stationary shooter starts to look like a
+driving action. This is in shipped code and recalibrating the threshold is the
+owner's call, so it is recorded here rather than changed.
+
+Panning clips are **not** stabilised. Residual stabilisation error is a slow
+drift, and every ratio feature here is normalised against a baseline gathered
+over the clip, so a drift would bias that baseline instead of breaking it — an
+error that survives review because the output still looks like data. Those
+clips are marked `drop_elevation` and their target is reported missing.
+
+## How accuracy is measured
+
+`evaluate.py` takes `{clip#shot: predicted_elevation}` and the frozen split. It
+was written **before any model existed**, so no choice in it was made after
+seeing a result.
+
+It reports four things a bare accuracy number hides:
+
+1. **The training-mean baseline.** Elevation on this corpus is compressed
+   around the 0.12 boundary, so a constant predictor already scores well —
+   measured at **92.9% on train**. Any model that does not clearly beat that
+   has learned the mean, not the movement.
+2. **The ambiguous band held apart.** Labels contradict each other between 0.05
+   and 0.15. Averaging those in mixes "did it learn shooting" with "did it
+   guess our threshold", and only the first is a skill.
+3. **The train–test gap**, because twenty-odd samples will be memorised by
+   anything with capacity.
+4. **A bootstrap interval resampled over GROUPS, not shots.** Five of Salah's
+   shots are not five independent observations. The resulting interval is wide;
+   that width is the finding, not a defect in the estimate.

@@ -39,9 +39,8 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import sys
 from collections import defaultdict
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -71,6 +70,13 @@ EXCLUDE_DIRS = {
     ),
 }
 
+# Matched as a SUBSTRING of the filename stem, not as an exact name.
+#
+# The owner relabels by renaming -- 20 of 110 files were renamed in one
+# session -- so an exclusion keyed to an exact filename silently stops
+# applying the moment a suffix is added. That happened: `Salahairballtest.mp4`
+# became `Salahairballtest_set_shot.mp4` and re-entered the dataset as an
+# independent clip, duplicating seven seconds of salah_video.
 EXCLUDE_FILES = {
     "video8.mov": (
         "already cut into the ten single_shot/video8_* clips, which carry "
@@ -80,7 +86,7 @@ EXCLUDE_FILES = {
     "video9.mov": (
         "already cut into single_shot/video9_shot01..03."
     ),
-    "Salahairballtest.mp4": (
+    "Salahairballtest": (
         "a 7 s excerpt of salah_video.mp4 at offset -15.4 s, not a separate "
         "attempt."
     ),
@@ -101,6 +107,11 @@ class Clip:
     directory: str
     player: str
     label: Optional[str]
+    # "small_jump" or "free_throw" where the owner's filename said so. Kept
+    # beside the label, never folded into it: a small jump IS a set shot, and
+    # is also the most informative diagnostic case we have, because it sits in
+    # the band where the 0.12 threshold cannot separate the classes.
+    label_note: str
     duration_s: float
     fps: float
     width: int
@@ -122,6 +133,93 @@ class Clip:
     split: str = ""
     needs_crop: bool = False
     drop_elevation: bool = False
+
+
+VIDEO_SUFFIXES = {".mp4", ".mov", ".avi", ".mkv", ".m4v", ".webm"}
+VIDEO_DIRS = (
+    "assets/videos",
+    "assets/videos/single_shot",
+    "assets/videos/ShootingVideosDataset",
+    "assets/videos/training",
+)
+
+
+# Labels the owner gave in conversation rather than in a filename.
+#
+# Kept in a table, not applied by renaming the file, because renaming the
+# owner's footage to encode a label would destroy the only record of what they
+# originally called it -- and `scan_disk` already joins on size precisely
+# because those names move.
+#
+# This is a table of things the OWNER SAID. It is not a place to record what
+# the pipeline inferred, and nothing measured belongs in it.
+OWNER_STATED_LABELS = {
+    # "it's set but with very small [jump]" -- about their own footage, all
+    # five shots. Independently consistent with the measured elevations, every
+    # one of which came in under the 0.12 jump-shot boundary.
+    "salah_video.mp4": ("set_shot", "small_jump"),
+}
+
+
+def parse_label(filename: str) -> tuple:
+    """(label, note) from the filename, as the OWNER of the data labelled it.
+
+    These labels are the user's ground truth, typed by hand into the
+    filenames. They are worth more than anything this pipeline infers, so the
+    parser is deliberately forgiving about spelling and spacing and strict
+    about ORDER.
+
+    Order is the whole trick. `small_jump` must be tested BEFORE `jump`, or
+    every small-jump clip silently becomes a jump shot -- which is the exact
+    opposite of what its name says.
+
+    A "small jump" is a set shot taken with a slight rise. The owner's words:
+    "it's set but with very small [jump]". It is recorded as set_shot with the
+    note preserved, because the note is what makes the shot a useful diagnostic
+    case later -- not because the distinction is unreal.
+
+    A free throw is a set shot. Stated by the owner, and consistent with A1,
+    where free throws show 15.3 cm of vertical displacement against 26.9-31.2
+    cm for jump shots.
+    """
+    low = filename.lower().replace("-", "_").replace(" ", "")
+
+    if low in OWNER_STATED_LABELS:
+        return OWNER_STATED_LABELS[low]
+
+    if "small_jump" in low or "smalljump" in low:
+        return "set_shot", "small_jump"
+    if "free_throw" in low or "freethrow" in low:
+        return "set_shot", "free_throw"
+    # jumpshot / jumpshoot / jump_shot / jump_Shot / jump / _jump.
+    if "jump" in low:
+        return "jump_shot", ""
+    if "set" in low:
+        return "set_shot", ""
+    return None, ""
+
+
+def scan_disk() -> Dict[int, Path]:
+    """Current video files on disk, keyed by SIZE.
+
+    Keyed by size and not by name because the owner renames files as they
+    label them -- 20 of 110 were renamed mid-session, which turned a manifest
+    built from a filename snapshot into 12 clips reporting `invalid_video`.
+
+    Size is stable under rename, and it is unique here: zero collisions across
+    all 110 files. That is what makes it safe to use as the join key against
+    measurements taken before the renames, instead of re-measuring for 80
+    minutes to recover information that never changed.
+    """
+    found: Dict[int, Path] = {}
+    for rel in VIDEO_DIRS:
+        directory = PROJECT / rel
+        if not directory.is_dir():
+            continue
+        for path in sorted(directory.iterdir()):
+            if path.suffix.lower() in VIDEO_SUFFIXES and path.is_file():
+                found[path.stat().st_size] = path
+    return found
 
 
 def _f(row: dict, key: str) -> Optional[float]:
@@ -149,19 +247,29 @@ def load_clips() -> List[Clip]:
             key = Path((row.get("video") or "").replace("\\", "/")).name
             quality[key] = row
 
+    on_disk = scan_disk()
+
     clips: List[Clip] = []
     with INVENTORY_CSV.open(encoding="utf-8") as fh:
         for row in csv.DictReader(fh):
-            name = row["filename"]
-            q = quality.get(name, {})
-            label = row.get("label") or ""
+            # Join the measurements to the file as it exists NOW. The
+            # measurements were taken before the owner relabelled by renaming;
+            # size survives a rename and the name does not.
+            size = int(_f(row, "size_bytes") or 0)
+            current = on_disk.get(size)
+            name = current.name if current else row["filename"]
+            q = quality.get(row["filename"], {})
+            label, note = parse_label(name)
             clips.append(
                 Clip(
-                    path=row["path"].replace("\\", "/"),
+                    path=(current.as_posix() if current
+                          else row["path"].replace("\\", "/")),
                     filename=name,
-                    directory=row["directory"].replace("\\", "/"),
+                    directory=(current.parent.relative_to(PROJECT).as_posix()
+                               if current else row["directory"].replace("\\", "/")),
                     player=row.get("player") or "",
-                    label=None if label in ("", "None") else label,
+                    label=label,
+                    label_note=note,
                     duration_s=_f(row, "duration_s") or 0.0,
                     fps=_f(row, "fps") or 0.0,
                     width=int(_f(row, "width") or 0),
@@ -187,8 +295,11 @@ def apply_exclusions(clips: List[Clip]) -> None:
         if c.directory in EXCLUDE_DIRS:
             c.status, c.reason = "exclude", EXCLUDE_DIRS[c.directory]
             continue
-        if c.filename in EXCLUDE_FILES:
-            c.status, c.reason = "exclude", EXCLUDE_FILES[c.filename]
+        hit = next(
+            (k for k in EXCLUDE_FILES if k.lower() in c.filename.lower()), None
+        )
+        if hit:
+            c.status, c.reason = "exclude", EXCLUDE_FILES[hit]
             continue
         if (
             c.intruder_frac is not None
@@ -232,10 +343,32 @@ def assign_preprocessing(clips: List[Clip]) -> None:
     for c in clips:
         if c.status != "include":
             continue
-        c.needs_crop = (c.subject_h is not None and c.subject_h < 0.45) or bool(
-            c.panel_box
-        )
+        c.needs_crop = (
+            c.subject_h is not None and c.subject_h < 0.45
+        ) or _panel_is_inset(c)
         c.drop_elevation = c.cam_shift is not None and c.cam_shift >= 0.02
+
+
+def _panel_is_inset(c: Clip) -> bool:
+    """True only when the detected content panel is SMALLER than the frame.
+
+    `panel_box` is written for every clip, and for a clip with no letterbox it
+    is the whole frame -- "0,0,1280,720" on a 1280x720 video. Testing it for
+    truthiness therefore said "this needs cropping" about every clip that had
+    been measured at all, which is why 40 of 40 were flagged. A crop to the
+    full frame is a re-encode that changes nothing.
+
+    The 1% tolerance is for rounding in the panel detector, not a judgement
+    about how much letterboxing is worth removing: a box one pixel narrower
+    than the frame is the same box.
+    """
+    if not c.panel_box or not c.width or not c.height:
+        return False
+    try:
+        _, _, w, h = (int(v) for v in c.panel_box.split(","))
+    except ValueError:
+        return False
+    return w < c.width * 0.99 or h < c.height * 0.99
 
 
 # The same human under two names in the inventory. Merged explicitly, because
@@ -243,6 +376,13 @@ def assign_preprocessing(clips: List[Clip]) -> None:
 # `Klay` and `Klaythompson` are one person.
 PLAYER_ALIASES = {
     "klaythompson": "Klay",
+    # `Couch` and `Couch2` may be one coach filmed in two sessions or two
+    # different people -- the filenames do not say and nothing measurable can
+    # tell us. Merged, because the two errors are not symmetric: merging two
+    # different people costs one split boundary, while separating one person
+    # puts them on both sides of the test set and inflates the score with no
+    # sign that anything is wrong.
+    "couch2": "Couch",
 }
 
 
@@ -314,8 +454,25 @@ def build_groups(clips: List[Clip]) -> None:
 # Whole PLAYERS, not whole clips. If a player appears in training the model can
 # learn the person -- build, kit, gym, camera angle -- and report an accuracy
 # that describes recognition rather than shooting form.
-TEST_GROUPS = {"Stephcurry", "Klay"}
-VAL_GROUPS = {"Couch2", "Booker"}
+# CHOSEN FOR MEASURABILITY, not alphabetically and not at random.
+#
+# The first choice here was Stephcurry + Klay, on the sound principle of
+# holding out whole players. It produced a test set of 8 shots of which 5 had
+# NO elevation at all: both are broadcast footage where the camera pans, and
+# `body_rise_ratio` cannot separate the player rising from the camera falling,
+# so the target is None. Three usable samples is not a test set.
+#
+# Measured shots with a usable elevation, per group:
+#
+#     video8 10/10   Salah 5/5   Booker 4/4   Couch 5/5   video_0x 2/2
+#     Stephcurry 2/6   video9 1/1   Klay 1/2
+#     Kevindurant 0/3   LethalShooter 0/2
+#
+# Booker and Couch give 9 of the 30 measurable shots, from players who appear
+# nowhere else. That is 30% held out, from footage the instrument can actually
+# read.
+TEST_GROUPS = {"Booker", "Couch"}
+VAL_GROUPS = {"video_0x", "video9"}
 
 
 def assign_splits(clips: List[Clip]) -> None:
@@ -438,12 +595,45 @@ def main() -> int:
 
     if not args.report:
         DATA.mkdir(parents=True, exist_ok=True)
+        rows = [asdict(c) for c in clips]
+        _carry_prepared_paths(rows)
         MANIFEST_JSON.write_text(
-            json.dumps([asdict(c) for c in clips], indent=2, ensure_ascii=False),
-            encoding="utf-8",
+            json.dumps(rows, indent=2, ensure_ascii=False), encoding="utf-8"
         )
         print(f"\nwrote {MANIFEST_JSON.relative_to(PROJECT)}")
     return 0
+
+
+def _carry_prepared_paths(rows: List[dict]) -> None:
+    """Preserve `prepared_path`, which temporal/preprocess.py owns, not this file.
+
+    This module rebuilds the manifest from scratch every run, so without this
+    a re-run would silently drop the pointer to every cropped clip and send
+    feature extraction back to the raw footage -- with no error, just quietly
+    worse pose detection and a different dataset than the one last measured.
+
+    A stale pointer is worse than a missing one, so an entry whose rendered
+    file is gone is dropped rather than carried.
+    """
+    if not MANIFEST_JSON.exists():
+        return
+    try:
+        old = json.loads(MANIFEST_JSON.read_text(encoding="utf-8"))
+    except (ValueError, OSError):
+        return
+    known = {
+        c["filename"]: c["prepared_path"]
+        for c in old
+        if c.get("prepared_path") and Path(c["prepared_path"]).exists()
+    }
+    carried = 0
+    for r in rows:
+        p = known.get(r["filename"])
+        if p:
+            r["prepared_path"] = p
+            carried += 1
+    if carried:
+        print(f"  carried {carried} prepared_path entries from the previous manifest")
 
 
 if __name__ == "__main__":

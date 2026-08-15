@@ -1,10 +1,11 @@
 [
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/salah_video.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/salah_video.mp4",
     "filename": "salah_video.mp4",
     "directory": "assets/videos",
     "player": "Salah",
     "label": null,
+    "label_note": "",
     "duration_s": 56.077,
     "fps": 29.99,
     "width": 1280,
@@ -23,14 +24,16 @@
     "group": "Salah",
     "split": "train",
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/salah_video.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/video8.mov",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/video8.mov",
     "filename": "video8.mov",
     "directory": "assets/videos",
     "player": "video8",
     "label": null,
+    "label_note": "",
     "duration_s": 28.633,
     "fps": 30.0,
     "width": 1280,
@@ -49,14 +52,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/video8.mov"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/video9.mov",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/video9.mov",
     "filename": "video9.mov",
     "directory": "assets/videos",
     "player": "video9",
     "label": null,
+    "label_note": "",
     "duration_s": 13.367,
     "fps": 30.0,
     "width": 1280,
@@ -75,14 +80,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/video9.mov"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/video_01_free_throw.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/video_01_free_throw.mp4",
     "filename": "video_01_free_throw.mp4",
     "directory": "assets/videos",
     "player": "video_0x",
     "label": "set_shot",
+    "label_note": "free_throw",
     "duration_s": 13.5,
     "fps": 24.0,
     "width": 1280,
@@ -99,16 +106,18 @@
     "status": "include",
     "reason": "",
     "group": "video_0x",
-    "split": "train",
-    "needs_crop": true,
-    "drop_elevation": false
+    "split": "val",
+    "needs_crop": false,
+    "drop_elevation": false,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\assets\\videos\\video_01_free_throw.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/video_07_side_jump_shot.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/video_07_side_jump_shot.mp4",
     "filename": "video_07_side_jump_shot.mp4",
     "directory": "assets/videos",
     "player": "video_0x",
     "label": "jump_shot",
+    "label_note": "",
     "duration_s": 45.045,
     "fps": 29.99,
     "width": 480,
@@ -125,16 +134,18 @@
     "status": "include",
     "reason": "",
     "group": "video_0x",
-    "split": "train",
+    "split": "val",
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\temporal\\data\\clips\\video_07_side_jump_shot.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/single_shot/video8_shot01_set.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/single_shot/video8_shot01_set.mp4",
     "filename": "video8_shot01_set.mp4",
     "directory": "assets/videos/single_shot",
     "player": "video8",
     "label": "set_shot",
+    "label_note": "",
     "duration_s": 2.333,
     "fps": 30.0,
     "width": 1280,
@@ -153,14 +164,16 @@
     "group": "video8",
     "split": "train",
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\temporal\\data\\clips\\video8_shot01_set.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/single_shot/video8_shot02_set.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/single_shot/video8_shot02_set.mp4",
     "filename": "video8_shot02_set.mp4",
     "directory": "assets/videos/single_shot",
     "player": "video8",
     "label": "set_shot",
+    "label_note": "",
     "duration_s": 2.233,
     "fps": 30.0,
     "width": 1280,
@@ -179,14 +192,16 @@
     "group": "video8",
     "split": "train",
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\temporal\\data\\clips\\video8_shot02_set.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/single_shot/video8_shot03_set.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/single_shot/video8_shot03_set.mp4",
     "filename": "video8_shot03_set.mp4",
     "directory": "assets/videos/single_shot",
     "player": "video8",
     "label": "set_shot",
+    "label_note": "",
     "duration_s": 2.7,
     "fps": 30.0,
     "width": 1280,
@@ -205,14 +220,16 @@
     "group": "video8",
     "split": "train",
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\temporal\\data\\clips\\video8_shot03_set.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/single_shot/video8_shot04_set.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/single_shot/video8_shot04_set.mp4",
     "filename": "video8_shot04_set.mp4",
     "directory": "assets/videos/single_shot",
     "player": "video8",
     "label": "set_shot",
+    "label_note": "",
     "duration_s": 2.833,
     "fps": 30.0,
     "width": 1280,
@@ -231,14 +248,16 @@
     "group": "video8",
     "split": "train",
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\temporal\\data\\clips\\video8_shot04_set.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/single_shot/video8_shot05_set.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/single_shot/video8_shot05_set.mp4",
     "filename": "video8_shot05_set.mp4",
     "directory": "assets/videos/single_shot",
     "player": "video8",
     "label": "set_shot",
+    "label_note": "",
     "duration_s": 2.367,
     "fps": 30.0,
     "width": 1280,
@@ -257,14 +276,16 @@
     "group": "video8",
     "split": "train",
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\temporal\\data\\clips\\video8_shot05_set.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/single_shot/video8_shot06_set.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/single_shot/video8_shot06_set.mp4",
     "filename": "video8_shot06_set.mp4",
     "directory": "assets/videos/single_shot",
     "player": "video8",
     "label": "set_shot",
+    "label_note": "",
     "duration_s": 2.9,
     "fps": 30.0,
     "width": 1280,
@@ -283,14 +304,16 @@
     "group": "video8",
     "split": "train",
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\temporal\\data\\clips\\video8_shot06_set.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/single_shot/video8_shot07_set.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/single_shot/video8_shot07_set.mp4",
     "filename": "video8_shot07_set.mp4",
     "directory": "assets/videos/single_shot",
     "player": "video8",
     "label": "set_shot",
+    "label_note": "",
     "duration_s": 2.9,
     "fps": 30.0,
     "width": 1280,
@@ -309,14 +332,16 @@
     "group": "video8",
     "split": "train",
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\temporal\\data\\clips\\video8_shot07_set.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/single_shot/video8_shot08_set.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/single_shot/video8_shot08_set.mp4",
     "filename": "video8_shot08_set.mp4",
     "directory": "assets/videos/single_shot",
     "player": "video8",
     "label": "set_shot",
+    "label_note": "",
     "duration_s": 2.9,
     "fps": 30.0,
     "width": 1280,
@@ -335,14 +360,16 @@
     "group": "video8",
     "split": "train",
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\temporal\\data\\clips\\video8_shot08_set.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/single_shot/video8_shot09_set.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/single_shot/video8_shot09_set.mp4",
     "filename": "video8_shot09_set.mp4",
     "directory": "assets/videos/single_shot",
     "player": "video8",
     "label": "set_shot",
+    "label_note": "",
     "duration_s": 2.933,
     "fps": 30.0,
     "width": 1280,
@@ -361,14 +388,16 @@
     "group": "video8",
     "split": "train",
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\temporal\\data\\clips\\video8_shot09_set.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/single_shot/video8_shot10_jump.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/single_shot/video8_shot10_jump.mp4",
     "filename": "video8_shot10_jump.mp4",
     "directory": "assets/videos/single_shot",
     "player": "video8",
     "label": "jump_shot",
+    "label_note": "",
     "duration_s": 2.767,
     "fps": 30.0,
     "width": 1280,
@@ -387,14 +416,16 @@
     "group": "video8",
     "split": "train",
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\temporal\\data\\clips\\video8_shot10_jump.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/single_shot/video9_shot01_jump.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/single_shot/video9_shot01_jump.mp4",
     "filename": "video9_shot01_jump.mp4",
     "directory": "assets/videos/single_shot",
     "player": "video9",
     "label": "jump_shot",
+    "label_note": "",
     "duration_s": 2.433,
     "fps": 30.0,
     "width": 1280,
@@ -411,16 +442,18 @@
     "status": "include",
     "reason": "",
     "group": "video9",
-    "split": "train",
+    "split": "val",
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\temporal\\data\\clips\\video9_shot01_jump.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/single_shot/video9_shot02_jump.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/single_shot/video9_shot02_jump.mp4",
     "filename": "video9_shot02_jump.mp4",
     "directory": "assets/videos/single_shot",
     "player": "video9",
     "label": "jump_shot",
+    "label_note": "",
     "duration_s": 3.4,
     "fps": 30.0,
     "width": 1280,
@@ -437,16 +470,18 @@
     "status": "include",
     "reason": "",
     "group": "video9",
-    "split": "train",
+    "split": "val",
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\temporal\\data\\clips\\video9_shot02_jump.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/single_shot/video9_shot03_jump.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/single_shot/video9_shot03_jump.mp4",
     "filename": "video9_shot03_jump.mp4",
     "directory": "assets/videos/single_shot",
     "player": "video9",
     "label": "jump_shot",
+    "label_note": "",
     "duration_s": 3.567,
     "fps": 30.0,
     "width": 1280,
@@ -463,16 +498,18 @@
     "status": "include",
     "reason": "",
     "group": "video9",
-    "split": "train",
+    "split": "val",
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\temporal\\data\\clips\\video9_shot03_jump.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Bookerfreethrowshooting1_set.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Bookerfreethrowshooting1_set.mp4",
     "filename": "Bookerfreethrowshooting1_set.mp4",
     "directory": "assets/videos/ShootingVideosDataset",
     "player": "Booker",
     "label": "set_shot",
+    "label_note": "free_throw",
     "duration_s": 2.5,
     "fps": 30.0,
     "width": 1280,
@@ -489,16 +526,18 @@
     "status": "include",
     "reason": "",
     "group": "Booker",
-    "split": "val",
+    "split": "test",
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\temporal\\data\\clips\\Bookerfreethrowshooting1_set.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Bookerrightcornershooting1_jumpshoot.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Bookerrightcornershooting1_jumpshoot.mp4",
     "filename": "Bookerrightcornershooting1_jumpshoot.mp4",
     "directory": "assets/videos/ShootingVideosDataset",
     "player": "Booker",
     "label": "jump_shot",
+    "label_note": "",
     "duration_s": 2.5,
     "fps": 30.0,
     "width": 1280,
@@ -515,16 +554,18 @@
     "status": "include",
     "reason": "",
     "group": "Booker",
-    "split": "val",
+    "split": "test",
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\temporal\\data\\clips\\Bookerrightcornershooting1_jumpshoot.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Bookerrightwingshooting2miss_jumpshoot.mp4",
-    "filename": "Bookerrightwingshooting2miss_jumpshoot.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Bookerrightwingshooting2miss_set_Shot.mp4",
+    "filename": "Bookerrightwingshooting2miss_set_Shot.mp4",
     "directory": "assets/videos/ShootingVideosDataset",
     "player": "Booker",
-    "label": "jump_shot",
+    "label": "set_shot",
+    "label_note": "",
     "duration_s": 2.5,
     "fps": 30.0,
     "width": 1280,
@@ -541,16 +582,18 @@
     "status": "include",
     "reason": "",
     "group": "Booker",
-    "split": "val",
-    "needs_crop": true,
-    "drop_elevation": false
+    "split": "test",
+    "needs_crop": false,
+    "drop_elevation": false,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\assets\\videos\\ShootingVideosDataset\\Bookerrightwingshooting2miss_set_Shot.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Couch2rightcourner3ptshooting1_jumpshoot.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Couch2rightcourner3ptshooting1_jumpshoot.mp4",
     "filename": "Couch2rightcourner3ptshooting1_jumpshoot.mp4",
     "directory": "assets/videos/ShootingVideosDataset",
     "player": "Couch2",
     "label": "jump_shot",
+    "label_note": "",
     "duration_s": 2.0,
     "fps": 30.0,
     "width": 1280,
@@ -566,17 +609,19 @@
     "panel_box": "440,0,760,558",
     "status": "include",
     "reason": "",
-    "group": "Couch2",
-    "split": "val",
+    "group": "Couch",
+    "split": "test",
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\temporal\\data\\clips\\Couch2rightcourner3ptshooting1_jumpshoot.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Couch2rightcourner3ptshooting2_jumpshoot.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Couch2rightcourner3ptshooting2_jumpshoot.mp4",
     "filename": "Couch2rightcourner3ptshooting2_jumpshoot.mp4",
     "directory": "assets/videos/ShootingVideosDataset",
     "player": "Couch2",
     "label": "jump_shot",
+    "label_note": "",
     "duration_s": 2.567,
     "fps": 30.0,
     "width": 1280,
@@ -592,17 +637,19 @@
     "panel_box": "514,0,813,557",
     "status": "include",
     "reason": "",
-    "group": "Couch2",
-    "split": "val",
+    "group": "Couch",
+    "split": "test",
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\temporal\\data\\clips\\Couch2rightcourner3ptshooting2_jumpshoot.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Couch2rightcournershooting1_set.mp4",
-    "filename": "Couch2rightcournershooting1_set.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Couch2rightcournershooting1_set_Shot.mp4",
+    "filename": "Couch2rightcournershooting1_set_Shot.mp4",
     "directory": "assets/videos/ShootingVideosDataset",
     "player": "Couch2",
     "label": "set_shot",
+    "label_note": "",
     "duration_s": 2.033,
     "fps": 30.0,
     "width": 1280,
@@ -618,17 +665,19 @@
     "panel_box": "522,152,781,532",
     "status": "include",
     "reason": "",
-    "group": "Couch2",
-    "split": "val",
+    "group": "Couch",
+    "split": "test",
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\temporal\\data\\clips\\Couch2rightcournershooting1_set_Shot.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Couch2rightwing3ptshooting1_jump.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Couch2rightwing3ptshooting1_jump.mp4",
     "filename": "Couch2rightwing3ptshooting1_jump.mp4",
     "directory": "assets/videos/ShootingVideosDataset",
     "player": "Couch2",
     "label": "jump_shot",
+    "label_note": "",
     "duration_s": 2.567,
     "fps": 30.0,
     "width": 1280,
@@ -644,17 +693,19 @@
     "panel_box": "476,0,807,604",
     "status": "include",
     "reason": "",
-    "group": "Couch2",
-    "split": "val",
+    "group": "Couch",
+    "split": "test",
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\temporal\\data\\clips\\Couch2rightwing3ptshooting1_jump.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Couchleftwing3ptshooting1_jumpshot.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Couchleftwing3ptshooting1_jumpshot.mp4",
     "filename": "Couchleftwing3ptshooting1_jumpshot.mp4",
     "directory": "assets/videos/ShootingVideosDataset",
     "player": "Couch",
     "label": "jump_shot",
+    "label_note": "",
     "duration_s": 2.033,
     "fps": 30.0,
     "width": 1280,
@@ -671,16 +722,18 @@
     "status": "include",
     "reason": "",
     "group": "Couch",
-    "split": "train",
+    "split": "test",
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\temporal\\data\\clips\\Couchleftwing3ptshooting1_jumpshot.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Couchrightcornershooting1.mp4",
-    "filename": "Couchrightcornershooting1.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Couchrightcornershooting1_jump_shot.mp4",
+    "filename": "Couchrightcornershooting1_jump_shot.mp4",
     "directory": "assets/videos/ShootingVideosDataset",
     "player": "Couch",
-    "label": null,
+    "label": "jump_shot",
+    "label_note": "",
     "duration_s": 2.3,
     "fps": 30.0,
     "width": 1280,
@@ -697,16 +750,18 @@
     "status": "include",
     "reason": "",
     "group": "Couch",
-    "split": "train",
+    "split": "test",
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\temporal\\data\\clips\\Couchrightcornershooting1_jump_shot.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Couchshooting1.mp4",
-    "filename": "Couchshooting1.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Couchshooting1_small_jump _shoot.mp4",
+    "filename": "Couchshooting1_small_jump _shoot.mp4",
     "directory": "assets/videos/ShootingVideosDataset",
     "player": "Couch",
-    "label": null,
+    "label": "set_shot",
+    "label_note": "small_jump",
     "duration_s": 1.733,
     "fps": 30.0,
     "width": 1280,
@@ -723,16 +778,18 @@
     "status": "include",
     "reason": "",
     "group": "Couch",
-    "split": "train",
+    "split": "test",
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\temporal\\data\\clips\\Couchshooting1_small_jump _shoot.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Kevindurantrightcournor3ptshooting1.mp4",
-    "filename": "Kevindurantrightcournor3ptshooting1.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Kevindurantrightcournor3ptshooting1_jump_shoot.mp4",
+    "filename": "Kevindurantrightcournor3ptshooting1_jump_shoot.mp4",
     "directory": "assets/videos/ShootingVideosDataset",
     "player": "Kevindurant",
-    "label": null,
+    "label": "jump_shot",
+    "label_note": "",
     "duration_s": 2.567,
     "fps": 30.0,
     "width": 1280,
@@ -751,14 +808,16 @@
     "group": "Kevindurant",
     "split": "train",
     "needs_crop": true,
-    "drop_elevation": true
+    "drop_elevation": true,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\temporal\\data\\clips\\Kevindurantrightcournor3ptshooting1_jump_shoot.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Kevindurantrightcournor3ptshooting2.mp4",
-    "filename": "Kevindurantrightcournor3ptshooting2.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Kevindurantrightcournor3ptshooting2_jump_shot.mp4",
+    "filename": "Kevindurantrightcournor3ptshooting2_jump_shot.mp4",
     "directory": "assets/videos/ShootingVideosDataset",
     "player": "Kevindurant",
-    "label": null,
+    "label": "jump_shot",
+    "label_note": "",
     "duration_s": 2.567,
     "fps": 30.0,
     "width": 1280,
@@ -776,15 +835,17 @@
     "reason": "",
     "group": "Kevindurant",
     "split": "train",
-    "needs_crop": true,
-    "drop_elevation": true
+    "needs_crop": false,
+    "drop_elevation": true,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\assets\\videos\\ShootingVideosDataset\\Kevindurantrightcournor3ptshooting2_jump_shot.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Kevindurantrightwing3ptshooting2miss.mp4",
-    "filename": "Kevindurantrightwing3ptshooting2miss.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Kevindurantrightwing3ptshooting2miss_jump_shot.mp4",
+    "filename": "Kevindurantrightwing3ptshooting2miss_jump_shot.mp4",
     "directory": "assets/videos/ShootingVideosDataset",
     "player": "Kevindurant",
-    "label": null,
+    "label": "jump_shot",
+    "label_note": "",
     "duration_s": 2.567,
     "fps": 30.0,
     "width": 1280,
@@ -802,15 +863,17 @@
     "reason": "",
     "group": "Kevindurant",
     "split": "train",
-    "needs_crop": true,
-    "drop_elevation": true
+    "needs_crop": false,
+    "drop_elevation": true,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\assets\\videos\\ShootingVideosDataset\\Kevindurantrightwing3ptshooting2miss_jump_shot.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Klay3ptshooting1.mp4",
-    "filename": "Klay3ptshooting1.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Klay3ptshooting1_jump_shot.mp4",
+    "filename": "Klay3ptshooting1_jump_shot.mp4",
     "directory": "assets/videos/ShootingVideosDataset",
     "player": "Klay",
-    "label": null,
+    "label": "jump_shot",
+    "label_note": "",
     "duration_s": 2.5,
     "fps": 30.0,
     "width": 1280,
@@ -827,16 +890,18 @@
     "status": "include",
     "reason": "",
     "group": "Klay",
-    "split": "test",
-    "needs_crop": true,
-    "drop_elevation": false
+    "split": "train",
+    "needs_crop": false,
+    "drop_elevation": false,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\assets\\videos\\ShootingVideosDataset\\Klay3ptshooting1_jump_shot.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Klay3ptshooting3.mp4",
-    "filename": "Klay3ptshooting3.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Klay3ptshooting3_jump_Shot.mp4",
+    "filename": "Klay3ptshooting3_jump_Shot.mp4",
     "directory": "assets/videos/ShootingVideosDataset",
     "player": "Klay",
-    "label": null,
+    "label": "jump_shot",
+    "label_note": "",
     "duration_s": 2.5,
     "fps": 30.0,
     "width": 1280,
@@ -855,14 +920,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Klay3ptshooting3_jump_Shot.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Klay3ptshooting4.mp4",
-    "filename": "Klay3ptshooting4.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Klay3ptshooting4_jump_shot.mp4",
+    "filename": "Klay3ptshooting4_jump_shot.mp4",
     "directory": "assets/videos/ShootingVideosDataset",
     "player": "Klay",
-    "label": null,
+    "label": "jump_shot",
+    "label_note": "",
     "duration_s": 2.5,
     "fps": 30.0,
     "width": 1280,
@@ -881,14 +948,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Klay3ptshooting4_jump_shot.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Klaythompsonpracticeshooting.mp4",
-    "filename": "Klaythompsonpracticeshooting.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/small_jump_shot.mp4",
+    "filename": "small_jump_shot.mp4",
     "directory": "assets/videos/ShootingVideosDataset",
     "player": "Klaythompson",
-    "label": null,
+    "label": "set_shot",
+    "label_note": "small_jump",
     "duration_s": 4.2,
     "fps": 30.0,
     "width": 1280,
@@ -905,16 +974,18 @@
     "status": "include",
     "reason": "",
     "group": "Klay",
-    "split": "test",
-    "needs_crop": true,
-    "drop_elevation": true
+    "split": "train",
+    "needs_crop": false,
+    "drop_elevation": true,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\assets\\videos\\ShootingVideosDataset\\small_jump_shot.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/LethalShooterRightCourner3ptshooting1.mp4",
-    "filename": "LethalShooterRightCourner3ptshooting1.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/LethalShooterRightCourner3ptshooting1_jump_shot.mp4",
+    "filename": "LethalShooterRightCourner3ptshooting1_jump_shot.mp4",
     "directory": "assets/videos/ShootingVideosDataset",
     "player": "LethalShooter",
-    "label": null,
+    "label": "jump_shot",
+    "label_note": "",
     "duration_s": 2.3,
     "fps": 30.0,
     "width": 404,
@@ -933,14 +1004,16 @@
     "group": "LethalShooter",
     "split": "train",
     "needs_crop": true,
-    "drop_elevation": true
+    "drop_elevation": true,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\temporal\\data\\clips\\LethalShooterRightCourner3ptshooting1_jump_shot.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Lethalshooterpractice3ptshooting.mp4",
-    "filename": "Lethalshooterpractice3ptshooting.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Lethalshooterpractice3ptshooting_jump_shot.mp4",
+    "filename": "Lethalshooterpractice3ptshooting_jump_shot.mp4",
     "directory": "assets/videos/ShootingVideosDataset",
     "player": "LethalShooter",
-    "label": null,
+    "label": "jump_shot",
+    "label_note": "",
     "duration_s": 3.233,
     "fps": 30.0,
     "width": 1280,
@@ -959,14 +1032,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Lethalshooterpractice3ptshooting_jump_shot.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Lethalshooterpractice3ptshooting2.mp4",
-    "filename": "Lethalshooterpractice3ptshooting2.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Lethalshooterpractice3ptshooting2_jump_shot.mp4",
+    "filename": "Lethalshooterpractice3ptshooting2_jump_shot.mp4",
     "directory": "assets/videos/ShootingVideosDataset",
     "player": "LethalShooter",
-    "label": null,
+    "label": "jump_shot",
+    "label_note": "",
     "duration_s": 2.5,
     "fps": 30.0,
     "width": 1280,
@@ -985,14 +1060,16 @@
     "group": "LethalShooter",
     "split": "train",
     "needs_crop": true,
-    "drop_elevation": true
+    "drop_elevation": true,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\temporal\\data\\clips\\Lethalshooterpractice3ptshooting2_jump_shot.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Lethalshooterpracticeshooting.mp4",
-    "filename": "Lethalshooterpracticeshooting.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Lethalshooterpracticeshooting_jump_shot.mp4",
+    "filename": "Lethalshooterpracticeshooting_jump_shot.mp4",
     "directory": "assets/videos/ShootingVideosDataset",
     "player": "LethalShooter",
-    "label": null,
+    "label": "jump_shot",
+    "label_note": "",
     "duration_s": 3.3,
     "fps": 30.0,
     "width": 1280,
@@ -1011,14 +1088,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Lethalshooterpracticeshooting_jump_shot.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Mikedunn3ptshooting3.mp4",
-    "filename": "Mikedunn3ptshooting3.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Mikedunn3ptshooting3_set_shot.mp4",
+    "filename": "Mikedunn3ptshooting3_set_shot.mp4",
     "directory": "assets/videos/ShootingVideosDataset",
     "player": "Mikedunn",
-    "label": null,
+    "label": "set_shot",
+    "label_note": "",
     "duration_s": 2.5,
     "fps": 30.0,
     "width": 1280,
@@ -1037,14 +1116,16 @@
     "group": "Mikedunn",
     "split": "train",
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\temporal\\data\\clips\\Mikedunn3ptshooting3_set_shot.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Salahairballtest.mp4",
-    "filename": "Salahairballtest.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Salahairballtest_set_shot.mp4",
+    "filename": "Salahairballtest_set_shot.mp4",
     "directory": "assets/videos/ShootingVideosDataset",
     "player": "Salah",
-    "label": null,
+    "label": "set_shot",
+    "label_note": "",
     "duration_s": 7.067,
     "fps": 30.0,
     "width": 1280,
@@ -1063,14 +1144,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Salahairballtest_set_shot.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Stephcurryleftcourner3ptshooting1.mp4",
-    "filename": "Stephcurryleftcourner3ptshooting1.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Stephcurryleftcourner3ptshooting1_jump_shot.mp4",
+    "filename": "Stephcurryleftcourner3ptshooting1_jump_shot.mp4",
     "directory": "assets/videos/ShootingVideosDataset",
     "player": "Stephcurry",
-    "label": null,
+    "label": "jump_shot",
+    "label_note": "",
     "duration_s": 2.567,
     "fps": 30.0,
     "width": 1280,
@@ -1087,16 +1170,18 @@
     "status": "include",
     "reason": "",
     "group": "Stephcurry",
-    "split": "test",
-    "needs_crop": true,
-    "drop_elevation": true
+    "split": "train",
+    "needs_crop": false,
+    "drop_elevation": true,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\assets\\videos\\ShootingVideosDataset\\Stephcurryleftcourner3ptshooting1_jump_shot.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Stephcurryleftcourner3ptshooting3miss.mp4",
-    "filename": "Stephcurryleftcourner3ptshooting3miss.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/curry_jump_shot.mp4",
+    "filename": "curry_jump_shot.mp4",
     "directory": "assets/videos/ShootingVideosDataset",
     "player": "Stephcurry",
-    "label": null,
+    "label": "jump_shot",
+    "label_note": "",
     "duration_s": 2.567,
     "fps": 30.0,
     "width": 1280,
@@ -1113,16 +1198,18 @@
     "status": "include",
     "reason": "",
     "group": "Stephcurry",
-    "split": "test",
-    "needs_crop": true,
-    "drop_elevation": false
+    "split": "train",
+    "needs_crop": false,
+    "drop_elevation": false,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\assets\\videos\\ShootingVideosDataset\\curry_jump_shot.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Stephcurryleftcourner3ptshooting4miss.mp4",
-    "filename": "Stephcurryleftcourner3ptshooting4miss.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Stephcurryleftcourner3ptshooting4miss_jump_shot.mp4",
+    "filename": "Stephcurryleftcourner3ptshooting4miss_jump_shot.mp4",
     "directory": "assets/videos/ShootingVideosDataset",
     "player": "Stephcurry",
-    "label": null,
+    "label": "jump_shot",
+    "label_note": "",
     "duration_s": 2.533,
     "fps": 30.0,
     "width": 1280,
@@ -1139,16 +1226,18 @@
     "status": "include",
     "reason": "",
     "group": "Stephcurry",
-    "split": "test",
-    "needs_crop": true,
-    "drop_elevation": true
+    "split": "train",
+    "needs_crop": false,
+    "drop_elevation": true,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\assets\\videos\\ShootingVideosDataset\\Stephcurryleftcourner3ptshooting4miss_jump_shot.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Stephcurryleftcourner3ptshooting5.mp4",
-    "filename": "Stephcurryleftcourner3ptshooting5.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Stephcurryleftcourner3ptshooting5_jump_shot.mp4",
+    "filename": "Stephcurryleftcourner3ptshooting5_jump_shot.mp4",
     "directory": "assets/videos/ShootingVideosDataset",
     "player": "Stephcurry",
-    "label": null,
+    "label": "jump_shot",
+    "label_note": "",
     "duration_s": 3.067,
     "fps": 30.0,
     "width": 1280,
@@ -1165,16 +1254,18 @@
     "status": "include",
     "reason": "",
     "group": "Stephcurry",
-    "split": "test",
-    "needs_crop": true,
-    "drop_elevation": false
+    "split": "train",
+    "needs_crop": false,
+    "drop_elevation": false,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\assets\\videos\\ShootingVideosDataset\\Stephcurryleftcourner3ptshooting5_jump_shot.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Stephcurryleftwing3ptshooting1_jumpshoot.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Stephcurryleftwing3ptshooting1_jumpshoot.mp4",
     "filename": "Stephcurryleftwing3ptshooting1_jumpshoot.mp4",
     "directory": "assets/videos/ShootingVideosDataset",
     "player": "Stephcurry",
     "label": "jump_shot",
+    "label_note": "",
     "duration_s": 2.567,
     "fps": 30.0,
     "width": 1280,
@@ -1191,16 +1282,18 @@
     "status": "include",
     "reason": "",
     "group": "Stephcurry",
-    "split": "test",
+    "split": "train",
     "needs_crop": true,
-    "drop_elevation": true
+    "drop_elevation": true,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\temporal\\data\\clips\\Stephcurryleftwing3ptshooting1_jumpshoot.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Stephcurryleftwing3ptshooting6_jumpshoot.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Stephcurryleftwing3ptshooting6_jumpshoot.mp4",
     "filename": "Stephcurryleftwing3ptshooting6_jumpshoot.mp4",
     "directory": "assets/videos/ShootingVideosDataset",
     "player": "Stephcurry",
     "label": "jump_shot",
+    "label_note": "",
     "duration_s": 3.25,
     "fps": 24.0,
     "width": 998,
@@ -1219,14 +1312,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Stephcurryleftwing3ptshooting6_jumpshoot.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Stephcurryleftwing3ptshooting7_jumpshoot.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Stephcurryleftwing3ptshooting7_jumpshoot.mp4",
     "filename": "Stephcurryleftwing3ptshooting7_jumpshoot.mp4",
     "directory": "assets/videos/ShootingVideosDataset",
     "player": "Stephcurry",
     "label": "jump_shot",
+    "label_note": "",
     "duration_s": 3.125,
     "fps": 24.0,
     "width": 982,
@@ -1243,16 +1338,18 @@
     "status": "include",
     "reason": "",
     "group": "Stephcurry",
-    "split": "test",
+    "split": "train",
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:\\Users\\karim\\Desktop\\Swichy\\temporal\\data\\clips\\Stephcurryleftwing3ptshooting7_jumpshoot.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Stephcurryleftwing3ptshooting_jumpshoot5.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Stephcurryleftwing3ptshooting_jumpshoot5.mp4",
     "filename": "Stephcurryleftwing3ptshooting_jumpshoot5.mp4",
     "directory": "assets/videos/ShootingVideosDataset",
     "player": "Stephcurry",
     "label": "jump_shot",
+    "label_note": "",
     "duration_s": 3.167,
     "fps": 24.0,
     "width": 1000,
@@ -1271,14 +1368,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/ShootingVideosDataset/Stephcurryleftwing3ptshooting_jumpshoot5.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-05-25 142320.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-05-25 142320.mp4",
     "filename": "Screen Recording 2026-05-25 142320.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 9.833,
     "fps": 30.0,
     "width": 426,
@@ -1297,14 +1396,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-05-25 142320.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 004129.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 004129.mp4",
     "filename": "Screen Recording 2026-08-14 004129.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 4.3,
     "fps": 30.0,
     "width": 1920,
@@ -1323,14 +1424,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 004129.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 004215.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 004215.mp4",
     "filename": "Screen Recording 2026-08-14 004215.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 3.567,
     "fps": 30.0,
     "width": 1920,
@@ -1349,14 +1452,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 004215.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 004832.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 004832.mp4",
     "filename": "Screen Recording 2026-08-14 004832.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 4.8,
     "fps": 30.0,
     "width": 1920,
@@ -1375,14 +1480,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 004832.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005322.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005322.mp4",
     "filename": "Screen Recording 2026-08-14 005322.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 3.567,
     "fps": 30.0,
     "width": 1920,
@@ -1401,14 +1508,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005322.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005350.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005350.mp4",
     "filename": "Screen Recording 2026-08-14 005350.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 5.1,
     "fps": 30.0,
     "width": 1920,
@@ -1427,14 +1536,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005350.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005414.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005414.mp4",
     "filename": "Screen Recording 2026-08-14 005414.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 3.4,
     "fps": 30.0,
     "width": 1920,
@@ -1453,14 +1564,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005414.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005440.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005440.mp4",
     "filename": "Screen Recording 2026-08-14 005440.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 3.967,
     "fps": 30.0,
     "width": 1920,
@@ -1479,14 +1592,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005440.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005503.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005503.mp4",
     "filename": "Screen Recording 2026-08-14 005503.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 3.033,
     "fps": 30.0,
     "width": 1920,
@@ -1505,14 +1620,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005503.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005520.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005520.mp4",
     "filename": "Screen Recording 2026-08-14 005520.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 3.367,
     "fps": 30.0,
     "width": 1920,
@@ -1531,14 +1648,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005520.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005540.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005540.mp4",
     "filename": "Screen Recording 2026-08-14 005540.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 2.7,
     "fps": 30.0,
     "width": 1920,
@@ -1557,14 +1676,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005540.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005601.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005601.mp4",
     "filename": "Screen Recording 2026-08-14 005601.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 5.3,
     "fps": 30.0,
     "width": 1920,
@@ -1583,14 +1704,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005601.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005619.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005619.mp4",
     "filename": "Screen Recording 2026-08-14 005619.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 4.833,
     "fps": 30.0,
     "width": 1920,
@@ -1609,14 +1732,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005619.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005642.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005642.mp4",
     "filename": "Screen Recording 2026-08-14 005642.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 3.9,
     "fps": 30.0,
     "width": 1920,
@@ -1635,14 +1760,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005642.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005704.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005704.mp4",
     "filename": "Screen Recording 2026-08-14 005704.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 8.333,
     "fps": 30.0,
     "width": 1920,
@@ -1661,14 +1788,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005704.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005724.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005724.mp4",
     "filename": "Screen Recording 2026-08-14 005724.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 2.967,
     "fps": 30.0,
     "width": 1920,
@@ -1687,14 +1816,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005724.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005744.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005744.mp4",
     "filename": "Screen Recording 2026-08-14 005744.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 4.467,
     "fps": 30.0,
     "width": 1920,
@@ -1713,14 +1844,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005744.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005827.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005827.mp4",
     "filename": "Screen Recording 2026-08-14 005827.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 3.533,
     "fps": 30.0,
     "width": 1920,
@@ -1739,14 +1872,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005827.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005915.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005915.mp4",
     "filename": "Screen Recording 2026-08-14 005915.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 7.6,
     "fps": 30.0,
     "width": 1920,
@@ -1765,14 +1900,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005915.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005934.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005934.mp4",
     "filename": "Screen Recording 2026-08-14 005934.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 6.233,
     "fps": 30.0,
     "width": 1920,
@@ -1791,14 +1928,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005934.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005953.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005953.mp4",
     "filename": "Screen Recording 2026-08-14 005953.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 6.3,
     "fps": 30.0,
     "width": 1920,
@@ -1817,14 +1956,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 005953.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 010914.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 010914.mp4",
     "filename": "Screen Recording 2026-08-14 010914.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 5.367,
     "fps": 30.0,
     "width": 1920,
@@ -1843,14 +1984,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 010914.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 010937.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 010937.mp4",
     "filename": "Screen Recording 2026-08-14 010937.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 5.167,
     "fps": 30.0,
     "width": 1920,
@@ -1869,14 +2012,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 010937.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 010958.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 010958.mp4",
     "filename": "Screen Recording 2026-08-14 010958.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 7.967,
     "fps": 30.0,
     "width": 1920,
@@ -1895,14 +2040,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 010958.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 011022.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 011022.mp4",
     "filename": "Screen Recording 2026-08-14 011022.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 6.133,
     "fps": 30.0,
     "width": 1920,
@@ -1921,14 +2068,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 011022.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 011040.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 011040.mp4",
     "filename": "Screen Recording 2026-08-14 011040.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 6.467,
     "fps": 30.0,
     "width": 1920,
@@ -1947,14 +2096,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 011040.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 011059.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 011059.mp4",
     "filename": "Screen Recording 2026-08-14 011059.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 7.0,
     "fps": 30.0,
     "width": 1920,
@@ -1973,14 +2124,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 011059.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 011122.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 011122.mp4",
     "filename": "Screen Recording 2026-08-14 011122.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 7.067,
     "fps": 30.0,
     "width": 1920,
@@ -1999,14 +2152,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 011122.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 011917.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 011917.mp4",
     "filename": "Screen Recording 2026-08-14 011917.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 7.267,
     "fps": 30.0,
     "width": 1920,
@@ -2025,14 +2180,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 011917.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 011935.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 011935.mp4",
     "filename": "Screen Recording 2026-08-14 011935.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 5.567,
     "fps": 30.0,
     "width": 1920,
@@ -2051,14 +2208,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 011935.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 011954.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 011954.mp4",
     "filename": "Screen Recording 2026-08-14 011954.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 5.867,
     "fps": 30.0,
     "width": 1920,
@@ -2077,14 +2236,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 011954.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 012014.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 012014.mp4",
     "filename": "Screen Recording 2026-08-14 012014.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 5.7,
     "fps": 30.0,
     "width": 1920,
@@ -2103,14 +2264,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 012014.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 012033.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 012033.mp4",
     "filename": "Screen Recording 2026-08-14 012033.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 6.367,
     "fps": 30.0,
     "width": 1920,
@@ -2129,14 +2292,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 012033.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 012053.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 012053.mp4",
     "filename": "Screen Recording 2026-08-14 012053.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 5.9,
     "fps": 30.0,
     "width": 1920,
@@ -2155,14 +2320,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 012053.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 012526.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 012526.mp4",
     "filename": "Screen Recording 2026-08-14 012526.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 5.667,
     "fps": 30.0,
     "width": 1920,
@@ -2181,14 +2348,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 012526.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 012651.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 012651.mp4",
     "filename": "Screen Recording 2026-08-14 012651.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 5.3,
     "fps": 30.0,
     "width": 1920,
@@ -2207,14 +2376,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 012651.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013549.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013549.mp4",
     "filename": "Screen Recording 2026-08-14 013549.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 6.733,
     "fps": 30.0,
     "width": 1920,
@@ -2233,14 +2404,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013549.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013608.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013608.mp4",
     "filename": "Screen Recording 2026-08-14 013608.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 8.433,
     "fps": 30.0,
     "width": 1920,
@@ -2259,14 +2432,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013608.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013626.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013626.mp4",
     "filename": "Screen Recording 2026-08-14 013626.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 7.233,
     "fps": 30.0,
     "width": 1920,
@@ -2285,14 +2460,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013626.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013643.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013643.mp4",
     "filename": "Screen Recording 2026-08-14 013643.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 6.733,
     "fps": 30.0,
     "width": 1920,
@@ -2311,14 +2488,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013643.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013702.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013702.mp4",
     "filename": "Screen Recording 2026-08-14 013702.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 8.1,
     "fps": 30.0,
     "width": 1920,
@@ -2337,14 +2516,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013702.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013717.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013717.mp4",
     "filename": "Screen Recording 2026-08-14 013717.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 5.167,
     "fps": 30.0,
     "width": 1920,
@@ -2363,14 +2544,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013717.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013734.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013734.mp4",
     "filename": "Screen Recording 2026-08-14 013734.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 7.3,
     "fps": 30.0,
     "width": 1920,
@@ -2389,14 +2572,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013734.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013749.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013749.mp4",
     "filename": "Screen Recording 2026-08-14 013749.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 5.233,
     "fps": 30.0,
     "width": 1920,
@@ -2415,14 +2600,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013749.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013804.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013804.mp4",
     "filename": "Screen Recording 2026-08-14 013804.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 6.033,
     "fps": 30.0,
     "width": 1920,
@@ -2441,14 +2628,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013804.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013820.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013820.mp4",
     "filename": "Screen Recording 2026-08-14 013820.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 6.2,
     "fps": 30.0,
     "width": 1920,
@@ -2467,14 +2656,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013820.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013910.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013910.mp4",
     "filename": "Screen Recording 2026-08-14 013910.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 4.0,
     "fps": 30.0,
     "width": 1920,
@@ -2493,14 +2684,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013910.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013929.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013929.mp4",
     "filename": "Screen Recording 2026-08-14 013929.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 7.4,
     "fps": 30.0,
     "width": 1920,
@@ -2519,14 +2712,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 013929.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 014019.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 014019.mp4",
     "filename": "Screen Recording 2026-08-14 014019.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 6.3,
     "fps": 30.0,
     "width": 1920,
@@ -2545,14 +2740,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 014019.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 014036.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 014036.mp4",
     "filename": "Screen Recording 2026-08-14 014036.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 5.533,
     "fps": 30.0,
     "width": 1920,
@@ -2571,14 +2768,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 014036.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 020257.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 020257.mp4",
     "filename": "Screen Recording 2026-08-14 020257.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 4.533,
     "fps": 30.0,
     "width": 1920,
@@ -2597,14 +2796,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 020257.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 020313.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 020313.mp4",
     "filename": "Screen Recording 2026-08-14 020313.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 6.233,
     "fps": 30.0,
     "width": 1920,
@@ -2623,14 +2824,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 020313.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 020332.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 020332.mp4",
     "filename": "Screen Recording 2026-08-14 020332.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 7.4,
     "fps": 30.0,
     "width": 1920,
@@ -2649,14 +2852,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 020332.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 020348.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 020348.mp4",
     "filename": "Screen Recording 2026-08-14 020348.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 5.0,
     "fps": 30.0,
     "width": 1920,
@@ -2675,14 +2880,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 020348.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 021059.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 021059.mp4",
     "filename": "Screen Recording 2026-08-14 021059.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 5.767,
     "fps": 30.0,
     "width": 1920,
@@ -2701,14 +2908,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 021059.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 023859.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 023859.mp4",
     "filename": "Screen Recording 2026-08-14 023859.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 4.2,
     "fps": 30.0,
     "width": 1920,
@@ -2727,14 +2936,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 023859.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 023934.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 023934.mp4",
     "filename": "Screen Recording 2026-08-14 023934.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 3.567,
     "fps": 30.0,
     "width": 1920,
@@ -2753,14 +2964,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 023934.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 023959.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 023959.mp4",
     "filename": "Screen Recording 2026-08-14 023959.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 5.8,
     "fps": 30.0,
     "width": 1920,
@@ -2779,14 +2992,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 023959.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 024100.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 024100.mp4",
     "filename": "Screen Recording 2026-08-14 024100.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 6.933,
     "fps": 30.0,
     "width": 1920,
@@ -2805,14 +3020,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 024100.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 024248.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 024248.mp4",
     "filename": "Screen Recording 2026-08-14 024248.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 7.4,
     "fps": 30.0,
     "width": 1920,
@@ -2831,14 +3048,16 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 024248.mp4"
   },
   {
-    "path": "c:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 024308.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 024308.mp4",
     "filename": "Screen Recording 2026-08-14 024308.mp4",
     "directory": "assets/videos/training",
     "player": "screen_recording",
     "label": null,
+    "label_note": "",
     "duration_s": 4.567,
     "fps": 30.0,
     "width": 1920,
@@ -2857,6 +3076,7 @@
     "group": "",
     "split": "",
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "prepared_path": "C:/Users/karim/Desktop/Swichy/assets/videos/training/Screen Recording 2026-08-14 024308.mp4"
   }
 ]
