@@ -169,10 +169,22 @@ def _classify(elev: Optional[float]) -> Optional[str]:
     return "jump_shot" if elev >= JUMP_VERTICAL_DISPLACEMENT_RATIO else "set_shot"
 
 
-def extract(raw: bool = False) -> List[Shot]:
+def extract(raw: bool = False) -> tuple:
+    """Returns (shots, rejected) -- both, always.
+
+    `rejected` is not diagnostics. A shot the pipeline refuses never reaches
+    score_shot, so it has no frames and no target, and it silently vanished
+    from the dataset: this loop used to `continue` past it without a word.
+    That is how a membership change becomes invisible, and it happened -- eight
+    video8 shots disappeared when a preprocessing bug pushed them over the
+    driving threshold, and the totals were the only sign.
+
+    Excluded from training, named in the report. Both.
+    """
     clips = json.loads(MANIFEST_JSON.read_text(encoding="utf-8"))
     included = [c for c in clips if c["status"] == "include"]
     out: List[Shot] = []
+    rejected: List[dict] = []
 
     for i, c in enumerate(included, 1):
         # The preprocessed copy when there is one, the original otherwise.
@@ -201,6 +213,19 @@ def extract(raw: bool = False) -> List[Shot]:
         kept = 0
         for s in run.shots:
             if s.is_rejected:
+                rejected.append({
+                    "clip": c["filename"],
+                    "shot_number": s.shot_number,
+                    "split": c["split"],
+                    "filename_label": c.get("label"),
+                    "shot_type": s.shot_type.value if s.shot_type else None,
+                    "reason": (
+                        s.rejection.value if s.rejection else "score_is_None"
+                    ),
+                    "evidence": list(
+                        s.classification.evidence if s.classification else ()
+                    ),
+                })
                 continue
             frames = _CAPTURED.get(s.shot_number) or []
             # None, not 0.0, when nothing was measurable. The whole point.
@@ -238,11 +263,12 @@ def extract(raw: bool = False) -> List[Shot]:
                 )
             )
             kept += 1
-        print(f"  {kept} shot(s)")
-    return out
+        n_rej = sum(1 for r in rejected if r["clip"] == c["filename"])
+        print(f"  {kept} shot(s)" + (f", {n_rej} refused" if n_rej else ""))
+    return out, rejected
 
 
-def report(shots: List[Shot]) -> str:
+def report(shots: List[Shot], rejected: List[dict]) -> str:
     lines: List[str] = []
     lines.append(f"{len(shots)} shots from "
                  f"{len({s.clip for s in shots})} clips")
@@ -264,6 +290,23 @@ def report(shots: List[Shot]) -> str:
             f"\nelevation  n={n}  min={have[0]:.3f}  p25={have[n//4]:.3f}  "
             f"median={have[n//2]:.3f}  p75={have[(3*n)//4]:.3f}  max={have[-1]:.3f}"
         )
+
+    # Refused shots, always, even when there are none -- "0 refused" is a
+    # measurement and its absence would be indistinguishable from nobody
+    # having looked.
+    lines.append(f"\n{len(rejected)} shots REFUSED by the pipeline "
+                 "(excluded from the dataset)")
+    for reason, n in collections.Counter(
+        r["reason"] for r in rejected
+    ).most_common():
+        lines.append(f"    {n:3d}  {reason}")
+    for r in rejected:
+        lines.append(
+            f"      {r['clip'][:44]:46s} #{r['shot_number']} {r['split']:<6s} "
+            f"as={r['shot_type']}  owner labelled it {r['filename_label']}"
+        )
+        for note in r["evidence"]:
+            lines.append(f"          - {note}")
 
     missing = collections.Counter(
         s.no_elevation_reason for s in shots if s.elevation is None
@@ -291,9 +334,9 @@ def report(shots: List[Shot]) -> str:
 
 def main() -> int:
     raw = "--raw" in sys.argv
-    shots = extract(raw=raw)
+    shots, rejected = extract(raw=raw)
     print()
-    print(report(shots))
+    print(report(shots, rejected))
     dest = DATA / ("shots_raw.json" if raw else "shots.json")
     dest.write_text(
         json.dumps([asdict(s) for s in shots], indent=2, ensure_ascii=False),

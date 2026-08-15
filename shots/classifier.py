@@ -11,16 +11,23 @@ reliable:
   2. HORIZONTAL travel of the hips during the attempt
         -> separates a stationary shot from a driving action
 
-That is enough for the current product scope, which is stationary shooting.
-It is NOT enough to tell a layup from a hook shot from a dunk. Those share
-"the player is moving", and separating them needs approach direction,
-take-off foot, and ball position -- none of which we model yet.
+SCOPE: this product classifies JUMP SHOTS and SET SHOTS, and nothing else.
 
-So a driving action is reported as LAYUP, the most common member of that
-family, with LOW confidence and an explicit note. It is never scored: every
-member of that family is NOT_IMPLEMENTED, so the outcome (a rejection with
-no score) is identical regardless of which one it actually was. The label is
-a hint for the user, not a claim.
+Those two discriminators are enough for that. Neither is enough to tell a
+layup from a hook shot from a dunk -- those share "the player is moving", and
+separating them needs approach direction, take-off foot, and ball position,
+none of which we model.
+
+So a driving action is reported as UNKNOWN and never scored. Not as a layup:
+the horizontal test measures that the attempt is NOT stationary shooting, and
+says nothing about what it is instead. Naming the most common member of a
+family we cannot resolve would be a guess wearing a label, and it is the
+scored path that matters anyway -- an unsupported type produces a rejection
+with no score, identically whichever one it was.
+
+The driving test therefore exists as a GUARD, not as a feature. Removing it
+would not shrink the product to jump and set; it would send drives into the
+jump-shot rules and produce confident, wrong coaching.
 
 WHY NOT "jump detected = jump shot"
 -----------------------------------
@@ -63,11 +70,13 @@ SET_SHOT_FEET_LIFT_RATIO = 0.05
 # Horizontal: fraction of frame width the hips traverse during the attempt. A
 # stationary shooter sways within a narrow band; a driving player crosses the
 # frame. Purely empirical.
+#
+# NOT normalised by the player's on-screen height, unlike every other ratio in
+# this project, so it is not invariant to camera zoom: the same sway reads
+# larger on tighter framing. Known and deliberately left alone -- this gate
+# only ever refuses shots, both types it guards are out of scope, and
+# recalibrating it would change which shots exist in the dataset.
 DRIVING_HORIZONTAL_TRAVEL_RATIO = 0.18
-
-# Backwards-compatible aliases (the units changed, the names are kept).
-JUMP_VERTICAL_DISPLACEMENT_M = JUMP_VERTICAL_DISPLACEMENT_RATIO
-DRIVING_HORIZONTAL_TRAVEL_M = DRIVING_HORIZONTAL_TRAVEL_RATIO
 
 
 @dataclass
@@ -117,6 +126,17 @@ def classify(evidence: AttemptEvidence) -> ShotClassification:
         )
 
     # 1. Driving actions leave the stationary-shooting family entirely.
+    #
+    # Reported as UNKNOWN, not as a layup. What was actually measured is that
+    # the hips crossed the frame, which rules the attempt OUT of the two types
+    # this product supports; it does not rule anything IN. Naming a layup meant
+    # asserting one member of a family -- layup, hook shot, dunk -- that pose
+    # alone cannot separate, and the note underneath said exactly that. A
+    # verdict whose own evidence retracts it is not a verdict.
+    #
+    # Confidence is 0.0 for the same reason. There is no shot type here to be
+    # confident about, and the old 0.35 attached a number to a guess. What we
+    # ARE confident about is the measurement, and that lives in the notes.
     if evidence.horizontal_travel_m >= DRIVING_HORIZONTAL_TRAVEL_RATIO:
         notes.append(
             f"hips travelled {evidence.horizontal_travel_m:.2f} of frame width during the "
@@ -124,12 +144,12 @@ def classify(evidence: AttemptEvidence) -> ShotClassification:
             "moving action, not a stationary shot"
         )
         notes.append(
-            "pose alone cannot separate layup / hook shot / dunk; reported as "
-            "layup with low confidence"
+            "Swichy analyses jump shots and set shots; a moving action is "
+            "outside that scope and is not scored"
         )
         return ShotClassification(
-            shot_type=ShotType.LAYUP,
-            confidence=0.35,
+            shot_type=ShotType.UNKNOWN,
+            confidence=0.0,
             evidence=tuple(notes),
             rejection=RejectionReason.SHOT_TYPE_NOT_SUPPORTED_YET,
         )
