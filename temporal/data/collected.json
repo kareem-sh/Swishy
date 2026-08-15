@@ -17,5 +17,17 @@
     "elevation": 0.2445,
     "type": "jump_shot",
     "measurable_shots": 8
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=PkBXvCzsVFU",
+    "id": "PkBXvCzsVFU",
+    "accepted": false,
+    "why": "no measurable elevation (camera moves, or the clip starts after the stance)"
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=UdbrQtGL6Bw",
+    "id": "UdbrQtGL6Bw",
+    "accepted": false,
+    "why": "elevation 1.807 exceeds the physical limit (0.4): edited footage or a camera cut, not a jump"
   }
 ]

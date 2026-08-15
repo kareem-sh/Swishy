@@ -96,6 +96,11 @@ EXCLUDE_FILES = {
 # for most of the clip, so no crop can isolate one shooter. Measured, not
 # assumed: the fraction of frames with an intruder in the crop and the
 # intruder's height ratio are both recorded below and both come from quality.csv.
+# Above this much background motion, elevation cannot be measured: a camera
+# tilting down looks exactly like a player rising. Named here so collect.py
+# can apply the SAME limit rather than accept clips this file will discard.
+MAX_CAM_SHIFT = 0.02
+
 MIN_INTRUDER_FRAC = 0.50
 MIN_INTRUDER_SIZE_RATIO = 0.50
 
@@ -359,7 +364,7 @@ def assign_preprocessing(clips: List[Clip]) -> None:
         c.needs_crop = (
             c.subject_h is not None and c.subject_h < 0.45
         ) or _panel_is_inset(c)
-        c.drop_elevation = c.cam_shift is not None and c.cam_shift >= 0.02
+        c.drop_elevation = c.cam_shift is not None and c.cam_shift >= MAX_CAM_SHIFT
 
 
 def _panel_is_inset(c: Clip) -> bool:

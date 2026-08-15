@@ -61,7 +61,8 @@ from scripts.coach_report import analyze_video  # noqa: E402
 from analysis.engine import MAX_SHOOTING_ELEVATION  # noqa: E402
 from shots.classifier import JUMP_VERTICAL_DISPLACEMENT_RATIO  # noqa: E402
 from shots.elevation import shooting_event_ms, takeoff_elevation  # noqa: E402
-from temporal.dataset import DATA  # noqa: E402
+from temporal.dataset import DATA, MAX_CAM_SHIFT  # noqa: E402
+from temporal.ingest import camera_shift  # noqa: E402
 
 STAGING = DATA / "staging"
 ACCEPTED = PROJECT / "assets" / "videos" / "collected"
@@ -115,7 +116,25 @@ def _elevation_of(frames) -> Optional[float]:
 
 
 def vet(path: Path, min_elevation: float) -> dict:
-    """Run the real pipeline. Accept only what it can actually measure."""
+    """Run the real pipeline. Accept only what it can actually measure.
+
+    A measurable elevation is necessary and NOT sufficient. `dataset.py` drops
+    the target of any clip whose camera moves more than MAX_CAM_SHIFT, and it
+    is right to: on a panning clip elevation is still computable and simply
+    wrong, because a camera tilting down looks exactly like a player rising.
+    A measured number there is the dangerous case, not the safe one.
+
+    The first version of this file checked only measurability, and accepted a
+    clip at cam_shift 0.021 whose 0.244 the dataset then discarded -- an
+    ACCEPT that could not deliver a target. Two components disagreeing about
+    the same decision is worse than either rule alone.
+    """
+    shift = camera_shift(path)
+    if shift is not None and shift >= MAX_CAM_SHIFT:
+        return {"ok": False,
+                "why": f"camera moves ({shift:.4f} >= {MAX_CAM_SHIFT}): the "
+                       "dataset drops elevation for this clip, so it cannot "
+                       "contribute a target"}
     _CAPTURED.clear()
     try:
         with quiet_native_stderr():

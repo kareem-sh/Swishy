@@ -157,7 +157,7 @@ def _panel_box(frames: List[np.ndarray], w: int, h: int) -> str:
     return f"{x0},{y0},{x1 - x0},{y1 - y0}"
 
 
-def _camera_shift(grays: List[np.ndarray], boxes: List[list], w: int) -> Optional[float]:
+def camera_shift_frames(grays: List[np.ndarray], boxes: List[list], w: int) -> Optional[float]:
     """Median background motion between sampled frames, in frame widths.
 
     Tracked OUTSIDE the person boxes, because points on a moving player move
@@ -306,7 +306,7 @@ def measure(path: Path) -> Optional[Measured]:
                                   if second else None),
         frac_intruder_in_crop=_intruder_in_crop(boxes, w, h),
         cam_shift_median_wpers=(lambda v: None if v is None else round(v, 5))(
-            _camera_shift(grays, boxes, w)),
+            camera_shift_frames(grays, boxes, w)),
         panel_box=_panel_box(grays, w, h),
         boxes=boxes,
     )
@@ -467,3 +467,13 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+def camera_shift(path: Path) -> Optional[float]:
+    """Background motion for one clip, without the rest of the measurements.
+
+    Exposed so `collect.py` can apply the same camera limit `dataset.py` does,
+    instead of accepting clips whose target the dataset will then drop.
+    """
+    m = measure(path)
+    return None if m is None else m.cam_shift_median_wpers

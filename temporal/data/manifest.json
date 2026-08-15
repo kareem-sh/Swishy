@@ -3260,5 +3260,32 @@
     "split": "",
     "needs_crop": false,
     "drop_elevation": false
+  },
+  {
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/collected/ywxvxdwEGAs_jump_shot.mp4",
+    "filename": "ywxvxdwEGAs_jump_shot.mp4",
+    "directory": "assets/videos/collected",
+    "player": "",
+    "label": "jump_shot",
+    "label_note": "",
+    "duration_s": 59.192,
+    "fps": 29.97,
+    "width": 1280,
+    "height": 720,
+    "dup_group": "",
+    "session_cluster": "",
+    "frac_no_pose": 0.0,
+    "subject_h": 0.453,
+    "multi_person": true,
+    "intruder_frac": 1.0,
+    "intruder_size_ratio": 0.84,
+    "cam_shift": 0.02097,
+    "panel_box": "0,0,1280,720",
+    "status": "exclude",
+    "reason": "a second player 0.84x the shooter's height is inside the shooter crop on 100% of frames, so no crop isolates one shooter",
+    "group": "",
+    "split": "",
+    "needs_crop": false,
+    "drop_elevation": false
   }
 ]
