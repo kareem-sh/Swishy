@@ -28,8 +28,17 @@ class TrajectoryComparison:
     target_release_speed_m_s: Optional[float]
     observed_release_speed_m_s: Optional[float]
     release_speed_error_m_s: Optional[float]
+    target_entry_angle_deg: Optional[float]
+    observed_entry_angle_deg: Optional[float]
+    entry_angle_error_deg: Optional[float]
+    entry_angle_fit_status: str
     observed_kinematics_source: str
     early_kinematics_status: str
+    early_reachability_status: str
+    predicted_height_at_rim_distance_m: Optional[float]
+    reachability_height_margin_m: Optional[float]
+    minimum_reachable_speed_m_s: Optional[float]
+    reachability_vertical_tolerance_m: float
     release_height_m: Optional[float]
     rim_height_m: Optional[float]
     horizontal_distance_m: Optional[float]
@@ -47,6 +56,20 @@ class TrajectoryComparison:
     observed_apex_height_rim_radii: Optional[float]
     ideal_apex_height_rim_radii: Optional[float]
     apex_height_error_rim_radii: Optional[float]
+    apex_fit_status: str
+    observed_apex_timestamp_ms: Optional[int]
+    ideal_apex_timestamp_ms: Optional[int]
+    observed_apex_time_from_release_s: Optional[float]
+    ideal_apex_time_from_release_s: Optional[float]
+    apex_time_error_s: Optional[float]
+    observed_apex_x_rim_radii: Optional[float]
+    ideal_apex_x_rim_radii: Optional[float]
+    observed_apex_progress: Optional[float]
+    ideal_apex_progress: Optional[float]
+    apex_position_error_progress: Optional[float]
+    observed_apex_distance_m: Optional[float]
+    ideal_apex_distance_m: Optional[float]
+    apex_position_error_m: Optional[float]
     rim_crossing_error_rim_radii: Optional[float]
     observed_point_count: int
     observed_direct_point_count: int
@@ -63,6 +86,37 @@ class _RelativePoint:
     timestamp_ms: int
     measurement_source: str = "unknown"
     is_direct_observation: bool = True
+
+
+@dataclass(frozen=True)
+class _ApexComparison:
+    """Fitted observed peak and the corresponding ideal peak."""
+
+    fit_status: str
+    observed_height_rim_radii: Optional[float]
+    ideal_height_rim_radii: Optional[float]
+    observed_timestamp_ms: Optional[int]
+    ideal_timestamp_ms: Optional[int]
+    observed_time_from_release_s: Optional[float]
+    ideal_time_from_release_s: Optional[float]
+    observed_x_rim_radii: Optional[float]
+    ideal_x_rim_radii: Optional[float]
+    observed_progress: Optional[float]
+    ideal_progress: Optional[float]
+    observed_distance_m: Optional[float]
+    ideal_distance_m: Optional[float]
+
+
+@dataclass(frozen=True)
+class _ObservedFlightFit:
+    """Robust rim-relative x(t), y(t) fit for one release-to-rim flight."""
+
+    status: str
+    release_timestamp_ms: int
+    first_time_s: Optional[float] = None
+    last_time_s: Optional[float] = None
+    x_coefficients: Optional[Tuple[float, float]] = None
+    y_coefficients: Optional[Tuple[float, float, float]] = None
 
 
 def ideal_trajectory_pixels(
@@ -342,6 +396,7 @@ class IdealTrajectoryTracker:
         velocity_min_toward_rim_m_s: float = 0.25,
         velocity_min_upward_m_s: float = 0.25,
         velocity_max_speed_m_s: float = 20.0,
+        reachability_vertical_tolerance_m: Optional[float] = None,
         comparison_min_points: int = 3,
     ) -> None:
         self.release_angle_deg = float(release_angle_deg)
@@ -382,6 +437,14 @@ class IdealTrajectoryTracker:
         self.velocity_max_speed_m_s = max(
             1.0,
             float(velocity_max_speed_m_s),
+        )
+        self.reachability_vertical_tolerance_m = max(
+            0.0,
+            float(
+                self.rim_diameter_m / 2.0
+                if reachability_vertical_tolerance_m is None
+                else reachability_vertical_tolerance_m
+            ),
         )
         self.comparison_min_points = max(2, int(comparison_min_points))
         self.reset()
@@ -649,6 +712,30 @@ class IdealTrajectoryTracker:
             observed_speed,
             early_kinematics_status,
         ) = self._observed_release_kinematics(velocity_scale_m)
+        early_reachability_status = "not_evaluated"
+        predicted_height_at_rim_distance_m = None
+        reachability_height_margin_m = None
+        minimum_reachable_speed_m_s = None
+        if observed_angle is not None and observed_speed is not None:
+            (
+                early_reachability_status,
+                predicted_height_at_rim_distance_m,
+                reachability_height_margin_m,
+                minimum_reachable_speed_m_s,
+            ) = self._launch_reachability(
+                observed_angle,
+                observed_speed,
+                horizontal_m,
+                vertical_m,
+                distance_is_calibrated=(
+                    calibrated
+                    or self._horizontal_distance_override_m is not None
+                ),
+            )
+            if early_reachability_status == "below_required_height":
+                observed_angle = None
+                observed_speed = None
+                early_kinematics_status = "physically_unreachable_target"
         observed_kinematics_source = "early_post_release_fit"
         if observed_angle is None or observed_speed is None:
             flight_kinematics = self._release_to_rim_ballistic_kinematics(
@@ -672,10 +759,42 @@ class IdealTrajectoryTracker:
             else None
         )
 
-        path_rmse, observed_apex, ideal_apex = self._path_comparison()
+        path_rmse = self._path_comparison()
+        apex = self._apex_comparison(horizontal_m, target_speed)
         apex_error = (
-            observed_apex - ideal_apex
-            if observed_apex is not None and ideal_apex is not None
+            apex.observed_height_rim_radii - apex.ideal_height_rim_radii
+            if apex.observed_height_rim_radii is not None
+            and apex.ideal_height_rim_radii is not None
+            else None
+        )
+        apex_time_error = (
+            apex.observed_time_from_release_s
+            - apex.ideal_time_from_release_s
+            if apex.observed_time_from_release_s is not None
+            and apex.ideal_time_from_release_s is not None
+            else None
+        )
+        apex_position_error_progress = (
+            apex.observed_progress - apex.ideal_progress
+            if apex.observed_progress is not None
+            and apex.ideal_progress is not None
+            else None
+        )
+        apex_position_error_m = (
+            apex.observed_distance_m - apex.ideal_distance_m
+            if apex.observed_distance_m is not None
+            and apex.ideal_distance_m is not None
+            else None
+        )
+        (
+            target_entry_angle,
+            observed_entry_angle,
+            entry_angle_fit_status,
+        ) = self._entry_angle_comparison(horizontal_m, vertical_m)
+        entry_angle_error = (
+            observed_entry_angle - target_entry_angle
+            if observed_entry_angle is not None
+            and target_entry_angle is not None
             else None
         )
 
@@ -686,8 +805,21 @@ class IdealTrajectoryTracker:
             target_release_speed_m_s=target_speed,
             observed_release_speed_m_s=observed_speed,
             release_speed_error_m_s=speed_error,
+            target_entry_angle_deg=target_entry_angle,
+            observed_entry_angle_deg=observed_entry_angle,
+            entry_angle_error_deg=entry_angle_error,
+            entry_angle_fit_status=entry_angle_fit_status,
             observed_kinematics_source=observed_kinematics_source,
             early_kinematics_status=early_kinematics_status,
+            early_reachability_status=early_reachability_status,
+            predicted_height_at_rim_distance_m=(
+                predicted_height_at_rim_distance_m
+            ),
+            reachability_height_margin_m=reachability_height_margin_m,
+            minimum_reachable_speed_m_s=minimum_reachable_speed_m_s,
+            reachability_vertical_tolerance_m=(
+                self.reachability_vertical_tolerance_m
+            ),
             release_height_m=self._release_height_m if calibrated else None,
             rim_height_m=self.rim_height_m,
             horizontal_distance_m=horizontal_m,
@@ -708,9 +840,27 @@ class IdealTrajectoryTracker:
             ),
             release_anchor_source=self._release_anchor_source,
             path_rmse_rim_radii=path_rmse,
-            observed_apex_height_rim_radii=observed_apex,
-            ideal_apex_height_rim_radii=ideal_apex,
+            observed_apex_height_rim_radii=(
+                apex.observed_height_rim_radii
+            ),
+            ideal_apex_height_rim_radii=apex.ideal_height_rim_radii,
             apex_height_error_rim_radii=apex_error,
+            apex_fit_status=apex.fit_status,
+            observed_apex_timestamp_ms=apex.observed_timestamp_ms,
+            ideal_apex_timestamp_ms=apex.ideal_timestamp_ms,
+            observed_apex_time_from_release_s=(
+                apex.observed_time_from_release_s
+            ),
+            ideal_apex_time_from_release_s=apex.ideal_time_from_release_s,
+            apex_time_error_s=apex_time_error,
+            observed_apex_x_rim_radii=apex.observed_x_rim_radii,
+            ideal_apex_x_rim_radii=apex.ideal_x_rim_radii,
+            observed_apex_progress=apex.observed_progress,
+            ideal_apex_progress=apex.ideal_progress,
+            apex_position_error_progress=apex_position_error_progress,
+            observed_apex_distance_m=apex.observed_distance_m,
+            ideal_apex_distance_m=apex.ideal_distance_m,
+            apex_position_error_m=apex_position_error_m,
             rim_crossing_error_rim_radii=(
                 self._crossing_relative_x - target_x
                 if self._crossing_relative_x is not None
@@ -831,6 +981,60 @@ class IdealTrajectoryTracker:
         )
         return observed_angle, observed_speed, "accepted"
 
+    def _launch_reachability(
+        self,
+        release_angle_deg: float,
+        release_speed_m_s: float,
+        horizontal_distance_m: float,
+        vertical_difference_m: float,
+        *,
+        distance_is_calibrated: bool,
+    ) -> Tuple[str, Optional[float], Optional[float], Optional[float]]:
+        """Check whether an early launch estimate can reach the rim's height.
+
+        This is a lower-bound gate, not make/miss prediction. A launch may pass
+        above the target and still be physically reachable; it is rejected only
+        when gravity places it more than one configured tolerance below the rim
+        by the time it has covered the known horizontal distance.
+        """
+        if not distance_is_calibrated:
+            return "not_calibrated", None, None, None
+
+        angle_rad = math.radians(float(release_angle_deg))
+        speed_m_s = float(release_speed_m_s)
+        horizontal_m = float(horizontal_distance_m)
+        vertical_m = float(vertical_difference_m)
+        horizontal_speed_m_s = speed_m_s * math.cos(angle_rad)
+        if (
+            speed_m_s <= 0.0
+            or horizontal_m <= 0.0
+            or horizontal_speed_m_s <= 1e-6
+        ):
+            return "invalid_launch", None, None, None
+
+        flight_time_s = horizontal_m / horizontal_speed_m_s
+        predicted_height_m = (
+            speed_m_s * math.sin(angle_rad) * flight_time_s
+            - 0.5 * 9.81 * flight_time_s * flight_time_s
+        )
+        height_margin_m = predicted_height_m - vertical_m
+        minimum_speed_m_s = required_release_speed(
+            horizontal_m,
+            vertical_m - self.reachability_vertical_tolerance_m,
+            release_angle_deg,
+        )
+        status = (
+            "accepted"
+            if height_margin_m >= -self.reachability_vertical_tolerance_m
+            else "below_required_height"
+        )
+        return (
+            status,
+            predicted_height_m,
+            height_margin_m,
+            minimum_speed_m_s,
+        )
+
     def _release_to_rim_ballistic_kinematics(
         self,
         vertical_difference_m: float,
@@ -940,11 +1144,11 @@ class IdealTrajectoryTracker:
 
     def _path_comparison(
         self,
-    ) -> Tuple[Optional[float], Optional[float], Optional[float]]:
+    ) -> Optional[float]:
         release = self._release
         target_x, target_y = self._target_relative_xy
         if release is None or abs(target_x - release.x) <= 1e-6:
-            return None, None, None
+            return None
 
         direction = 1.0 if target_x >= release.x else -1.0
         distance = abs(target_x - release.x)
@@ -956,7 +1160,6 @@ class IdealTrajectoryTracker:
         ) / (distance * distance)
 
         residuals: List[float] = []
-        observed_heights: List[float] = []
         for point in self._observed:
             progress = direction * (point.x - release.x)
             if progress < 0.0 or progress > distance:
@@ -971,10 +1174,58 @@ class IdealTrajectoryTracker:
                 physical,
             )
             residuals.append(point.y - ideal_y)
-            observed_heights.append(target_y - point.y)
 
-        sample_x = np.linspace(0.0, distance, self.samples)
-        ideal_y = np.asarray(
+        if len(residuals) < self.comparison_min_points:
+            return None
+        return math.sqrt(float(np.mean(np.square(residuals))))
+
+    def _apex_comparison(
+        self,
+        horizontal_distance_m: float,
+        target_release_speed_m_s: Optional[float],
+    ) -> _ApexComparison:
+        """Locate observed and ideal peaks in time and along the shot path.
+
+        The observed peak comes from a robust x(t)/y(t) fit rather than the
+        single smallest image-y measurement. This suppresses detector jitter.
+        Position is expressed as progress from release (0) to rim target (1),
+        making it comparable across resolutions and moving-camera footage.
+        """
+        release = self._release
+        target_x, target_y = self._target_relative_xy
+        if release is None or abs(target_x - release.x) <= 1e-6:
+            return _ApexComparison(
+                "invalid_geometry",
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+
+        direction = 1.0 if target_x >= release.x else -1.0
+        distance = abs(target_x - release.x)
+        theta = math.radians(self._active_release_angle_deg)
+        height_to_target = release.y - target_y
+        curvature = (
+            distance * math.tan(theta) - height_to_target
+        ) / (distance * distance)
+        physical = self._physical_distances()
+
+        # The ideal curve is quadratic in horizontal progress. Evaluating at
+        # three exact positions recovers that quadratic and its vertex without
+        # introducing sampling-resolution error.
+        ideal_progress_samples = np.asarray(
+            [0.0, distance / 2.0, distance], dtype=np.float64
+        )
+        ideal_y_samples = np.asarray(
             [
                 self._ideal_relative_y(
                     float(progress),
@@ -985,17 +1236,282 @@ class IdealTrajectoryTracker:
                     curvature,
                     physical,
                 )
-                for progress in sample_x
+                for progress in ideal_progress_samples
             ],
             dtype=np.float64,
         )
-        ideal_apex = float(target_y - np.min(ideal_y))
+        ideal_coefficients = np.polyfit(
+            ideal_progress_samples, ideal_y_samples, 2
+        )
+        ideal_quadratic = float(ideal_coefficients[0])
+        if ideal_quadratic > 1e-9:
+            ideal_progress_radii = float(
+                np.clip(
+                    -ideal_coefficients[1] / (2.0 * ideal_quadratic),
+                    0.0,
+                    distance,
+                )
+            )
+        else:
+            ideal_progress_radii = float(
+                ideal_progress_samples[int(np.argmin(ideal_y_samples))]
+            )
+        ideal_y = float(np.polyval(ideal_coefficients, ideal_progress_radii))
+        ideal_progress = ideal_progress_radii / distance
+        ideal_x = release.x + direction * ideal_progress_radii
+        ideal_distance_m = ideal_progress * horizontal_distance_m
+        ideal_time_s = None
+        if target_release_speed_m_s is not None:
+            ideal_horizontal_speed = (
+                target_release_speed_m_s * math.cos(theta)
+            )
+            if ideal_horizontal_speed > 1e-9:
+                ideal_time_s = ideal_distance_m / ideal_horizontal_speed
 
-        if len(residuals) < self.comparison_min_points:
-            return None, None, ideal_apex
-        rmse = math.sqrt(float(np.mean(np.square(residuals))))
-        observed_apex = max(observed_heights)
-        return rmse, observed_apex, ideal_apex
+        release_timestamp_ms = (
+            self._kinematics_start_timestamp_ms
+            if self._kinematics_start_timestamp_ms is not None
+            else release.timestamp_ms
+        )
+        ideal_timestamp_ms = (
+            release_timestamp_ms + int(round(ideal_time_s * 1000.0))
+            if ideal_time_s is not None
+            else None
+        )
+
+        fit_status, observed_timestamp_ms, observed_x, observed_y = (
+            self._fit_observed_apex(release_timestamp_ms)
+        )
+        if observed_x is None or observed_y is None:
+            return _ApexComparison(
+                fit_status,
+                None,
+                target_y - ideal_y,
+                None,
+                ideal_timestamp_ms,
+                None,
+                ideal_time_s,
+                None,
+                ideal_x,
+                None,
+                ideal_progress,
+                None,
+                ideal_distance_m,
+            )
+
+        observed_progress_radii = direction * (observed_x - release.x)
+        observed_progress = observed_progress_radii / distance
+        observed_distance_m = observed_progress * horizontal_distance_m
+        observed_time_s = (
+            (observed_timestamp_ms - release_timestamp_ms) / 1000.0
+            if observed_timestamp_ms is not None
+            else None
+        )
+        return _ApexComparison(
+            fit_status,
+            target_y - observed_y,
+            target_y - ideal_y,
+            observed_timestamp_ms,
+            ideal_timestamp_ms,
+            observed_time_s,
+            ideal_time_s,
+            observed_x,
+            ideal_x,
+            observed_progress,
+            ideal_progress,
+            observed_distance_m,
+            ideal_distance_m,
+        )
+
+    def _fit_observed_apex(
+        self,
+        release_timestamp_ms: int,
+    ) -> Tuple[str, Optional[int], Optional[float], Optional[float]]:
+        """Fit the measured flight and return its vertex in rim units."""
+        flight_fit = self._fit_observed_flight(release_timestamp_ms)
+        if (
+            flight_fit.status != "accepted"
+            or flight_fit.x_coefficients is None
+            or flight_fit.y_coefficients is None
+            or flight_fit.first_time_s is None
+            or flight_fit.last_time_s is None
+        ):
+            return flight_fit.status, None, None, None
+
+        x_coefficients = np.asarray(
+            flight_fit.x_coefficients, dtype=np.float64
+        )
+        y_coefficients = np.asarray(
+            flight_fit.y_coefficients, dtype=np.float64
+        )
+        quadratic = float(y_coefficients[0])
+        if quadratic <= 1e-9:
+            return "non_ballistic_curve", None, None, None
+        apex_time_s = -float(y_coefficients[1]) / (2.0 * quadratic)
+        if (
+            apex_time_s < flight_fit.first_time_s
+            or apex_time_s > flight_fit.last_time_s
+        ):
+            return "apex_outside_observed_flight", None, None, None
+
+        apex_x = float(np.polyval(x_coefficients, apex_time_s))
+        apex_y = float(np.polyval(y_coefficients, apex_time_s))
+        apex_timestamp_ms = release_timestamp_ms + int(
+            round(apex_time_s * 1000.0)
+        )
+        return "accepted", apex_timestamp_ms, apex_x, apex_y
+
+    def _fit_observed_flight(
+        self,
+        release_timestamp_ms: int,
+    ) -> _ObservedFlightFit:
+        """Robustly fit all visual measurements from release to crossing."""
+        end_timestamp_ms = (
+            self._crossing_timestamp_ms
+            if self._crossing_timestamp_ms is not None
+            else self._observed[-1].timestamp_ms if self._observed else None
+        )
+        points = [
+            point
+            for point in self._observed
+            if point.timestamp_ms >= release_timestamp_ms
+            and (
+                end_timestamp_ms is None
+                or point.timestamp_ms <= end_timestamp_ms
+            )
+        ]
+        minimum_points = max(5, self.comparison_min_points)
+        if len(points) < minimum_points:
+            return _ObservedFlightFit(
+                "insufficient_points", release_timestamp_ms
+            )
+
+        times = np.asarray(
+            [
+                (point.timestamp_ms - release_timestamp_ms) / 1000.0
+                for point in points
+            ],
+            dtype=np.float64,
+        )
+        if len(np.unique(times)) < 3 or times[-1] <= times[0]:
+            return _ObservedFlightFit(
+                "invalid_timestamps", release_timestamp_ms
+            )
+
+        x_values = np.asarray([point.x for point in points], dtype=np.float64)
+        y_values = np.asarray([point.y for point in points], dtype=np.float64)
+        inliers = np.ones(len(points), dtype=bool)
+        minimum_inliers = max(
+            minimum_points,
+            int(math.ceil(len(points) * 0.6)),
+        )
+
+        for _ in range(3):
+            if int(np.count_nonzero(inliers)) < minimum_inliers:
+                return _ObservedFlightFit(
+                    "too_few_fit_inliers", release_timestamp_ms
+                )
+            x_coefficients = np.polyfit(times[inliers], x_values[inliers], 1)
+            y_coefficients = np.polyfit(times[inliers], y_values[inliers], 2)
+            predicted_x = np.polyval(x_coefficients, times)
+            predicted_y = np.polyval(y_coefficients, times)
+            residuals = np.hypot(
+                x_values - predicted_x,
+                y_values - predicted_y,
+            )
+            median = float(np.median(residuals[inliers]))
+            mad = float(np.median(np.abs(residuals[inliers] - median)))
+            robust_sigma = max(1.4826 * mad, 0.01)
+            threshold = max(
+                self.velocity_fit_outlier_threshold_rim_radii,
+                median + 3.5 * robust_sigma,
+            )
+            updated_inliers = residuals <= threshold
+            if int(np.count_nonzero(updated_inliers)) < minimum_inliers:
+                return _ObservedFlightFit(
+                    "outlier_rejection_failed", release_timestamp_ms
+                )
+            if np.array_equal(updated_inliers, inliers):
+                break
+            inliers = updated_inliers
+
+        x_coefficients = np.polyfit(times[inliers], x_values[inliers], 1)
+        y_coefficients = np.polyfit(times[inliers], y_values[inliers], 2)
+        first_time_s = float(np.min(times[inliers]))
+        last_time_s = float(np.max(times[inliers]))
+        return _ObservedFlightFit(
+            status="accepted",
+            release_timestamp_ms=release_timestamp_ms,
+            first_time_s=first_time_s,
+            last_time_s=last_time_s,
+            x_coefficients=(
+                float(x_coefficients[0]),
+                float(x_coefficients[1]),
+            ),
+            y_coefficients=(
+                float(y_coefficients[0]),
+                float(y_coefficients[1]),
+                float(y_coefficients[2]),
+            ),
+        )
+
+    def _entry_angle_comparison(
+        self,
+        horizontal_distance_m: float,
+        vertical_distance_m: float,
+    ) -> Tuple[Optional[float], Optional[float], str]:
+        """Return ideal/observed downward angles at the rim plane."""
+        horizontal_m = float(horizontal_distance_m)
+        if horizontal_m <= 1e-9:
+            return None, None, "invalid_geometry"
+
+        theta = math.radians(self._active_release_angle_deg)
+        # For a projectile constrained to pass through (d, delta_h), its
+        # downward slope at the target is tan(theta) - 2*delta_h/d.
+        target_downward_slope = (
+            math.tan(theta)
+            - 2.0 * float(vertical_distance_m) / horizontal_m
+        )
+        target_entry_angle = (
+            math.degrees(math.atan(target_downward_slope))
+            if target_downward_slope > 0.0
+            else None
+        )
+
+        if self._crossing_timestamp_ms is None:
+            return target_entry_angle, None, "rim_crossing_unavailable"
+
+        release_timestamp_ms = (
+            self._kinematics_start_timestamp_ms
+            if self._kinematics_start_timestamp_ms is not None
+            else self._release.timestamp_ms if self._release is not None else 0
+        )
+        flight_fit = self._fit_observed_flight(release_timestamp_ms)
+        if (
+            flight_fit.status != "accepted"
+            or flight_fit.x_coefficients is None
+            or flight_fit.y_coefficients is None
+        ):
+            return target_entry_angle, None, flight_fit.status
+
+        crossing_time_s = (
+            self._crossing_timestamp_ms - release_timestamp_ms
+        ) / 1000.0
+        if crossing_time_s < 0.0:
+            return target_entry_angle, None, "crossing_before_release"
+
+        horizontal_velocity = abs(float(flight_fit.x_coefficients[0]))
+        quadratic, linear, _ = flight_fit.y_coefficients
+        downward_velocity = 2.0 * quadratic * crossing_time_s + linear
+        if horizontal_velocity <= 1e-9:
+            return target_entry_angle, None, "no_horizontal_velocity"
+        if downward_velocity <= 0.0:
+            return target_entry_angle, None, "not_descending_at_rim"
+
+        observed_entry_angle = math.degrees(
+            math.atan2(downward_velocity, horizontal_velocity)
+        )
+        return target_entry_angle, observed_entry_angle, "accepted"
 
     def _physical_distances(self) -> Optional[Tuple[float, float]]:
         if (

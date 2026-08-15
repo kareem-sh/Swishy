@@ -51,7 +51,7 @@ trajectory_overlay:
   ideal_close_angle_deg: 65.0
   ideal_midrange_distance_m: 3.0
   ideal_midrange_angle_deg: 65.0
-  ideal_three_point_distance_m: 5.30
+  ideal_three_point_distance_m: 6.75
   ideal_three_point_angle_deg: 45.0
   # Vertical target within YOLO's rim box: 0.0 = top/min Y, 0.5 = box center.
   ideal_rim_y_fraction: 0.0

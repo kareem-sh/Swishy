@@ -1060,3 +1060,116 @@ rules:
       which the per-frame rule engine cannot express. Observed drift ranged
       0.008-0.180 body heights over the same shots, so there is a real signal
       there for whenever the engine can carry cross-phase state.
+
+# ---------------------------------------------------------------------------
+# BALL TRAJECTORY RULES
+# ---------------------------------------------------------------------------
+# These run once after the complete ball flight, through
+# BiomechanicsEngine.evaluate_trajectory(). Every metric is an OBSERVED minus
+# IDEAL error, so zero is the target and the sign selects the correction.
+# The same rules apply to set shots and jump shots because each comparison is
+# already relative to that shot's own release point, distance, and ideal arc.
+#
+# These are initial engineering tolerances and should be calibrated against a
+# larger labelled shot corpus. Apex progress is the scale-independent scored
+# position rule. Apex distance reports the same error in metres and is kept
+# measured-only to avoid penalising one apex-position mistake twice.
+trajectory_rules:
+  trajectory_release_angle:
+    name: "Ball Release Angle"
+    metric: release_angle_error_deg
+    shot_types: [set_shot, jump_shot]
+    min: -8.0
+    max: 8.0
+    ideal_min: -3.0
+    ideal_max: 3.0
+    unit: "deg"
+    severity: warning
+    scored: true
+    message_excellent: "The ball left at the target launch angle."
+    refine_low: "The launch was slightly flat. Send the ball a little higher toward the reference arc."
+    refine_high: "The launch was slightly steep. Use a slightly flatter path toward the reference arc."
+    message_low: "The launch was too flat. Raise the ball's path toward the reference arc."
+    message_high: "The launch was too steep. Flatten the ball's path toward the reference arc."
+    rationale: "Signed observed-minus-target release-angle error."
+
+  trajectory_release_speed:
+    name: "Ball Release Speed"
+    metric: release_speed_error_m_s
+    shot_types: [set_shot, jump_shot]
+    min: -1.0
+    max: 1.0
+    ideal_min: -0.35
+    ideal_max: 0.35
+    unit: "m/s"
+    severity: warning
+    scored: true
+    message_excellent: "The ball's release speed matched the reference."
+    refine_low: "The ball was slightly slow for this distance. Add a little more pace toward the rim."
+    refine_high: "The ball was slightly fast for this distance. Use a slightly softer release."
+    message_low: "The ball was too slow for this distance. Add pace while keeping the target arc."
+    message_high: "The ball was too fast for this distance. Soften the release while keeping the target arc."
+    rationale: "Signed observed-minus-required launch-speed error in metres per second."
+
+  trajectory_apex_height:
+    name: "Arc Height"
+    metric: apex_height_error_rim_radii
+    shot_types: [set_shot, jump_shot]
+    required_status:
+      field: apex_fit_status
+      allowed: [accepted]
+    min: -1.5
+    max: 1.5
+    ideal_min: -0.5
+    ideal_max: 0.5
+    unit: "rim radii"
+    severity: info
+    scored: true
+    message_excellent: "The top of the arc matched the reference height."
+    refine_low: "The arc was slightly low. Give the ball a little more height."
+    refine_high: "The arc was slightly high. Bring the peak a little closer to the reference."
+    message_low: "The arc was too low. Raise the peak to create a better path into the rim."
+    message_high: "The arc was too high. Lower the peak while preserving a controlled entry."
+    rationale: "Observed-minus-ideal apex height, normalized by the tracked inner-rim radius."
+
+  trajectory_apex_progress:
+    name: "Apex Position"
+    metric: apex_position_error_progress
+    shot_types: [set_shot, jump_shot]
+    required_status:
+      field: apex_fit_status
+      allowed: [accepted]
+    min: -0.15
+    max: 0.15
+    ideal_min: -0.05
+    ideal_max: 0.05
+    unit: "flight fraction"
+    severity: warning
+    scored: true
+    message_excellent: "The ball peaked at the target position between release and rim."
+    refine_low: "The ball peaked slightly early. Carry the rise a little farther toward the rim."
+    refine_high: "The ball peaked slightly late. Let it begin descending a little sooner."
+    message_low: "The ball peaked too early. Carry the upward path farther toward the rim."
+    message_high: "The ball peaked too late. Shape the arc so it begins descending sooner."
+    rationale: "Observed-minus-ideal apex progress, where release is 0 and the rim is 1."
+
+  trajectory_apex_distance:
+    name: "Apex Distance"
+    metric: apex_position_error_m
+    shot_types: [set_shot, jump_shot]
+    required_status:
+      field: apex_fit_status
+      allowed: [accepted]
+    min: -0.75
+    max: 0.75
+    ideal_min: -0.25
+    ideal_max: 0.25
+    unit: "m"
+    severity: info
+    scored: false
+    message_excellent: "Apex distance matched the reference, shown for measurement detail."
+    refine_low: "The peak was slightly closer to the release point than the reference."
+    refine_high: "The peak was slightly closer to the rim than the reference."
+    message_low: "The peak occurred much earlier than the reference distance."
+    message_high: "The peak occurred much later than the reference distance."
+    rationale: "The apex-position error in metres; measured-only because apex progress already scores it."

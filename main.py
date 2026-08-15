@@ -50,7 +50,7 @@ VIDEO = "assets/videos/salahRandomshotTest.mov"
 # Your height in centimetres, or None. Never estimated from the camera: a
 # single lens cannot separate a tall player from a near one. Without it, the
 # height-relative metrics are skipped and everything else still runs.
-HEIGHT_CM = 178
+HEIGHT_CM = 175
 
 # "auto" picks the shooting hand from the footage.
 SHOOTING_HAND = "auto"
@@ -106,6 +106,7 @@ def main() -> int:
             run.overlay,
             shot_count=len(run.shots),
             shooting_side=side,
+            ball_overlay=run.ball_overlay,
         )
     return 0
 

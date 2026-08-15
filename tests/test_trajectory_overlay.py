@@ -4,10 +4,14 @@ import math
 import sys
 from pathlib import Path
 
+import numpy as np
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from ball.models import BallSnapshot
 from ball.trajectory_overlay import ObservedTrajectoryRecorder
+from pipeline import FrameResult
+from visualization.renderer import draw_ball_overlays
 
 
 def _ball(
@@ -217,6 +221,26 @@ def test_robust_fit_ignores_one_jitter_outlier() -> None:
     assert middle_y < 280.0
 
 
+def test_shared_ball_renderer_can_be_reused_by_offline_replay() -> None:
+    canvas = np.zeros((240, 320, 3), dtype=np.uint8)
+    frame_result = FrameResult(
+        ball_state="ascending",
+        ball_tracking_status="tracked",
+        ball_measurement_source="nanotrack",
+        stabilized_rim_center_xy=(250.0, 80.0),
+        stabilized_rim_inner_radius=20.0,
+        observed_ball_path_segments=[[(80.0, 180.0), (130.0, 120.0)]],
+        fitted_observed_ball_path=[(80.0, 180.0), (160.0, 90.0)],
+        ideal_ball_path=[(80.0, 180.0), (250.0, 80.0)],
+        ideal_rim_target_xy=(250.0, 80.0),
+    )
+
+    returned = draw_ball_overlays(canvas, frame_result)
+
+    assert returned is canvas
+    assert np.count_nonzero(canvas) > 0
+
+
 if __name__ == "__main__":
     test_path_follows_current_rim_after_camera_motion()
     test_missing_detection_starts_a_new_segment()
@@ -225,4 +249,5 @@ if __name__ == "__main__":
     test_reused_detection_is_not_recorded_as_observed()
     test_release_confirmation_backtracks_to_last_near_wrist_point()
     test_robust_fit_ignores_one_jitter_outlier()
+    test_shared_ball_renderer_can_be_reused_by_offline_replay()
     print("All observed trajectory overlay tests passed.")

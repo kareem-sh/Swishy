@@ -28,9 +28,15 @@ def build_detailed_shot_report(
     visibility_gaps: Optional[List[VisibilityGapNote]] = None,
 ) -> DetailedShotReport:
     biomech = load_yaml("biomechanics.yaml")
-    rules_cfg = biomech.get("rules", {})
+    rules_cfg = {
+        **(biomech.get("rules", {}) or {}),
+        **(biomech.get("trajectory_rules", {}) or {}),
+    }
 
-    rule_map = {r.rule_id: r for r in summary.passed_rules + summary.violations}
+    all_rules = list(summary.passed_rules) + list(summary.violations)
+    for phase in summary.phase_scores:
+        all_rules.extend(phase.measured)
+    rule_map = {r.rule_id: r for r in all_rules}
     evaluations: List[RuleEvaluation] = []
 
     for rule_id, rule in rule_map.items():

@@ -21,6 +21,18 @@ def print_shot_summary(summary: ShotSummary):
         confidence = summary.outcome.confidence
         print(f"  Basket: {result} ({confidence:.0%} confidence)")
 
+    if (
+        summary.pose_release_timestamp_ms is not None
+        or summary.ball_release_timestamp_ms is not None
+    ):
+        print(
+            "  Release timing: "
+            f"pose={summary.pose_release_timestamp_ms} ms, "
+            f"ball={summary.ball_release_timestamp_ms} ms, "
+            f"difference={summary.release_disagreement_ms} ms, "
+            f"alignment confidence={summary.release_alignment_confidence}"
+        )
+
     if summary.capture_note:
         print(f"\n  Capture: {summary.capture_note}")
 

@@ -91,6 +91,9 @@ def test_tracker_calculates_angle_speed_and_path_error() -> None:
     assert comparison.path_rmse_rim_radii is not None
     assert comparison.path_rmse_rim_radii < 1e-9
     assert comparison.observed_point_count == 8
+    assert comparison.target_entry_angle_deg is not None
+    assert comparison.observed_entry_angle_deg is None
+    assert comparison.entry_angle_fit_status == "rim_crossing_unavailable"
 
 
 def test_reference_curve_follows_a_moving_rim() -> None:
@@ -341,6 +344,75 @@ def test_release_velocity_window_is_frame_rate_independent() -> None:
     )
 
 
+def _calibrated_launch_comparison(speed_m_s: float, angle_deg: float):
+    scale_m_per_radius = 20.0 * 0.0025
+    vx_radii_s = (
+        speed_m_s * math.cos(math.radians(angle_deg))
+        / scale_m_per_radius
+    )
+    vy_radii_s = (
+        speed_m_s * math.sin(math.radians(angle_deg))
+        / scale_m_per_radius
+    )
+    gravity_radii_s2 = 9.81 / scale_m_per_radius
+    points = []
+    for timestamp_ms in (0, 100, 200):
+        t = timestamp_ms / 1000.0
+        points.append(
+            (
+                -84.5 + vx_radii_s * t,
+                26.3 - vy_radii_s * t + 0.5 * gravity_radii_s2 * t * t,
+                timestamp_ms,
+            )
+        )
+
+    tracker = IdealTrajectoryTracker(
+        velocity_fit_window_s=0.2,
+        velocity_fit_min_points=3,
+        reachability_vertical_tolerance_m=0.2285,
+    )
+    tracker.start_from_relative_points(
+        points,
+        target_relative_xy=(0.0, 0.0),
+        release_height_m=1.735,
+        meters_per_pixel_at_release=0.0025,
+        rim_radius_px=20.0,
+        horizontal_distance_m_override=4.225,
+    )
+    return tracker.comparison()
+
+
+def test_impossible_early_speed_is_rejected_by_physical_reachability() -> None:
+    comparison = _calibrated_launch_comparison(1.689, 79.0)
+
+    assert comparison is not None
+    assert comparison.early_kinematics_status == "physically_unreachable_target"
+    assert comparison.early_reachability_status == "below_required_height"
+    assert comparison.observed_release_angle_deg is None
+    assert comparison.observed_release_speed_m_s is None
+    assert comparison.predicted_height_at_rim_distance_m is not None
+    assert comparison.reachability_height_margin_m is not None
+    assert comparison.reachability_height_margin_m < -0.2285
+    assert comparison.minimum_reachable_speed_m_s is not None
+    assert comparison.minimum_reachable_speed_m_s > 1.689
+
+
+def test_reachable_early_speed_survives_physical_reachability() -> None:
+    comparison = _calibrated_launch_comparison(8.0, 55.0)
+
+    assert comparison is not None
+    assert comparison.early_kinematics_status == "accepted"
+    assert comparison.early_reachability_status == "accepted"
+    assert comparison.observed_release_angle_deg is not None
+    assert comparison.observed_release_speed_m_s is not None
+    assert math.isclose(
+        comparison.observed_release_angle_deg, 55.0, abs_tol=1e-6
+    )
+    assert math.isclose(
+        comparison.observed_release_speed_m_s, 8.0, abs_tol=1e-6
+    )
+
+
 def test_invalid_away_from_rim_window_does_not_report_speed() -> None:
     tracker = IdealTrajectoryTracker(
         velocity_fit_window_s=0.066, velocity_fit_min_points=3
@@ -530,6 +602,107 @@ def test_court_location_overrides_image_distance() -> None:
     assert comparison.horizontal_distance_source == "fiba_court_location"
 
 
+def _comparison_for_known_apex(apex_progress: float):
+    """Build an exact image-space parabola with a chosen peak position."""
+    release_x = -10.0
+    release_y = 6.0
+    target_x = 0.0
+    # For y=A(t-p)^2+y_apex, solve A so y(0)=release_y and
+    # y(1)=0. Image y grows downward, so the vertex is the highest point.
+    quadratic = release_y / (2.0 * apex_progress - 1.0)
+    apex_y = -quadratic * (1.0 - apex_progress) ** 2
+    points = []
+    for index in range(11):
+        progress = index / 10.0
+        points.append(
+            (
+                release_x + (target_x - release_x) * progress,
+                quadratic * (progress - apex_progress) ** 2 + apex_y,
+                1000 + index * 100,
+                "yolo",
+                True,
+            )
+        )
+
+    tracker = IdealTrajectoryTracker(
+        release_angle_deg=54.0,
+        comparison_min_points=5,
+    )
+    tracker.start_from_relative_points(
+        points,
+        target_relative_xy=(target_x, 0.0),
+        kinematics_start_timestamp_ms=1000,
+        horizontal_distance_m_override=4.225,
+    )
+    tracker.update(
+        None,
+        released_this_frame=False,
+        shot_finished=False,
+        rim_center_xy=(500.0, 300.0),
+        rim_radius=20.0,
+        crossing_xy=(500.0, 300.0),
+        crossing_timestamp_ms=2000,
+    )
+    return tracker.comparison()
+
+
+def test_apex_position_reports_when_and_where_ball_peaked() -> None:
+    comparison = _comparison_for_known_apex(0.65)
+
+    assert comparison is not None
+    assert comparison.apex_fit_status == "accepted"
+    assert comparison.observed_apex_timestamp_ms == 1650
+    assert math.isclose(
+        comparison.observed_apex_time_from_release_s,
+        0.65,
+        abs_tol=1e-9,
+    )
+    assert math.isclose(
+        comparison.observed_apex_x_rim_radii,
+        -3.5,
+        abs_tol=1e-9,
+    )
+    assert math.isclose(
+        comparison.observed_apex_progress,
+        0.65,
+        abs_tol=1e-9,
+    )
+    assert math.isclose(
+        comparison.observed_apex_distance_m,
+        0.65 * 4.225,
+        abs_tol=1e-9,
+    )
+    assert comparison.ideal_apex_timestamp_ms is not None
+    assert comparison.ideal_apex_progress is not None
+    assert comparison.apex_position_error_progress is not None
+    assert comparison.apex_time_error_s is not None
+    expected_entry_angle = math.degrees(math.atan2(14.0, 10.0))
+    assert comparison.entry_angle_fit_status == "accepted"
+    assert math.isclose(
+        comparison.observed_entry_angle_deg,
+        expected_entry_angle,
+        abs_tol=1e-9,
+    )
+    assert comparison.target_entry_angle_deg is not None
+    assert math.isclose(
+        comparison.entry_angle_error_deg,
+        comparison.observed_entry_angle_deg
+        - comparison.target_entry_angle_deg,
+        abs_tol=1e-9,
+    )
+
+
+def test_apex_position_error_distinguishes_early_and_late_peaks() -> None:
+    early = _comparison_for_known_apex(0.65)
+    late = _comparison_for_known_apex(0.95)
+
+    assert early is not None and late is not None
+    assert early.apex_position_error_progress is not None
+    assert late.apex_position_error_progress is not None
+    assert early.apex_position_error_progress < 0.0
+    assert late.apex_position_error_progress > 0.0
+
+
 if __name__ == "__main__":
     test_ideal_curve_starts_at_release_and_ends_at_rim_center()
     test_required_speed_matches_level_45_degree_solution()
@@ -547,6 +720,8 @@ if __name__ == "__main__":
     test_release_kinematics_skip_pre_separation_preroll()
     test_release_kinematics_requires_direct_detector_anchors()
     test_release_velocity_window_is_frame_rate_independent()
+    test_impossible_early_speed_is_rejected_by_physical_reachability()
+    test_reachable_early_speed_survives_physical_reachability()
     test_invalid_away_from_rim_window_does_not_report_speed()
     test_rim_crossing_recovers_launch_when_early_fit_is_invalid()
     test_release_to_rim_average_speed_uses_crossing_time()
@@ -554,4 +729,6 @@ if __name__ == "__main__":
     test_trusted_wrist_release_can_be_close_to_rim_height()
     test_tracker_freezes_adaptive_angle_from_physical_distance()
     test_court_location_overrides_image_distance()
+    test_apex_position_reports_when_and_where_ball_peaked()
+    test_apex_position_error_distinguishes_early_and_late_peaks()
     print("All ideal trajectory tests passed.")

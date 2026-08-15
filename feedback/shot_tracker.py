@@ -44,6 +44,7 @@ from feedback.generator import generate_coaching_tips
 from feedback.models import ShotSummary
 from feedback.performance_plan import build_shot_performance_plan
 from feedback.phase_refiner import hold_duration_s, refine_phases
+from feedback.release_timing import release_timing_fields
 from feedback.scorer import score_shot
 from phase_detection.phases import CORE_ACTIVE, CORE_ANCHOR, CORE_REST, PHASE_LABELS
 from shots.classifier import AttemptEvidence, classify
@@ -81,6 +82,9 @@ class _Candidate:
     frames: List[FrameSnapshot] = field(default_factory=list)
     reached_release: bool = False
     release_ms: Optional[int] = None
+    # Independent ball event. Never copied into ``release_ms``: pose remains
+    # the authority for coaching phase cuts.
+    ball_release_ms: Optional[int] = None
     body_finished: bool = False
     body_finished_ms: Optional[int] = None
 
@@ -200,6 +204,25 @@ class _Candidate:
             return None
         return takeoff_elevation(timestamps, ankles, heights, wrists, event_ms)
 
+    def pose_release_timestamp_ms(self) -> Optional[int]:
+        """Final pose release event used by the coaching phase refiner."""
+        if self.event_index is not None and self.frames:
+            index = max(0, min(int(self.event_index), len(self.frames) - 1))
+            return self.frames[index].timestamp_ms
+        timestamps = [frame.timestamp_ms for frame in self.frames]
+        wrists = [
+            frame.features.wrist_height_ratio
+            if frame.features is not None
+            else None
+            for frame in self.frames
+        ]
+        event_ms = shooting_event_ms(timestamps, wrists)
+        return event_ms if event_ms is not None else self.release_ms
+
+    @property
+    def has_release_evidence(self) -> bool:
+        return self.reached_release or self.ball_release_ms is not None
+
     def evidence(self) -> AttemptEvidence:
         elevation = self.takeoff_elevation()
         # Two different reasons the stance measurement can be missing, and only
@@ -226,7 +249,7 @@ class _Candidate:
                 if self.wrist_above_shoulder_max != float("-inf")
                 else -1.0
             ),
-            reached_release=self.reached_release,
+            reached_release=self.has_release_evidence,
             duration_s=self.duration_s,
         )
 
@@ -274,6 +297,17 @@ class ShotTracker:
         self._body_grace_ms = 500
         self._ball_outcome: Optional[ShotOutcome] = None
         self._ball_outcome_timestamp_ms: Optional[int] = None
+        ball_cfg = load_yaml("ball.yaml")
+        release_sync_cfg = ball_cfg.get("release_sync", {}) or {}
+        self._release_disagreement_limit_ms = max(
+            0,
+            int(
+                float(
+                    release_sync_cfg.get("max_body_ball_time_delta_s", 0.10)
+                )
+                * 1000
+            ),
+        )
 
     # ------------------------------------------------------------------ api
     def attach_history(self, frame_buffer) -> None:
@@ -321,14 +355,27 @@ class ShotTracker:
         self._require_ball_outcome = bool(required)
         self._body_grace_ms = max(0, int(body_grace_ms))
 
+    @property
+    def current_pose_release_timestamp_ms(self) -> Optional[int]:
+        """Best current pose event; finalized summaries recompute it."""
+        if self._candidate is None:
+            return None
+        return self._candidate.pose_release_timestamp_ms()
+
+    @property
+    def release_disagreement_limit_ms(self) -> int:
+        return self._release_disagreement_limit_ms
+
     def begin_summary_display(self, frames: int) -> None:
         self._summary_display_frames = frames
 
     def reset(self) -> None:
         required, grace = self._require_ball_outcome, self._body_grace_ms
+        disagreement_limit_ms = self._release_disagreement_limit_ms
         history, analyzer = self._history, self._analyzer
         self.__init__()
         self.configure_ball_outcome(required, grace)
+        self._release_disagreement_limit_ms = disagreement_limit_ms
         self._history, self._analyzer = history, analyzer
 
     # -------------------------------------------------------------- updates
@@ -337,6 +384,7 @@ class ShotTracker:
         phase: str,
         snapshot: FrameSnapshot,
         ball_outcome: Optional[ShotOutcome] = None,
+        ball_release_timestamp_ms: Optional[int] = None,
     ) -> Optional[ShotSummary]:
         now_ms = snapshot.timestamp_ms
         completed: Optional[ShotSummary] = None
@@ -347,9 +395,14 @@ class ShotTracker:
             self._candidate.reached_release = True
             self._candidate.release_ms = now_ms
 
+        release_timestamp_ms = ball_release_timestamp_ms
+        if release_timestamp_ms is None and ball_outcome is not None:
+            release_timestamp_ms = ball_outcome.release_timestamp_ms
+        self._accept_ball_release(release_timestamp_ms, now_ms, phase)
+
         if self._candidate is not None and not self._candidate.body_finished:
             self._candidate.observe(snapshot)
-            if self._body_has_finished(phase):
+            if self._body_has_finished(phase, now_ms):
                 self._candidate.body_finished = True
                 self._candidate.body_finished_ms = now_ms
 
@@ -358,7 +411,7 @@ class ShotTracker:
         if self._candidate is not None:
             if (
                 self._candidate.duration_s > self._candidate_timeout_s
-                and not self._candidate.reached_release
+                and not self._candidate.has_release_evidence
             ):
                 # No release ever arrived. This is the toe-jiggle path.
                 self._discard()
@@ -368,7 +421,9 @@ class ShotTracker:
                 # never arrive, because an open candidate absorbs every later
                 # attempt into itself.
                 self._candidate.body_finished = True
-                completed = self._finalize(now_ms)
+                self._candidate.body_finished_ms = now_ms
+                if not self._require_ball_outcome or self._ball_outcome is not None:
+                    completed = self._finalize(now_ms)
             elif self._ready_to_finalize(now_ms):
                 completed = self._finalize(now_ms)
 
@@ -380,8 +435,17 @@ class ShotTracker:
         self,
         outcome: Optional[ShotOutcome],
         timestamp_ms: int,
+        ball_release_timestamp_ms: Optional[int] = None,
     ) -> Optional[ShotSummary]:
         """Continue/finalize an active attempt when pose is absent this frame."""
+        release_timestamp_ms = ball_release_timestamp_ms
+        if release_timestamp_ms is None and outcome is not None:
+            release_timestamp_ms = outcome.release_timestamp_ms
+        self._accept_ball_release(
+            release_timestamp_ms,
+            timestamp_ms,
+            self._prev_phase,
+        )
         if self._candidate is None:
             self._advance_summary_display(None)
             return None
@@ -393,7 +457,11 @@ class ShotTracker:
         self._advance_summary_display(completed)
         return completed
 
-    def finalize_in_progress(self, min_frames: int = 12) -> Optional[ShotSummary]:
+    def finalize_in_progress(
+        self,
+        min_frames: int = 12,
+        trajectory_comparison: Optional[dict] = None,
+    ) -> Optional[ShotSummary]:
         """Close an attempt still open when the video or session ends."""
         c = self._candidate
         if c is None or len(c.frames) < min_frames:
@@ -401,8 +469,16 @@ class ShotTracker:
             return None
         if self._require_ball_outcome and self._ball_outcome is None:
             self._ball_outcome = self._unknown_outcome(
-                c.last_ms, "Session ended before ball outcome was resolved"
+                c.last_ms,
+                "Session ended before ball outcome was resolved",
+                release_timestamp_ms=c.ball_release_ms,
             )
+        if self._ball_outcome is not None and isinstance(
+            trajectory_comparison, dict
+        ):
+            self._ball_outcome.timeseries_summary[
+                "trajectory_comparison"
+            ] = trajectory_comparison
         summary = self._finalize(c.last_ms, force=True)
         if summary is not None:
             self._summary_display_frames = 90
@@ -452,6 +528,42 @@ class ShotTracker:
                 # off camera, which would be untrue.
                 c.mid_start = False
                 c.entry_phase = c.frames[0].phase
+
+    def _open_from_ball_release(
+        self,
+        release_timestamp_ms: int,
+        now_ms: int,
+        phase: str,
+    ) -> None:
+        """Recover a pose attempt around a confirmed physical ball release."""
+        self._open(phase, release_timestamp_ms, mid_start=False)
+        c = self._candidate
+        if c is None:
+            return
+        c.ball_release_ms = release_timestamp_ms
+        self._backfill_follow_through(release_timestamp_ms, now_ms)
+        if c.frames:
+            c.started_ms = c.frames[0].timestamp_ms
+            c.entry_phase = c.frames[0].phase
+
+    def _backfill_follow_through(
+        self,
+        release_timestamp_ms: int,
+        now_ms: int,
+    ) -> None:
+        """Recover frames after release when association happens at outcome."""
+        c = self._candidate
+        if c is None or self._history is None or now_ms <= release_timestamp_ms:
+            return
+        frames = list(getattr(self._history, "frames", self._history) or [])
+        existing = {frame.timestamp_ms for frame in c.frames}
+        for snapshot in frames:
+            if (
+                release_timestamp_ms <= snapshot.timestamp_ms < now_ms
+                and snapshot.timestamp_ms not in existing
+            ):
+                c.observe(snapshot)
+                existing.add(snapshot.timestamp_ms)
 
     def _backfill(self, now_ms: int) -> None:
         """Pull the frames leading up to this moment into the candidate.
@@ -524,10 +636,16 @@ class ShotTracker:
         signal without the clock having to defend against merged attempts.
         """
         c = self._candidate
-        if c is None or c.release_ms is None or c.body_finished:
+        if c is None or c.body_finished:
             return False
 
-        elapsed_s = (now_ms - c.release_ms) / 1000.0
+        release_ms = (
+            c.release_ms if c.release_ms is not None else c.ball_release_ms
+        )
+        if release_ms is None:
+            return False
+
+        elapsed_s = (now_ms - release_ms) / 1000.0
         # A brief floor so the descent is not detected on the release frame
         # itself, where the wrist may still be reported below the shoulder.
         if elapsed_s >= self._min_follow_through_s and snapshot is not None:
@@ -545,7 +663,7 @@ class ShotTracker:
             return f.wrist_y < f.shoulder_y
         return False
 
-    def _body_has_finished(self, phase: str) -> bool:
+    def _body_has_finished(self, phase: str, now_ms: int) -> bool:
         """Has the shooting motion returned to rest?
 
         Returning to rest from ANY state ends the capture, provided the ball
@@ -554,9 +672,15 @@ class ShotTracker:
         a shot.
         """
         c = self._candidate
-        if c is None or phase != CORE_REST:
+        if c is None or phase != CORE_REST or not c.has_release_evidence:
             return False
-        return c.reached_release
+        # When pose never entered its release state, it may still report REST
+        # on the exact ball-release frame. Preserve a short physical
+        # follow-through window instead of ending the recovered attempt there.
+        if c.release_ms is None and c.ball_release_ms is not None:
+            elapsed_s = (now_ms - c.ball_release_ms) / 1000.0
+            return elapsed_s >= self._min_follow_through_s
+        return True
 
     def _discard(self) -> None:
         self.discarded_candidates += 1
@@ -566,7 +690,7 @@ class ShotTracker:
 
     def _is_credible(self, c: _Candidate, require_landing: bool = True) -> bool:
         """Does this candidate show a real shooting event?"""
-        if self._require_release and not c.reached_release:
+        if self._require_release and not c.has_release_evidence:
             return False
         if c.duration_s < self._min_duration_s:
             return False
@@ -595,6 +719,23 @@ class ShotTracker:
         # is blind, never when the wrist genuinely stayed still: a hand that
         # did not move produces a small number in both spaces.
         return by_world or by_image
+
+    def _accept_ball_release(
+        self,
+        release_timestamp_ms: Optional[int],
+        now_ms: int,
+        phase: str,
+    ) -> None:
+        if release_timestamp_ms is None:
+            return
+        release_ms = int(release_timestamp_ms)
+        if self._consumed_until_ms is not None and release_ms <= self._consumed_until_ms:
+            return
+        if self._candidate is None:
+            self._open_from_ball_release(release_ms, now_ms, phase)
+            return
+        if self._candidate.ball_release_ms is None:
+            self._candidate.ball_release_ms = release_ms
 
     def _accept_ball_outcome(self, outcome, timestamp_ms: int) -> None:
         if self._candidate is None or outcome is None or self._ball_outcome is not None:
@@ -653,7 +794,10 @@ class ShotTracker:
         return out
 
     def finalize_window(
-        self, frames: Sequence[FrameSnapshot], peak_ms: Optional[int] = None
+        self,
+        frames: Sequence[FrameSnapshot],
+        peak_ms: Optional[int] = None,
+        ball_outcome: Optional[ShotOutcome] = None,
     ) -> Optional[ShotSummary]:
         """Score one attempt whose bounds were decided offline.
 
@@ -691,14 +835,27 @@ class ShotTracker:
             )
         candidate.body_finished = True
         candidate.body_finished_ms = candidate.last_ms
+        if ball_outcome is not None:
+            candidate.ball_release_ms = ball_outcome.release_timestamp_ms
 
-        previous, self._candidate = self._candidate, candidate
+        previous_candidate = self._candidate
+        previous_outcome = self._ball_outcome
+        previous_outcome_timestamp_ms = self._ball_outcome_timestamp_ms
+        self._candidate = candidate
+        self._ball_outcome = ball_outcome
+        self._ball_outcome_timestamp_ms = (
+            ball_outcome.outcome_timestamp_ms
+            if ball_outcome is not None
+            else None
+        )
         try:
             return self._finalize(
                 candidate.last_ms, force=True, trust_bounds=True
             )
         finally:
-            self._candidate = previous
+            self._candidate = previous_candidate
+            self._ball_outcome = previous_outcome
+            self._ball_outcome_timestamp_ms = previous_outcome_timestamp_ms
 
     def _finalize(
         self, now_ms: int, force: bool = False, trust_bounds: bool = False
@@ -733,6 +890,22 @@ class ShotTracker:
         # actually was rather than against a guess made while it was happening.
         frames = self._refined_frames(c, classification.shot_type)
 
+        trajectory_rules = []
+        if self._analyzer is not None and self._ball_outcome is not None:
+            trajectory_comparison = self._ball_outcome.timeseries_summary.get(
+                "trajectory_comparison"
+            )
+            if isinstance(trajectory_comparison, dict):
+                trajectory_analysis = self._analyzer.evaluate_trajectory(
+                    trajectory_comparison,
+                    shot_type=getattr(
+                        classification.shot_type,
+                        "value",
+                        classification.shot_type,
+                    ),
+                )
+                trajectory_rules = trajectory_analysis.active_rules
+
         self.shot_count += 1
         if not classification.is_implemented:
             # Recognised, but we have no model for it. Produce a rejection,
@@ -755,6 +928,7 @@ class ShotTracker:
                 self.shot_count,
                 shot_type=getattr(classification.shot_type, "value", None),
                 hold_s=hold_duration_s(frames, c.event_index),
+                shot_level_rules=trajectory_rules,
                 started_mid_phase=c.mid_start,
                 ended_early=not c.body_finished,
                 entry_phase=frames[0].phase if frames else c.entry_phase,
@@ -768,6 +942,30 @@ class ShotTracker:
         # Real frame timestamps, on both the scored and the rejected path.
         summary.start_timestamp_ms = c.started_ms
         summary.end_timestamp_ms = c.last_ms
+        summary.outcome = self._ball_outcome
+        pose_release_timestamp_ms = c.pose_release_timestamp_ms()
+        ball_release_timestamp_ms = (
+            self._ball_outcome.release_timestamp_ms
+            if (
+                self._ball_outcome is not None
+                and self._ball_outcome.release_timestamp_ms is not None
+            )
+            else c.ball_release_ms
+        )
+        release_timing = release_timing_fields(
+            pose_release_timestamp_ms,
+            ball_release_timestamp_ms,
+            self._release_disagreement_limit_ms,
+        )
+        for field_name, value in release_timing.items():
+            setattr(summary, field_name, value)
+        if summary.outcome is not None:
+            summary.outcome.timeseries_summary["release_timing"] = release_timing
+            trajectory = summary.outcome.timeseries_summary.get(
+                "trajectory_comparison"
+            )
+            if isinstance(trajectory, dict):
+                trajectory.update(release_timing)
 
         self.last_summary = summary
         self.last_score = summary.score
@@ -778,10 +976,15 @@ class ShotTracker:
         return summary
 
     @staticmethod
-    def _unknown_outcome(timestamp_ms: int, evidence: str) -> ShotOutcome:
+    def _unknown_outcome(
+        timestamp_ms: int,
+        evidence: str,
+        release_timestamp_ms: Optional[int] = None,
+    ) -> ShotOutcome:
         return ShotOutcome(
             result="unknown",
             confidence=0.0,
+            release_timestamp_ms=release_timestamp_ms,
             outcome_timestamp_ms=timestamp_ms,
             evidence=[evidence],
         )

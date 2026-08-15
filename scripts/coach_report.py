@@ -78,6 +78,7 @@ class AnalysisRun:
     # Playback data, present only when the caller asked to keep it.
     landmarks: Optional[list] = None
     overlay: dict = field(default_factory=dict)
+    ball_overlay: dict = field(default_factory=dict)
     pose_share: float = 0.0
     discarded_candidates: int = 0
     frames_read: int = 0
@@ -236,6 +237,7 @@ def analyze_video(
     # Carried so a viewer can redraw without paying for pose detection again.
     run.landmarks = pipe.offline_landmarks
     run.overlay = pipe.offline_overlay
+    run.ball_overlay = pipe.offline_ball_overlay
 
     # No person in frame => this is not footage of someone shooting.
     if pose_share < MIN_POSE_FRAME_SHARE:
@@ -343,6 +345,47 @@ def _format_measured(rule) -> str:
     return f"{value:.2f}{rule.unit}"
 
 
+def _format_trajectory_measured(rule) -> str:
+    """Format a signed observed-minus-ideal trajectory error."""
+    value = rule.measured_value
+    if value is None:
+        return "n/a"
+    unit = f" {rule.unit}" if rule.unit else ""
+    return f"{value:+.2f}{unit} error"
+
+
+def _print_trajectory_feedback(ph, summary: ShotSummary) -> None:
+    """Print complete-flight rules separately from the player's pose phases."""
+    header = f"{ph.score}/100" if ph.score is not None else "not scored"
+    print(f"\n  BALL TRAJECTORY  ({header})")
+    print("  Evaluated once from the complete ball flight, not as a pose phase.")
+    if summary.release_alignment_confidence == "low":
+        print(
+            "  Measurement confidence: LOW — pose and ball release differed "
+            f"by {summary.release_disagreement_ms} ms."
+        )
+
+    for rule in ph.rules:
+        if rule.outcome.value == "excellent":
+            label = "ON TARGET"
+        elif rule.outcome.value == "good":
+            label = "REFINE"
+        else:
+            label = "CHANGE"
+        print(
+            f"    [{label:<9}] {rule.name}: "
+            f"{_format_trajectory_measured(rule)}"
+        )
+        print(f"                {rule.message}")
+
+    for rule in ph.measured:
+        print(
+            f"    [MEASURED ] {rule.name}: "
+            f"{_format_trajectory_measured(rule)} (not scored)"
+        )
+        print(f"                {rule.message}")
+
+
 def _print_next_steps(summary: ShotSummary) -> None:
     if summary.next_rep_focus:
         print("\n  WORK ON THIS NEXT")
@@ -370,10 +413,15 @@ def print_shot(summary: ShotSummary) -> None:
         print("  Not enough of the shot was visible to score it.")
         return
 
-    print("\n  PHASE SCORES")
+    pose_phases = [ph for ph in summary.phase_scores if ph.phase != "trajectory"]
+    trajectory_phases = [
+        ph for ph in summary.phase_scores if ph.phase == "trajectory"
+    ]
+
+    print("\n  POSE PHASE SCORES")
     print(f"  {'Phase':<22} {'Score':>5}  {'':<20}  Grade")
     print(f"  {'-' * 22} {'-' * 5}  {'-' * 20}  {'-' * 11}")
-    for ph in summary.phase_scores:
+    for ph in pose_phases:
         if ph.score is None:
             # Nothing scoreable in this phase. Printing 0 would read as a
             # failed phase, which is a different and untrue statement.
@@ -388,9 +436,12 @@ def print_shot(summary: ShotSummary) -> None:
             continue
         print(f"  {ph.label:<22} {ph.score:>3}/100  {_bar(ph.score)}  {ph.grade}")
 
-    print("\n  NOTES BY PHASE")
-    for ph in summary.phase_scores:
+    print("\n  POSE FEEDBACK BY PHASE")
+    for ph in pose_phases:
         _print_phase_notes(ph)
+
+    for ph in trajectory_phases:
+        _print_trajectory_feedback(ph, summary)
 
     # Shown, never scored. There is no published norm for how long a
     # follow-through should be held, and inventing a threshold here would

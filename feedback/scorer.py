@@ -415,6 +415,7 @@ def score_shot(
     entry_phase: str | None = None,
     shot_type=None,
     hold_s: float | None = None,
+    shot_level_rules: List[RuleResult] | None = None,
 ) -> ShotSummary:
     """Compute per-phase scores and an overall 0-100 score for one shot."""
     cfg = load_yaml("scoring.yaml")
@@ -428,6 +429,12 @@ def score_shot(
     hold_rule = _hold_rule(hold_s)
     if hold_rule is not None:
         rule_list.append(hold_rule)
+
+    # Complete-flight measurements (for example ball trajectory comparison)
+    # are evaluated once per shot rather than once per pose frame. They join
+    # the same RuleResult pipeline here so scoring, phase grouping, JSON, and
+    # coaching messages do not need a parallel implementation.
+    rule_list.extend(shot_level_rules or [])
 
     if not rule_list:
         return ShotSummary(

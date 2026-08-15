@@ -104,6 +104,17 @@ class ShotSummary:
     # None means the caller did not record it -- never a placeholder.
     start_timestamp_ms: Optional[int] = None
     end_timestamp_ms: Optional[int] = None
+    # Independent release clocks. Pose is the authority for coaching phase
+    # cuts; ball release is the authority for ball-flight calculations.
+    pose_release_timestamp_ms: Optional[int] = None
+    ball_release_timestamp_ms: Optional[int] = None
+    # Absolute disagreement is convenient for quality checks; the signed
+    # value preserves which detector fired first (positive = ball later).
+    release_disagreement_ms: Optional[int] = None
+    ball_minus_pose_release_ms: Optional[int] = None
+    release_disagreement_limit_ms: Optional[int] = None
+    release_timing_status: str = "unavailable"
+    release_alignment_confidence: str = "unassessed"
 
     @property
     def is_rejected(self) -> bool:

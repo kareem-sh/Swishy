@@ -12,8 +12,9 @@ from ball.shot_state_machine import (
     BallTrackingStatus,
 )
 from feedback.console import shot_summary_to_dict
+from feedback.release_timing import release_timing_fields
 from feedback.shot_tracker import ShotTracker
-from utils.frame_buffer import FrameSnapshot
+from utils.frame_buffer import FrameBuffer, FrameSnapshot
 
 
 def _ball(
@@ -165,7 +166,7 @@ def test_miss_confirmation_uses_elapsed_time_not_frame_count() -> None:
     assert confirmed.state == BallShotState.MISSED
 
 
-def test_front_rim_contact_can_deflect_in_and_become_made() -> None:
+def test_inside_center_crossing_can_continue_diagonally_and_become_made() -> None:
     machine = BallShotStateMachine()
     _release(machine)
 
@@ -174,15 +175,15 @@ def test_front_rim_contact_can_deflect_in_and_become_made() -> None:
     contact = _update(machine, 545, 310, 4, 400, (0, 350))
     made = _update(machine, 512, 338, 5, 500, (-180, 230))
 
-    assert contact.state == BallShotState.RIM_CONTACT
+    assert contact.state == BallShotState.CROSSED_INSIDE
     assert contact.crossed_rim_this_frame
     assert made.state == BallShotState.MADE
     assert made.outcome is not None
     assert made.outcome.result == "made"
-    assert "after rim contact" in made.outcome.evidence[-1]
+    assert "center crossed inside opening" in made.outcome.evidence[-1]
 
 
-def test_back_rim_contact_can_deflect_in_and_become_made() -> None:
+def test_inside_center_crossing_from_other_side_becomes_made() -> None:
     machine = BallShotStateMachine()
     _release(machine)
 
@@ -191,13 +192,13 @@ def test_back_rim_contact_can_deflect_in_and_become_made() -> None:
     contact = _update(machine, 455, 310, 4, 400, (0, 350))
     made = _update(machine, 488, 338, 5, 500, (180, 230))
 
-    assert contact.state == BallShotState.RIM_CONTACT
+    assert contact.state == BallShotState.CROSSED_INSIDE
     assert made.state == BallShotState.MADE
     assert made.outcome is not None
     assert made.outcome.result == "made"
 
 
-def test_rim_contact_that_bounces_away_becomes_missed() -> None:
+def test_inside_center_crossing_that_bounces_away_becomes_missed() -> None:
     machine = BallShotStateMachine()
     _release(machine)
 
@@ -207,8 +208,8 @@ def test_rim_contact_that_bounces_away_becomes_missed() -> None:
     first_bounce = _update(machine, 548, 285, 5, 500, (180, -300))
     missed = _update(machine, 568, 260, 6, 600, (200, -250))
 
-    assert contact.state == BallShotState.RIM_CONTACT
-    assert first_bounce.state == BallShotState.RIM_CONTACT
+    assert contact.state == BallShotState.CROSSED_INSIDE
+    assert first_bounce.state == BallShotState.CROSSED_INSIDE
     assert missed.state == BallShotState.MISSED
     assert missed.outcome is not None
     assert missed.outcome.result == "missed"
@@ -338,7 +339,12 @@ def test_moving_camera_uses_ball_position_relative_to_rim() -> None:
     assert made.outcome.result == "made"
 
 
-def _body_snapshot(timestamp_ms: int, phase: str, wrist_y: float = 1.0) -> FrameSnapshot:
+def _body_snapshot(
+    timestamp_ms: int,
+    phase: str,
+    wrist_y: float = 1.0,
+    wrist_height_ratio=None,
+) -> FrameSnapshot:
     from phase_detection.features import KinematicFeatures
 
     return FrameSnapshot(
@@ -353,6 +359,7 @@ def _body_snapshot(timestamp_ms: int, phase: str, wrist_y: float = 1.0) -> Frame
             nose_y=1.60,
             ankle_y_avg=0.10,
             ankle_baseline_y=0.10,
+            wrist_height_ratio=wrist_height_ratio,
         ),
     )
 
@@ -374,18 +381,36 @@ def test_shot_tracker_waits_for_ball_after_body_finishes() -> None:
     outcome = ShotOutcome(
         result="made",
         confidence=0.95,
+        release_timestamp_ms=150,
         outcome_timestamp_ms=300,
         evidence=["synthetic inside crossing"],
+        timeseries_summary={"trajectory_comparison": {}},
     )
     summary = tracker.update_ball_outcome(outcome, 300)
 
     assert summary is not None
     assert summary.outcome is outcome
+    assert summary.pose_release_timestamp_ms == 120
+    assert summary.ball_release_timestamp_ms == 150
+    assert summary.release_disagreement_ms == 30
+    assert summary.ball_minus_pose_release_ms == 30
     assert not tracker.shot_in_progress
 
     payload = shot_summary_to_dict(summary)
     assert payload["outcome"]["result"] == "made"
     assert payload["outcome"]["is_basket"] is True
+    expected_timing = {
+        "pose_release_timestamp_ms": 120,
+        "ball_release_timestamp_ms": 150,
+        "release_disagreement_ms": 30,
+        "ball_minus_pose_release_ms": 30,
+        "release_disagreement_limit_ms": 100,
+        "release_timing_status": "aligned",
+        "release_alignment_confidence": "normal",
+    }
+    assert payload["release_timing"] == expected_timing
+    assert payload["outcome"]["release_timing"] == expected_timing
+    assert payload["outcome"]["trajectory_comparison"] == expected_timing
 
 
 def test_ball_outcome_can_finish_after_body_grace_when_pose_never_lands() -> None:
@@ -407,19 +432,153 @@ def test_ball_outcome_can_finish_after_body_grace_when_pose_never_lands() -> Non
     assert summary is not None
     assert summary.ended_early
     assert summary.outcome is outcome
+    assert summary.pose_release_timestamp_ms == 60
+    assert summary.ball_release_timestamp_ms is None
+    assert summary.release_disagreement_ms is None
+    assert summary.ball_minus_pose_release_ms is None
+
+    payload = shot_summary_to_dict(summary)
+    assert payload["release_timing"] == {
+        "pose_release_timestamp_ms": 60,
+        "ball_release_timestamp_ms": None,
+        "release_disagreement_ms": None,
+        "ball_minus_pose_release_ms": None,
+        "release_disagreement_limit_ms": 100,
+        "release_timing_status": "unavailable",
+        "release_alignment_confidence": "unassessed",
+    }
+
+
+def test_large_release_disagreement_marks_trajectory_low_confidence() -> None:
+    timing = release_timing_fields(
+        pose_release_timestamp_ms=2333,
+        ball_release_timestamp_ms=1833,
+        disagreement_limit_ms=100,
+    )
+
+    assert timing["release_disagreement_ms"] == 500
+    assert timing["ball_minus_pose_release_ms"] == -500
+    assert timing["release_timing_status"] == "disagreed"
+    assert timing["release_alignment_confidence"] == "low"
+
+
+def test_final_pose_release_uses_full_shot_wrist_peak() -> None:
+    tracker = ShotTracker()
+
+    assert tracker.update(
+        "rise", _body_snapshot(0, "rise", 1.00, 0.10)
+    ) is None
+    assert tracker.update(
+        "rise", _body_snapshot(60, "rise", 1.20, 0.40)
+    ) is None
+    assert tracker.update(
+        "release", _body_snapshot(120, "release", 1.48, 0.70)
+    ) is None
+    assert tracker.update(
+        "recovery", _body_snapshot(180, "recovery", 1.05, 0.90)
+    ) is None
+    summary = tracker.update(
+        "ready", _body_snapshot(240, "ready", 1.00, 0.30)
+    )
+
+    assert summary is not None
+    # The live pose transition fired at 120 ms, but final coaching phase cuts
+    # deliberately use the highest wrist over the complete captured attempt.
+    assert summary.pose_release_timestamp_ms == 180
+    assert summary.ball_release_timestamp_ms is None
+
+
+def test_ball_release_recovers_pose_attempt_when_pose_fsm_misses_anchor() -> None:
+    tracker = ShotTracker()
+    tracker.configure_ball_outcome(required=True, body_grace_ms=500)
+    history = FrameBuffer(max_frames=30)
+    tracker.attach_history(history)
+
+    def update_pose(timestamp_ms, wrist_y, wrist_ratio, *, ball_release=None, outcome=None):
+        snapshot = _body_snapshot(
+            timestamp_ms,
+            "ready",
+            wrist_y,
+            wrist_ratio,
+        )
+        history.push(snapshot)
+        return tracker.update(
+            "ready",
+            snapshot,
+            ball_outcome=outcome,
+            ball_release_timestamp_ms=ball_release,
+        )
+
+    assert update_pose(0, 1.00, 0.10) is None
+    assert update_pose(60, 1.20, 0.40) is None
+    assert update_pose(120, 1.48, 0.75, ball_release=120) is None
+    assert tracker.shot_in_progress
+    assert update_pose(180, 1.55, 0.90) is None
+    assert update_pose(240, 1.40, 0.70) is None
+    assert update_pose(400, 1.10, 0.20) is None
+
+    outcome = ShotOutcome(
+        result="made",
+        confidence=0.9,
+        release_timestamp_ms=120,
+        outcome_timestamp_ms=500,
+        evidence=["synthetic ball-driven attempt"],
+    )
+    summary = update_pose(500, 1.00, 0.10, outcome=outcome)
+
+    assert summary is not None
+    assert summary.outcome is outcome
+    assert summary.pose_release_timestamp_ms == 180
+    assert summary.ball_release_timestamp_ms == 120
+    assert summary.release_disagreement_ms == 60
+    assert summary.release_alignment_confidence == "normal"
+    assert tracker.shot_count == 1
+    assert not tracker.shot_in_progress
+
+
+def test_release_timeout_waits_for_required_ball_outcome() -> None:
+    tracker = ShotTracker()
+    tracker.configure_ball_outcome(required=True, body_grace_ms=500)
+
+    assert tracker.update("rise", _body_snapshot(0, "rise", 1.00)) is None
+    assert tracker.update("release", _body_snapshot(100, "release", 1.48)) is None
+    # The follow-through clock has expired, but a required ball outcome has
+    # not arrived. This must mark the body complete without emitting a
+    # pose-only duplicate summary.
+    assert tracker.update(
+        "recovery", _body_snapshot(1400, "recovery", 1.10)
+    ) is None
+    assert tracker.shot_in_progress
+    assert not tracker.capture_in_progress
+
+    outcome = ShotOutcome(
+        result="missed",
+        confidence=0.8,
+        release_timestamp_ms=133,
+        outcome_timestamp_ms=1500,
+        evidence=["synthetic late outcome"],
+    )
+    summary = tracker.update_ball_outcome(outcome, 1500)
+    assert summary is not None
+    assert summary.outcome is outcome
+    assert tracker.shot_count == 1
 
 
 if __name__ == "__main__":
     test_clean_inside_crossing_becomes_made()
     test_outside_crossing_becomes_missed()
     test_miss_confirmation_uses_elapsed_time_not_frame_count()
-    test_front_rim_contact_can_deflect_in_and_become_made()
-    test_back_rim_contact_can_deflect_in_and_become_made()
-    test_rim_contact_that_bounces_away_becomes_missed()
+    test_inside_center_crossing_can_continue_diagonally_and_become_made()
+    test_inside_center_crossing_from_other_side_becomes_made()
+    test_inside_center_crossing_that_bounces_away_becomes_missed()
     test_predicted_points_cannot_confirm_a_make()
     test_ball_flight_continues_when_pose_is_missing()
     test_nanotrack_evidence_is_labelled_separately_from_yolo()
     test_moving_camera_uses_ball_position_relative_to_rim()
     test_shot_tracker_waits_for_ball_after_body_finishes()
     test_ball_outcome_can_finish_after_body_grace_when_pose_never_lands()
+    test_large_release_disagreement_marks_trajectory_low_confidence()
+    test_final_pose_release_uses_full_shot_wrist_peak()
+    test_ball_release_recovers_pose_attempt_when_pose_fsm_misses_anchor()
+    test_release_timeout_waits_for_required_ball_outcome()
     print("All ball shot state-machine tests passed.")

@@ -76,7 +76,7 @@ def _release(machine: BallShotStateMachine) -> None:
     assert released.state == BallShotState.ASCENDING
 
 
-def test_clean_entry_requires_downward_contour_fit_then_below_confirmation():
+def test_clean_entry_requires_downward_center_crossing_then_below_confirmation():
     machine = BallShotStateMachine()
     _release(machine)
 
@@ -104,7 +104,7 @@ def test_clean_entry_can_continue_diagonally_without_a_net():
     assert crossing.state == BallShotState.CROSSED_INSIDE
     assert made.state == BallShotState.MADE
     assert made.outcome is not None and made.outcome.result == "made"
-    assert "clean inside crossing" in made.outcome.evidence[-1]
+    assert "center crossed inside opening" in made.outcome.evidence[-1]
 
 
 def test_ball_coming_from_below_cannot_become_made():
@@ -119,7 +119,7 @@ def test_ball_coming_from_below_cannot_become_made():
     assert result.state != BallShotState.MADE
 
 
-def test_rim_contact_can_continue_diagonally_after_inner_entry():
+def test_center_inside_crossing_ignores_projected_contour_overlap():
     machine = BallShotStateMachine()
     _release(machine)
 
@@ -131,13 +131,14 @@ def test_rim_contact_can_continue_diagonally_after_inner_entry():
     made = _update(machine, 580.0, 330.0, 4, velocity=(350.0, 200.0))
 
     assert contact.crossed_rim_this_frame
-    assert contact.state == BallShotState.RIM_CONTACT
+    assert contact.state == BallShotState.CROSSED_INSIDE
+    assert not machine.saw_rim_contact
     assert made.state == BallShotState.MADE
     assert made.outcome is not None and made.outcome.result == "made"
-    assert "after rim contact" in made.outcome.evidence[-1]
+    assert "center crossed inside opening" in made.outcome.evidence[-1]
 
 
-def test_verified_contact_crossing_that_rebounds_up_is_missed():
+def test_center_inside_crossing_that_rebounds_up_is_missed():
     machine = BallShotStateMachine()
     _release(machine)
 
@@ -147,7 +148,7 @@ def test_verified_contact_crossing_that_rebounds_up_is_missed():
     missed = _update(machine, 575.0, 270.0, 5, velocity=(150.0, -200.0))
 
     assert contact.crossed_rim_this_frame
-    assert contact.state == BallShotState.RIM_CONTACT
+    assert contact.state == BallShotState.CROSSED_INSIDE
     assert missed.state == BallShotState.MISSED
     assert missed.outcome is not None and missed.outcome.result == "missed"
 
@@ -205,13 +206,32 @@ def test_outside_downward_entry_becomes_missed():
     assert missed.outcome is not None and missed.outcome.result == "missed"
 
 
+def test_crossing_center_is_interpolated_between_coarse_frames():
+    machine = BallShotStateMachine()
+    _release(machine)
+
+    # Neither endpoint is centered, but the segment between their measured
+    # centers passes exactly through the rim target at the rim plane.
+    _update(machine, 430.0, 270.0, 2, velocity=(700.0, -100.0))
+    crossing = _update(machine, 570.0, 330.0, 3, velocity=(1400.0, 600.0))
+
+    assert crossing.crossed_rim_this_frame
+    # The same coarse frame is already sufficiently below the rim, so the
+    # zero-second make confirmation may advance directly to MADE.
+    assert crossing.state == BallShotState.MADE
+    assert crossing.crossing_xy is not None
+    assert abs(crossing.crossing_xy[0] - 500.0) < 1e-9
+    assert crossing.crossing_timestamp_ms == 250
+
+
 if __name__ == "__main__":
-    test_clean_entry_requires_downward_contour_fit_then_below_confirmation()
+    test_clean_entry_requires_downward_center_crossing_then_below_confirmation()
     test_clean_entry_can_continue_diagonally_without_a_net()
     test_ball_coming_from_below_cannot_become_made()
-    test_rim_contact_can_continue_diagonally_after_inner_entry()
-    test_verified_contact_crossing_that_rebounds_up_is_missed()
+    test_center_inside_crossing_ignores_projected_contour_overlap()
+    test_center_inside_crossing_that_rebounds_up_is_missed()
     test_rim_contact_requires_the_actual_inner_opening()
     test_projected_edge_overlap_does_not_turn_airball_into_make()
     test_outside_downward_entry_becomes_missed()
+    test_crossing_center_is_interpolated_between_coarse_frames()
     print("Basket entry geometry tests passed.")

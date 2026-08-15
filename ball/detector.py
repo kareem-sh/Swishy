@@ -67,8 +67,8 @@ class BallDetector:
         self.model_path = str(det.get("model_path") or DEFAULT_LOCAL.as_posix())
         self.hf_repo = str(det.get("hf_repo", DEFAULT_HF_REPO))
         self.hf_file = str(det.get("hf_file", DEFAULT_HF_FILE))
-        self.use_half = (
-            bool(det.get("half", True))
+        self.use_quantize = (
+            bool(det.get("quantize", 16))
             and self.model_path.lower().endswith(".pt")
             and self.device != "cpu"
         )
@@ -286,8 +286,8 @@ class BallDetector:
             classes=requested_classes,
             verbose=False,
         )
-        if self.use_half:
-            predict_args["half"] = True
+        if self.use_quantize:
+            predict_args["quantize"] = 16
         results = self._model.predict(**predict_args)
         if not results or results[0].boxes is None or len(results[0].boxes) == 0:
             return CourtDetections()

@@ -25,10 +25,13 @@ on.
 
 from __future__ import annotations
 
+from bisect import bisect_left
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
 import cv2
+
+from visualization.renderer import draw_ball_overlays
 
 # MediaPipe's 33-point skeleton, as the pairs worth drawing. Face points are
 # omitted: they add clutter and nothing here is measured from them.
@@ -119,8 +122,9 @@ def replay(
     shot_count: int = 0,
     shooting_side: str = "right",
     window_name: str = "Swichy - analysed",
+    ball_overlay: Optional[Dict[int, object]] = None,
 ) -> None:
-    """Show the video with skeleton, phase, score and joint angles drawn on it.
+    """Show the completed pose and basketball analysis on the source video.
 
     Controls: SPACE pause/resume, A/D or LEFT/RIGHT step while paused, Q quit.
     """
@@ -137,12 +141,33 @@ def replay(
 
     # Timestamp -> nearest analysed entry, resolved once rather than per frame.
     keys = sorted(overlay)
+    ball_overlay = ball_overlay or {}
+    ball_keys = sorted(ball_overlay)
 
     def entry_for(ts: int) -> Optional[dict]:
         if not keys:
             return None
         best = min(keys, key=lambda k: abs(k - ts))
         return overlay[best] if abs(best - ts) <= (1000.0 / fps) else None
+
+    def ball_entry_for(ts: int):
+        if not ball_keys:
+            return None
+        # Frame timestamps are normally exact. The nearest-frame fallback
+        # also handles videos whose reported FPS introduces 1 ms rounding.
+        exact = ball_overlay.get(ts)
+        if exact is not None:
+            return exact
+        position = bisect_left(ball_keys, ts)
+        neighbours = ball_keys[max(0, position - 1):position + 1]
+        if not neighbours:
+            return None
+        best = min(neighbours, key=lambda k: abs(k - ts))
+        return (
+            ball_overlay[best]
+            if abs(best - ts) <= (1000.0 / fps)
+            else None
+        )
 
     print(f"\n  Playing back {path.name} with the analysis drawn on it.")
     print("  SPACE pause/resume | A/D step when paused | Q quit\n")
@@ -166,6 +191,15 @@ def replay(
         info = entry_for(ts)
         phase = info["phase"] if info else None
         colour = PHASE_COLOURS.get(phase, IDLE)
+
+        ball_info = ball_entry_for(ts)
+        if ball_info is not None:
+            # The shared renderer draws on RGB images because video mode feeds
+            # it RGB. Replay decodes BGR, so convert around only this layer and
+            # keep the replay's existing BGR pose colours unchanged.
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            draw_ball_overlays(rgb_frame, ball_info)
+            frame = cv2.cvtColor(rgb_frame, cv2.COLOR_RGB2BGR)
 
         if marks:
             h, w = frame.shape[:2]

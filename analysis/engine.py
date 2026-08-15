@@ -5,7 +5,8 @@ Rules are defined in config/biomechanics.yaml and evaluated only
 during their relevant shot phases.
 """
 
-from typing import List, Optional
+import math
+from typing import Any, List, Mapping, Optional
 
 from analysis.models import AnalysisResult, RuleOutcome, RuleResult
 from phase_detection.features import KinematicFeatures
@@ -42,6 +43,7 @@ class BiomechanicsEngine:
     def __init__(self, player: Optional[PlayerProfile] = None):
         cfg = load_yaml("biomechanics.yaml")
         self._rules = cfg.get("rules", {})
+        self._trajectory_rules = cfg.get("trajectory_rules", {})
         # Height is optional. Without it, height-dependent metrics return None
         # and their rules are skipped rather than scored against a guess.
         self._player = player or PlayerProfile()
@@ -84,6 +86,147 @@ class BiomechanicsEngine:
             passed_count=passed,
             total_count=total,
         )
+
+    def evaluate_trajectory(
+        self,
+        comparison: Mapping[str, Any] | object,
+        shot_type: Optional[str] = None,
+    ) -> AnalysisResult:
+        """Evaluate one completed ball flight against its ideal trajectory.
+
+        Pose rules run frame-by-frame through :meth:`evaluate`. Trajectory
+        rules run once per shot because angle, speed, apex, and rim crossing
+        only become stable after the flight has been captured. The comparison
+        may be the ``TrajectoryComparison`` dataclass or its JSON-ready dict.
+        Missing measurements are skipped; they never become zero-valued
+        failures.
+        """
+        phase = "trajectory"
+        active: List[RuleResult] = []
+        violations: List[RuleResult] = []
+        passed = 0
+        total = 0
+
+        for rule_id, rule in self._trajectory_rules.items():
+            if not self._applies_to(rule, shot_type):
+                continue
+            result = self._evaluate_trajectory_rule(
+                rule_id,
+                rule,
+                comparison,
+                phase,
+            )
+            if result is None:
+                continue
+
+            total += 1
+            active.append(result)
+            if result.passed:
+                passed += 1
+            else:
+                violations.append(result)
+
+        return AnalysisResult(
+            phase=phase,
+            active_rules=active,
+            violations=violations,
+            passed_count=passed,
+            total_count=total,
+        )
+
+    def _evaluate_trajectory_rule(
+        self,
+        rule_id: str,
+        rule: dict,
+        comparison: Mapping[str, Any] | object,
+        phase: str,
+    ) -> Optional[RuleResult]:
+        metric = str(rule.get("metric", ""))
+        measured = self._trajectory_value(comparison, metric)
+        if measured is None:
+            return None
+        try:
+            measured_f = float(measured)
+        except (TypeError, ValueError):
+            return None
+        if not math.isfinite(measured_f):
+            return None
+
+        required_status = rule.get("required_status")
+        if required_status:
+            status_field = str(required_status.get("field", ""))
+            allowed = required_status.get("allowed", []) or []
+            status = self._trajectory_value(comparison, status_field)
+            if status not in allowed:
+                return None
+
+        min_val = rule.get("min")
+        max_val = rule.get("max")
+        ideal_min = rule.get("ideal_min")
+        ideal_max = rule.get("ideal_max")
+        outcome = self._classify(
+            measured_f,
+            min_val,
+            max_val,
+            ideal_min,
+            ideal_max,
+        )
+        confidence = self._trajectory_rule_confidence(comparison, metric)
+        return RuleResult(
+            rule_id=rule_id,
+            name=rule.get("name", rule_id),
+            passed=outcome is not RuleOutcome.NEEDS_WORK,
+            severity=rule.get("severity", "warning"),
+            message=self._message(
+                rule,
+                outcome,
+                measured_f,
+                ideal_min,
+                ideal_max,
+            ),
+            phase=phase,
+            measured_value=measured_f,
+            min_value=min_val,
+            max_value=max_val,
+            ideal_min=ideal_min,
+            ideal_max=ideal_max,
+            unit=rule.get("unit", ""),
+            scored=bool(rule.get("scored", True)),
+            outcome=outcome,
+            confidence=confidence,
+        )
+
+    @staticmethod
+    def _trajectory_value(
+        comparison: Mapping[str, Any] | object,
+        key: str,
+    ) -> Any:
+        if isinstance(comparison, Mapping):
+            return comparison.get(key)
+        return getattr(comparison, key, None)
+
+    @classmethod
+    def _trajectory_rule_confidence(
+        cls,
+        comparison: Mapping[str, Any] | object,
+        metric: str,
+    ) -> float:
+        """Attach provenance confidence without changing pass/fail bands."""
+        if metric in {"release_angle_error_deg", "release_speed_error_m_s"}:
+            source = cls._trajectory_value(
+                comparison, "observed_kinematics_source"
+            )
+            return 0.9 if source == "early_post_release_fit" else 0.75
+
+        direct = cls._trajectory_value(
+            comparison, "observed_direct_point_count"
+        )
+        total = cls._trajectory_value(comparison, "observed_point_count")
+        try:
+            ratio = float(direct) / max(1.0, float(total))
+        except (TypeError, ValueError):
+            ratio = 0.0
+        return min(0.9, 0.65 + 0.25 * max(0.0, min(1.0, ratio)))
 
     @staticmethod
     def _applies_to(rule: dict, shot_type: Optional[str]) -> bool:

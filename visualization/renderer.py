@@ -247,11 +247,25 @@ def _draw_ball_rim(annotated: np.ndarray, frame_result: FrameResult) -> None:
     )
 
 
+def draw_ball_overlays(
+    rgb_image: np.ndarray,
+    frame_result: FrameResult,
+) -> np.ndarray:
+    """Draw every ball/rim/trajectory layer used by video mode.
+
+    Keeping this separate from pose rendering lets offline replay reuse the
+    exact same basketball visualization without running YOLO or NanoTrack a
+    second time.
+    """
+    _draw_observed_ball_trajectory(rgb_image, frame_result)
+    _draw_ball_rim(rgb_image, frame_result)
+    return rgb_image
+
+
 def render_frame(rgb_image: np.ndarray, detection_result, frame_result: FrameResult) -> np.ndarray:
     """Draw ball/rim, skeleton, compact joint markers, and organized HUD."""
     annotated = np.copy(rgb_image)
-    _draw_observed_ball_trajectory(annotated, frame_result)
-    _draw_ball_rim(annotated, frame_result)
+    draw_ball_overlays(annotated, frame_result)
 
     if not detection_result or not getattr(detection_result, "pose_landmarks", None):
         return annotated

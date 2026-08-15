@@ -38,6 +38,7 @@ from config.settings import (
     VISIBILITY_THRESHOLD,
 )
 from feedback.models import ShotSummary
+from feedback.release_timing import release_timing_fields
 from feedback.shot_tracker import ShotTracker
 from filters.one_euro import LandmarkFilterBank
 from phase_detection.detector import ShotPhaseDetector
@@ -186,6 +187,15 @@ class ShotAnalysisPipeline:
         # the live path uses. Kept as a plain list, and only when a caller has
         # asked for it, so a live session never grows without bound.
         self._offline_history: Optional[List[FrameSnapshot]] = None
+        # The ball flight finishes during the frame pass, before offline pose
+        # segmentation knows the final shot windows. Preserve each physical
+        # outcome so its trajectory comparison can be attached later instead
+        # of being lost when the live shot tracker is reset.
+        self._offline_ball_outcomes: Optional[List[ShotOutcome]] = None
+        # Minimal per-frame results needed to redraw the basketball overlays
+        # during second-pass playback. Unlike full FrameResult objects from
+        # process_frame, these contain no pose/world arrays or HUD state.
+        self._offline_ball_overlay: Optional[Dict[int, FrameResult]] = None
         # Normalised (x, y) for every pose landmark, per frame, kept only when
         # playback was asked for. Enough to redraw the skeleton in a second
         # pass without paying for pose detection twice.
@@ -325,6 +335,12 @@ class ShotAnalysisPipeline:
             ),
             velocity_max_speed_m_s=float(
                 trajectory_display_cfg.get("velocity_max_speed_m_s", 20.0)
+            ),
+            reachability_vertical_tolerance_m=float(
+                physics_cfg.get(
+                    "reachability_vertical_tolerance_m",
+                    float(physics_cfg.get("rim_diameter_m", 0.457)) / 2.0,
+                )
             ),
             comparison_min_points=int(
                 trajectory_display_cfg.get("comparison_min_points", 3)
@@ -767,6 +783,11 @@ class ShotAnalysisPipeline:
             completed_shot = self._shot_tracker.update_ball_outcome(
                 ball_state_update.outcome,
                 timestamp_ms,
+                ball_release_timestamp_ms=(
+                    self._ball_shot_fsm.release_timestamp_ms
+                    if ball_state_update.released_this_frame
+                    else None
+                ),
             )
             if completed_shot is not None:
                 self._shot_tracker.begin_summary_display(
@@ -776,6 +797,14 @@ class ShotAnalysisPipeline:
             if self._shot_tracker.show_shot_summary:
                 display_summary = completed_shot or self._shot_tracker.last_summary
             phase = self._phase_detector.phase
+            ball_fields = self._ball_state_frame_fields(ball_state_update)
+            self._record_offline_ball_frame(
+                timestamp_ms,
+                ball,
+                rim,
+                ball_snapshot,
+                ball_fields,
+            )
             return FrameResult(
                 timestamp_ms=timestamp_ms,
                 has_pose=False,
@@ -792,7 +821,7 @@ class ShotAnalysisPipeline:
                 ball=ball,
                 rim=rim,
                 ball_snapshot=ball_snapshot,
-                **self._ball_state_frame_fields(ball_state_update),
+                **ball_fields,
             )
         left_ankle_y_px = raw["image"]["left_ankle"]["y"]
         right_ankle_y_px = raw["image"]["right_ankle"]["y"]
@@ -906,6 +935,11 @@ class ShotAnalysisPipeline:
             phase,
             snapshot,
             ball_outcome=ball_state_update.outcome,
+            ball_release_timestamp_ms=(
+                self._ball_shot_fsm.release_timestamp_ms
+                if ball_state_update.released_this_frame
+                else None
+            ),
         )
         if completed_shot is not None:
             self._shot_tracker.begin_summary_display(self._summary_display_frames)
@@ -931,6 +965,14 @@ class ShotAnalysisPipeline:
             )
         )
 
+        ball_fields = self._ball_state_frame_fields(ball_state_update)
+        self._record_offline_ball_frame(
+            timestamp_ms,
+            ball,
+            rim,
+            ball_snapshot,
+            ball_fields,
+        )
         return FrameResult(
             image_landmarks=raw["image"],
             world_landmarks=world,
@@ -953,7 +995,7 @@ class ShotAnalysisPipeline:
             ball=ball,
             rim=rim,
             ball_snapshot=ball_snapshot,
-            **self._ball_state_frame_fields(ball_state_update),
+            **ball_fields,
         )
 
     @staticmethod
@@ -1056,6 +1098,12 @@ class ShotAnalysisPipeline:
                     "release",
                     comparison,
                     outcome=None,
+                    pose_release_timestamp_ms=(
+                        self._shot_tracker.current_pose_release_timestamp_ms
+                    ),
+                    ball_release_timestamp_ms=(
+                        self._ball_shot_fsm.release_timestamp_ms
+                    ),
                 )
                 self._release_comparison_debug_printed = True
             if update.outcome is not None and not self._final_comparison_debug_printed:
@@ -1063,12 +1111,36 @@ class ShotAnalysisPipeline:
                     "final",
                     comparison,
                     outcome=update.outcome.result,
+                    pose_release_timestamp_ms=(
+                        self._shot_tracker.current_pose_release_timestamp_ms
+                    ),
+                    ball_release_timestamp_ms=update.outcome.release_timestamp_ms,
                 )
                 self._final_comparison_debug_printed = True
         if update.outcome is not None and comparison is not None:
-            update.outcome.timeseries_summary["trajectory_comparison"] = (
-                comparison.to_dict()
+            trajectory_comparison = comparison.to_dict()
+            trajectory_comparison.update(
+                release_timing_fields(
+                    self._shot_tracker.current_pose_release_timestamp_ms,
+                    update.outcome.release_timestamp_ms,
+                    self._shot_tracker.release_disagreement_limit_ms,
+                )
             )
+            update.outcome.timeseries_summary["trajectory_comparison"] = (
+                trajectory_comparison
+            )
+        self._record_offline_ball_outcome(update.outcome)
+
+    def _record_offline_ball_outcome(
+        self,
+        outcome: Optional[ShotOutcome],
+    ) -> None:
+        """Keep one copy of each terminal ball result for offline scoring."""
+        if outcome is None or self._offline_ball_outcomes is None:
+            return
+        if any(recorded is outcome for recorded in self._offline_ball_outcomes):
+            return
+        self._offline_ball_outcomes.append(outcome)
 
     def _release_calibration(
         self,
@@ -1341,6 +1413,8 @@ class ShotAnalysisPipeline:
         comparison,
         *,
         outcome: Optional[str],
+        pose_release_timestamp_ms: Optional[int] = None,
+        ball_release_timestamp_ms: Optional[int] = None,
     ) -> None:
         """Print ideal-versus-observed launch and complete-arc measurements."""
         def number(value: Optional[float]) -> str:
@@ -1351,16 +1425,42 @@ class ShotAnalysisPipeline:
         values = {
             "stage": stage,
             "outcome": outcome or "pending",
+            **release_timing_fields(
+                pose_release_timestamp_ms,
+                ball_release_timestamp_ms,
+                self._shot_tracker.release_disagreement_limit_ms,
+            ),
             "target_angle_deg": comparison.target_release_angle_deg,
             "observed_angle_deg": comparison.observed_release_angle_deg,
             "angle_error_deg": comparison.release_angle_error_deg,
             "target_speed_m_s": comparison.target_release_speed_m_s,
             "observed_speed_m_s": comparison.observed_release_speed_m_s,
             "speed_error_m_s": comparison.release_speed_error_m_s,
+            "target_entry_angle_deg": comparison.target_entry_angle_deg,
+            "observed_entry_angle_deg": (
+                comparison.observed_entry_angle_deg
+            ),
+            "entry_angle_error_deg": comparison.entry_angle_error_deg,
+            "entry_angle_fit_status": comparison.entry_angle_fit_status,
             "observed_kinematics_source": (
                 comparison.observed_kinematics_source
             ),
             "early_kinematics_status": comparison.early_kinematics_status,
+            "early_reachability_status": (
+                comparison.early_reachability_status
+            ),
+            "predicted_height_at_rim_distance_m": (
+                comparison.predicted_height_at_rim_distance_m
+            ),
+            "reachability_height_margin_m": (
+                comparison.reachability_height_margin_m
+            ),
+            "minimum_reachable_speed_m_s": (
+                comparison.minimum_reachable_speed_m_s
+            ),
+            "reachability_vertical_tolerance_m": (
+                comparison.reachability_vertical_tolerance_m
+            ),
             "release_height_m": comparison.release_height_m,
             "rim_height_m": comparison.rim_height_m,
             "horizontal_m": comparison.horizontal_distance_m,
@@ -1381,6 +1481,30 @@ class ShotAnalysisPipeline:
             "observed_apex_radii": comparison.observed_apex_height_rim_radii,
             "ideal_apex_radii": comparison.ideal_apex_height_rim_radii,
             "apex_error_radii": comparison.apex_height_error_rim_radii,
+            "apex_fit_status": comparison.apex_fit_status,
+            "observed_apex_timestamp_ms": (
+                comparison.observed_apex_timestamp_ms
+            ),
+            "ideal_apex_timestamp_ms": comparison.ideal_apex_timestamp_ms,
+            "observed_apex_time_s": (
+                comparison.observed_apex_time_from_release_s
+            ),
+            "ideal_apex_time_s": comparison.ideal_apex_time_from_release_s,
+            "apex_time_error_s": comparison.apex_time_error_s,
+            "observed_apex_x_radii": (
+                comparison.observed_apex_x_rim_radii
+            ),
+            "ideal_apex_x_radii": comparison.ideal_apex_x_rim_radii,
+            "observed_apex_progress": comparison.observed_apex_progress,
+            "ideal_apex_progress": comparison.ideal_apex_progress,
+            "apex_position_error_progress": (
+                comparison.apex_position_error_progress
+            ),
+            "observed_apex_distance_m": (
+                comparison.observed_apex_distance_m
+            ),
+            "ideal_apex_distance_m": comparison.ideal_apex_distance_m,
+            "apex_position_error_m": comparison.apex_position_error_m,
             "path_rmse_radii": comparison.path_rmse_rim_radii,
             "rim_crossing_error_radii": comparison.rim_crossing_error_rim_radii,
             "points": comparison.observed_point_count,
@@ -1417,6 +1541,25 @@ class ShotAnalysisPipeline:
             0.0,
             (target_y - float(update.rim_center_xy[1]))
             / float(update.rim_inner_radius),
+        )
+
+    def _record_offline_ball_frame(
+        self,
+        timestamp_ms: int,
+        ball: Optional[BallDetection],
+        rim: Optional[RimDetection],
+        ball_snapshot: Optional[BallSnapshot],
+        ball_fields: dict,
+    ) -> None:
+        """Save only what replay needs to reproduce basketball overlays."""
+        if self._offline_ball_overlay is None:
+            return
+        self._offline_ball_overlay[timestamp_ms] = FrameResult(
+            timestamp_ms=timestamp_ms,
+            ball=ball,
+            rim=rim,
+            ball_snapshot=ball_snapshot,
+            **ball_fields,
         )
 
     def _ball_state_frame_fields(self, update: BallStateUpdate) -> dict:
@@ -1534,6 +1677,8 @@ class ShotAnalysisPipeline:
         and where the hand peaked, which are only known once the shot is over.
         """
         self._offline_history = []
+        self._offline_ball_outcomes = []
+        self._offline_ball_overlay = {} if keep_landmarks else None
         self._offline_landmarks = [] if keep_landmarks else None
         self._offline_overlay = {}
 
@@ -1544,6 +1689,10 @@ class ShotAnalysisPipeline:
     @property
     def offline_overlay(self) -> Dict[int, Tuple[int, str, Optional[int]]]:
         return self._offline_overlay
+
+    @property
+    def offline_ball_overlay(self) -> Dict[int, FrameResult]:
+        return self._offline_ball_overlay or {}
 
     def segment_offline(self) -> List[ShotSummary]:
         """Find and score every shot in the recorded video.
@@ -1574,10 +1723,20 @@ class ShotAnalysisPipeline:
         self._shot_tracker.reset()
         self._offline_overlay = {}
         summaries: List[ShotSummary] = []
+        available_outcomes = list(self._offline_ball_outcomes or [])
+        used_outcomes: set[int] = set()
         for start, peak, end in windows:
             frames = self._offline_history[start:end + 1]
+            peak_timestamp_ms = self._offline_history[peak].timestamp_ms
+            ball_outcome = self._matching_offline_ball_outcome(
+                peak_timestamp_ms,
+                available_outcomes,
+                used_outcomes,
+            )
             summary = self._shot_tracker.finalize_window(
-                frames, peak_ms=self._offline_history[peak].timestamp_ms
+                frames,
+                peak_ms=peak_timestamp_ms,
+                ball_outcome=ball_outcome,
             )
             if summary is None:
                 continue
@@ -1609,15 +1768,57 @@ class ShotAnalysisPipeline:
                 }
         return summaries
 
+    @staticmethod
+    def _matching_offline_ball_outcome(
+        pose_release_timestamp_ms: int,
+        outcomes: List[ShotOutcome],
+        used_outcomes: set[int],
+        maximum_delta_ms: int = 1500,
+    ) -> Optional[ShotOutcome]:
+        """Match one physical ball flight to one offline pose shot.
+
+        Pose and ball release are independent measurements, so exact timestamp
+        equality is neither expected nor required. A generous 1.5-second gate
+        admits delayed ball-release detections while preventing an unrelated
+        dribble or a later attempt from being attached to this shot.
+        """
+        candidates = []
+        for index, outcome in enumerate(outcomes):
+            if index in used_outcomes or outcome.release_timestamp_ms is None:
+                continue
+            delta_ms = abs(
+                int(outcome.release_timestamp_ms) - pose_release_timestamp_ms
+            )
+            if delta_ms <= maximum_delta_ms:
+                candidates.append((delta_ms, index, outcome))
+        if not candidates:
+            return None
+        _, index, outcome = min(candidates, key=lambda item: item[0])
+        used_outcomes.add(index)
+        return outcome
+
     def finalize_session(self) -> Optional[ShotSummary]:
         """Close any shot still in progress (e.g. video ended mid-rep)."""
-        summary = self._shot_tracker.finalize_in_progress()
         comparison = self._ideal_trajectory.comparison()
+        trajectory_comparison = (
+            comparison.to_dict() if comparison is not None else None
+        )
+        summary = self._shot_tracker.finalize_in_progress(
+            trajectory_comparison=trajectory_comparison
+        )
         outcome = summary.outcome if summary is not None else None
 
         if outcome is not None and comparison is not None:
+            trajectory_comparison = comparison.to_dict()
+            trajectory_comparison.update(
+                release_timing_fields(
+                    summary.pose_release_timestamp_ms,
+                    summary.ball_release_timestamp_ms,
+                    self._shot_tracker.release_disagreement_limit_ms,
+                )
+            )
             outcome.timeseries_summary["trajectory_comparison"] = (
-                comparison.to_dict()
+                trajectory_comparison
             )
 
         if (
@@ -1629,6 +1830,16 @@ class ShotAnalysisPipeline:
                 "final",
                 comparison,
                 outcome=outcome.result if outcome is not None else None,
+                pose_release_timestamp_ms=(
+                    summary.pose_release_timestamp_ms
+                    if summary is not None
+                    else None
+                ),
+                ball_release_timestamp_ms=(
+                    summary.ball_release_timestamp_ms
+                    if summary is not None
+                    else None
+                ),
             )
             self._final_comparison_debug_printed = True
 

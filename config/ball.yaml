@@ -5,7 +5,7 @@ enabled: true
 detector:
   backend: yolo
   # Fine-tuned ball+hoop weights (E-BARD). Use .pt on CPU/VPS; .engine needs NVIDIA+TensorRT.
-  model_path: mlRingBall/runs/basketball_rim_training/basketball_and_rim/best.pt
+  model_path: models/best.pt
   hf_repo: GabrieleGiudici/E-BARD-detection-models
   hf_file: BODD_yolov8n_0001.pt
 
@@ -23,7 +23,7 @@ detector:
   fallback_until_rim_found: true
   rim_search_retry_interval: 4  # bounded 704px retry before rim lock
   device: auto             # auto | cpu | 0 (CUDA GPU 0)
-  half: true               # FP16 for PyTorch .pt; exported engines use compiled precision
+  quantize: 16  # FP16               # FP16 for PyTorch .pt; exported engines use compiled precision
   frame_stride: 1
   # A handheld camera changes the rim's pixel position, so do not preserve one
   # highest-confidence box for the entire video.
@@ -95,7 +95,7 @@ ball_state_machine:
   dynamic_rim: false
   # Print the exact rim-entry, confirmation-counter, rebound, timeout, and
   # final-decision evidence used for MADE/MISSED/UNKNOWN.
-  debug_outcome: false
+  debug_outcome: true
 
   release_distance_px: 33
   # Wrist separation rate, not per-frame displacement. The old 12 px/frame at
@@ -123,11 +123,10 @@ ball_state_machine:
   rim_contact_channel_scale: 1.15
   rim_depth_scale: 0.20
   rim_exit_channel_scale: 1.50
-  # At the downward rim-plane crossing, the tracked ball circle must fit
-  # horizontally inside the inner opening for a clean swish. A small tolerance
-  # absorbs detector-box jitter. A contact make must first place its center in
-  # the actual inner opening near the rim plane. Once that is proven, a later
-  # descending below-rim frame may continue diagonally even without a net.
+  # The interpolated ball CENTER decides whether a downward rim-plane crossing
+  # is inside. Full-circle containment is diagnostic only: an oblique camera
+  # can project a swishing ball over the rim contour. This tolerance therefore
+  # absorbs detector-box jitter in that diagnostic without proving contact.
   entry_containment_tolerance_scale: 0.05
 
   # A valid downward crossing plus one measured below-inside point is enough.

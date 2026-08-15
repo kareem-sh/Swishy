@@ -556,16 +556,24 @@ class BallShotStateMachine:
                         crossing_relative_x,
                         radius,
                     )
-                    if contour_fits:
+                    center_inside_opening = (
+                        crossing_offset <= self.rim_inner_radius
+                    )
+                    if center_inside_opening:
+                        # The interpolated center is the stable evidence here.
+                        # In an oblique camera view, the projected ball circle
+                        # can overlap the projected rim even during a swish;
+                        # that 2D contour overlap is not physical contact.
                         self.state = BallShotState.CROSSED_INSIDE
                         self.saw_inside_crossing = True
                         self.evidence.append(
-                            "Ball contour fit inside rim opening at downward crossing"
+                            "Ball center crossed inside rim opening"
                         )
                     elif crossing_offset <= contact_limit:
-                        # An edge crossing near the physical opening can still
-                        # deflect inward. Keep it unresolved until the tracked
-                        # center is observed inside the actual inner opening.
+                        # A center just outside the projected opening remains
+                        # unresolved. The legacy state name is not proof of a
+                        # physical collision; actual contact needs deflection
+                        # evidence across multiple frames.
                         self.state = BallShotState.RIM_CONTACT
                         self.saw_rim_contact = True
                         self.saw_contact_center_inside_opening = (
@@ -584,6 +592,7 @@ class BallShotStateMachine:
                         crossing_offset=abs(crossing_relative_x),
                         ball_radius=radius,
                         rim_inner_radius=self.rim_inner_radius,
+                        center_inside_opening=center_inside_opening,
                         contour_fits=contour_fits,
                         saw_rim_contact=self.saw_rim_contact,
                         vertical_velocity=vertical_velocity,
@@ -640,9 +649,9 @@ class BallShotStateMachine:
             BallShotState.CROSSED_INSIDE,
             BallShotState.RIM_CONTACT,
         }:
-            # A clean contour-fit crossing already proves that the ball passed
-            # through the rim opening. This must not depend on a vertical net
-            # channel: without a net, the ball naturally continues diagonally.
+            # An interpolated center crossing inside the opening establishes
+            # the entry path. This must not depend on a vertical net channel:
+            # without a net, the ball naturally continues diagonally.
             # Rim-contact entries remain stricter because they can still
             # deflect away after touching the rim.
             clean_inside_exit = (
@@ -715,7 +724,7 @@ class BallShotStateMachine:
                     evidence=(
                         "Ball center crossed the inner opening and descended below the rim after rim contact"
                         if contact_make
-                        else "Ball observed below rim after clean inside crossing"
+                        else "Ball observed below rim after center crossed inside opening"
                     ),
                     timestamp_ms=timestamp_ms,
                 )

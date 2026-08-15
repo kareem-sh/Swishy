@@ -110,6 +110,7 @@ def _outcome_dict(outcome) -> Optional[dict]:
         "entry_timestamp_ms": outcome.entry_timestamp_ms,
         "outcome_timestamp_ms": outcome.outcome_timestamp_ms,
         "evidence": list(outcome.evidence),
+        "release_timing": outcome.timeseries_summary.get("release_timing"),
         "trajectory_comparison": outcome.timeseries_summary.get(
             "trajectory_comparison"
         ),
@@ -136,6 +137,19 @@ def shot_to_dict(
         "end_timestamp_ms": end,
         "duration_s": round((end - start) / 1000.0, 2)
         if start is not None and end is not None else None,
+        "release_timing": {
+            "pose_release_timestamp_ms": summary.pose_release_timestamp_ms,
+            "ball_release_timestamp_ms": summary.ball_release_timestamp_ms,
+            "release_disagreement_ms": summary.release_disagreement_ms,
+            "ball_minus_pose_release_ms": summary.ball_minus_pose_release_ms,
+            "release_disagreement_limit_ms": (
+                summary.release_disagreement_limit_ms
+            ),
+            "release_timing_status": summary.release_timing_status,
+            "release_alignment_confidence": (
+                summary.release_alignment_confidence
+            ),
+        },
         "outcome": _outcome_dict(summary.outcome),
     }
 

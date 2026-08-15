@@ -53,3 +53,9 @@ simulation_max_steps: 500
 # Camera / scale (TODO: calibrate per setup)
 pixels_per_meter: null
 rim_diameter_m: 0.457
+
+# Reject an early speed/angle fit only when its projectile would be more than
+# one physical rim radius below the target after covering the calibrated shot
+# distance. Passing above the target is still reachable; this is not a
+# make/miss rule.
+reachability_vertical_tolerance_m: 0.2285
