@@ -19,7 +19,7 @@
 # produces better motor learning and retention than focusing on the limb
 # itself -- one of the most replicated findings in motor learning, tested on
 # basketball free throws specifically (constrained-action hypothesis; see
-# resources.md Part C).
+# SOURCES.md Part C).
 #
 #   internal (weaker):  "Bend your knees deeper"
 #   external (better):  "Drive the floor away as you rise"
@@ -30,7 +30,7 @@
 # ---------------------------------------------------------------------------
 # EVIDENCE LABELS
 # ---------------------------------------------------------------------------
-# Every rule carries `evidence:` naming its class, per resources.md Part E:
+# Every rule carries `evidence:` naming its class, per SOURCES.md Part E:
 #   DIRECTLY SUPPORTED / SUPPORTED WITH LIMITATIONS / INFERRED /
 #   ENGINEERING DECISION / NOT SUPPORTED
 # Thresholds labelled ENGINEERING DECISION are our choices, NOT published
@@ -50,50 +50,102 @@ rules:
     name: "Leg Load"
     metric: knee
     phases: [loading]
+    # min: the DEPTH of the dip is the whole point. The phase begins at the
+    # straightest knee by construction, so any other choice reports a leg
+    # that has not bent yet.
+    aggregate: min
+    max_rate: 1200          # deg/s, physical ceiling; see scorer._despike
     min: 80
     max: 145
     ideal_min: 100
     ideal_max: 128
     severity: info
-    scored: true
+    scored: false          # DEMOTED -- see evidence below
     message_excellent: "Good load. That shot's powered from the floor, which is what you want."
     refine_low: "Your legs are loading well. Sink slightly less so you can rise in one smooth motion."
     refine_high: "Your leg load is good. Sit a little deeper before you rise to build more lift."
     message_low: "You're bending your knees too deep, so there's a pause at the bottom. Come up a little higher and keep it flowing."
     message_high: "Bend your knees a bit deeper before you rise. Right now the arm is doing the work — let your legs send the ball up."
     evidence: >
-      NOT SUPPORTED as a proficiency discriminator. This is now the most
-      thoroughly contradicted claim in the project, and the position has
-      only hardened with additional sources.
+      NOT SUPPORTED as a proficiency discriminator. This is the most
+      thoroughly contradicted claim in the project.
 
-      Non-significant in three independent samples at the preparatory phase:
+      ⚠️ UNRESOLVED CONFLICT — THIS RULE IS SCORED AGAINST THE CORPUS'S OWN
+      INSTRUCTION. SOURCES.md Part E gives this rule the class NOT SUPPORTED
+      and the action, verbatim:
+
+          "Demote to displayed metric"
+
+      and SOURCES.md D3, verbatim:
+
+          "`knee_flexion_loading` must be demoted from a scored rule to a
+           displayed metric. Show the number and its trend across reps; do not
+           assert a target and do not penalise. This also removes an unfair
+           penalty on shorter/longer-limbed players."
+
+      The rule is nevertheless `scored: true` today, so a player IS penalised
+      against a target the evidence map says must not be asserted. That is a
+      live contradiction, recorded here rather than settled quietly: flipping
+      `scored` changes every score this project has produced, so it is the
+      maintainer's decision to take deliberately, not a documentation edit.
+      Until it is taken, this rule's contribution to the score has no evidential
+      basis. `severity: info` limits the damage; it does not remove it.
+
+      ⚠️ FIGURES BELOW ARE UNVERIFIED AGAINST OUR CORPUS. Of the three samples
+      quoted as "independent", SOURCES.md contains one:
+
           free throw,  N=34  113.3 (9.1) vs 107.3 (14.9)   p=0.549
+              MEANS AND SDs MATCH SOURCES.md A2 (PMC10436204). THE P-VALUE DOES
+              NOT: A2 records p=0.183 for this comparison, not 0.549. One of the
+              two is wrong and neither has been re-checked against the paper.
+              SOURCES.md F11.
+
           two-point,   N=18  115.6 (10.9) vs 113.8 (6.3)   p=0.672
           three-point, N=18  109.6 (5.8) vs 109.2 (11.6)   p=0.925
-      Against that: proficient shooters loaded deeper at 3-point range in one
-      earlier sample (p<0.001), and one report associates LOWER preparatory
-      flexion with successful shooting — the opposite direction again.
+              NOT IN THE CORPUS. Both are attributed to Cabarkapa et al. 2023b
+              (PMC10531893, female shooters), which SOURCES.md A10 records as
+              NOT VERIFIED: no full text retrieved, no number confirmed. These
+              figures exist in this file and nowhere else. Do not cite them.
+              SOURCES.md A10, F10.
 
-      DO NOT read the three non-significant p-values as proof of "no
-      difference". At n=18-34 they are evidence of low statistical power, not
-      of equivalence. The honest statement is that no consistent proficiency
-      effect has been demonstrated in either direction.
+      Note also that they are not three INDEPENDENT samples in the sense that
+      word usually carries. All three come from the same research group, which
+      is the single-lab dependency SOURCES.md Part G #2 calls "the largest
+      credibility risk in this corpus".
 
-      What IS consistent is the RANGE. Every sample lands between roughly
-      107 and 116 deg at the preparatory phase, and knee angle deepens
-      reliably with shooting distance (114.8 deg at 5.10 m vs 109.4 deg at
-      6.32 m, p<0.001). So the band is defensible as a description of what
-      shooters do; it is not defensible as a description of what wins.
+      Against those nulls: proficient shooters loaded deeper at 3-point range in
+      A3 (113.2 vs 94.3 deg, p<0.001, n=24 — this one IS in the corpus), and one
+      report associates LOWER preparatory flexion with successful shooting, the
+      opposite direction again. SOURCES.md D3 counts four findings in three
+      directions.
 
-      Band is an ENGINEERING DECISION spanning published values (94-122 deg),
-      kept at `info` severity so it informs without penalising.
-      resources.md D3; PMC10436204, PMC10531893.
+      DO NOT read the non-significant p-values as proof of "no difference". At
+      n=18-34 they are evidence of low statistical power, not of equivalence.
+      The honest statement is that no consistent proficiency effect has been
+      demonstrated in either direction.
+
+      What is consistent across the quoted samples is the RANGE — roughly
+      107 to 116 deg at the preparatory phase. The distance trend once cited
+      here (114.8 deg at 5.10 m vs 109.4 deg at 6.32 m, p<0.001) is ⚠️ ALSO
+      FROM PMC10531893 AND UNVERIFIED. The corpus's own distance evidence is
+      A1's prep-phase knee series, 121.5 / 116.7 / 112.5 deg by increasing
+      distance, which is consistent in direction but is a set of means, not a
+      significance test of the trend.
+
+      So the band is defensible as a rough description of what shooters do; it
+      is not defensible as a description of what wins. It is an ENGINEERING
+      DECISION spanning published values (94-122 deg), kept at `info` severity
+      so it informs without carrying a warning's weight.
+
+      SOURCES.md D3, Part E, A2, A3, A10, F10, F11.
 
   hip_hinge_loading:
     name: "Hip Drive"
     metric: hip
     phases: [loading]
-    min: 110
+    aggregate: min          # deepest hinge, same reasoning as the knee
+    max_rate: 1200          # deg/s, physical ceiling; see scorer._despike
+    min: 100                # widened from 110 -- see WIDENED BAND below
     max: 168
     ideal_min: 125
     ideal_max: 152
@@ -105,34 +157,123 @@ rules:
     message_low: "You're folding forward at the waist. Keep your chest up toward the rim as you sink."
     message_high: "Your hips stay too upright to build power. Push them back as you lower, like you're sitting onto a high stool."
     evidence: >
-      SUPPORTED WITH LIMITATIONS — the best-supported LOWER-BODY rule here,
-      and notably better supported than the knee.
+      WIDENED BAND: the lower bound moved 110 -> 100, which is the action
+      SOURCES.md Part E records for this rule verbatim -- "Keep, widen band,
+      distance-specific". Two of the three are done; the distance part waits on
+      shooting distance becoming an input.
 
-      Hip angle at the preparatory phase separated proficiency in a second,
-      independent sample: Cabarkapa et al. (2023), N=18 female players,
-      two-point range 5.10 m —
-          proficient (>=50% made)      136.9 deg (SD 6.2)
-          non-proficient (<50% made)   128.6 deg (SD 10.0)   p=0.048
-      i.e. the better shooters were LESS folded at the hip, not more.
+      THE JUSTIFICATION IS NOT THE FAILURE RATE. 100 sits 35 deg BELOW the
+      lowest published value in the corpus (A1's 135.5 at long range), so it is
+      not an attempt to match the literature -- it is an outer bound that
+      should only fire on gross deviation, the same logic as jump_elevation's
+      upper bound in this file. Moving it to 115 or 120 to "tighten" the rule
+      would put it inside the published range and start failing normal
+      shooters; moving it to 90 would stop it detecting anything.
 
-      It also separated proficiency at 3-point range in the earlier sample
-      (143.1 vs 155.9 deg, p<0.001), and it deepens systematically with
-      distance (133.2 deg at 5.10 m vs 126.3 deg at 6.32 m, p<0.001), which
-      is a dose-response pattern rather than a one-off difference.
+      MEASURED ACROSS 46 SHOTS, all 53 clips, before the change:
 
-      LIMITATIONS: p=0.048 is marginal; n=18; one research group; and the two
-      samples disagree on DIRECTION (the female two-point sample favours a
-      more open hip, the earlier 3-point sample a more closed one). That
-      disagreement is why the band stays wide and severity stays `info`
-      rather than being tightened around either mean.
+          p25 116.3    median 124.8    p75 141.9    range 44.3-174.5
+          old floor 110 -> 7 failures        new floor 100 -> 4
 
-      resources.md A1, A3; PMC10531893, PMC10436204.
+      WHAT THE FOUR REMAINING FAILURES ARE, and why this bound is right: one
+      corrupt frame (44.3 deg, with the knee reading 31.9 on the same frame),
+      two phases measured from a SINGLE frame (67.9 and 91.3), and exactly one
+      genuine deep forward hinge (90.9 deg with a normal knee of 126.3, over 12
+      frames). The rule now catches the real thing and little else.
+
+      ⚠️ SAMPLE SIZE IS DOING MORE WORK HERE THAN THE THRESHOLD. Of the nine
+      failures at the old bounds, four came from phases of five frames or
+      fewer and three from a single frame -- including the highest reading in
+      the corpus, 174.5 deg from one frame. Every well-sampled shot (12-32
+      frames) falls between 90.9 and 150.8 with no outlier at all. A phase
+      measured from one frame is currently scored with the same confidence as
+      one measured from twenty-five, and that is a project-wide gap, not a hip
+      problem. Fixing it would do more for this rule than any further threshold
+      change.
+
+      ⚠️ OUR DISTRIBUTION SITS BELOW THE PUBLISHED ONE. Median 124.8 against
+      A3's proficient mean of 143.1 -- eighteen degrees. Either these shooters
+      hinge more than the studied cohorts, or our three-landmark hip angle is
+      not measuring what their system measured. Until that is resolved the
+      ideal band 125-152 is left UNCHANGED, even though half our shots fall
+      below it: moving it down to centre on our own median would discard the
+      only published anchor the rule has and replace it with a description of
+      whoever we happen to have filmed.
+
+      ⚠️ IT IS NOW THE ONLY SCORED RULE IN `loading`. knee_flexion_loading was
+      demoted to a displayed metric on the corpus's own instruction, so the
+      phase rests on this rule alone. The two are NOT interchangeable and it
+      was measured before the demotion was accepted: across the same 46 shots
+      they share r = 0.698, r-squared 0.488 -- under half their variance -- and
+      they disagree about pass/fail on 16 of 46 shots, 35%. Real information
+      was lost with the knee. That was a deliberate call, recorded here rather
+      than smoothed over, and it is why this rule's bounds matter more now than
+      they did.
+
+      ---- the original assessment follows, unchanged ----
+
+      DIRECTION is contested; THE BAND IS AN ENGINEERING DECISION. This block
+      previously opened "SUPPORTED WITH LIMITATIONS — the best-supported
+      LOWER-BODY rule here, and notably better supported than the knee". The
+      comparison was doing more work than the evidence allows: most of what made
+      it look better supported than the knee is a set of figures the corpus does
+      not contain.
+
+      ⚠️ UNVERIFIED AGAINST OUR CORPUS. The headline result quoted here —
+
+          Cabarkapa et al. (2023), N=18 female players, two-point range 5.10 m
+              proficient (>=50% made)      136.9 deg (SD 6.2)
+              non-proficient (<50% made)   128.6 deg (SD 10.0)   p=0.048
+
+      — appears nowhere in SOURCES.md. It is attributed to PMC10531893, which
+      SOURCES.md A10 records as NOT VERIFIED: no full text retrieved, no number
+      confirmed, no evidence class assigned. The same applies to the distance
+      trend once cited here (133.2 deg at 5.10 m vs 126.3 deg at 6.32 m,
+      p<0.001) — ⚠️ ALSO FROM PMC10531893, ALSO UNVERIFIED. Neither figure may
+      be cited outside this file until F10 is closed.
+
+      WHAT THE CORPUS ACTUALLY HOLDS FOR THE HIP:
+
+          A3 (Cabarkapa 2026, n=24, three-point, prep phase)
+              non-proficient   155.9 deg
+              proficient       143.1 deg      p<0.001
+          A1 (Cabarkapa 2022, n=10 professional males, prep phase)
+              143.9 / 141.1 / 135.5 deg by increasing shooting distance,
+              with NO significant proficiency difference at any distance.
+
+      That is one significant proficiency result, at one distance, from one
+      laboratory, plus a set of means showing the hip closes with distance.
+      SOURCES.md Part G #2 records that no independent replication of this
+      group's shooting kinematics exists.
+
+      THE TWO SAMPLES DISAGREE ON DIRECTION, and this survives the
+      verification problem: A3 has the better shooters MORE folded at the hip
+      (143.1 vs 155.9), while the unverified female two-point sample has them
+      LESS folded (136.9 vs 128.6). A rule cannot coach toward both. That
+      disagreement is why the band stays wide, why it is not tightened around
+      either mean, and why severity stays `info`.
+
+      AND A GROUP MEAN IS NOT AN INDIVIDUAL CUTOFF. Even taking A3 at face
+      value, it says two groups differ on average at one distance. It does not
+      say that an individual crossing a line shoots worse, and nothing in the
+      corpus reports the within-group spread needed to turn a mean into a
+      threshold. 110-168 and 125-152 are ours: they span the published means
+      with room for our own measurement error (hip disagreement between
+      MediaPipe's full and heavy models is 6.2 deg mean, docs/LIMITS.md), and
+      no published interval was narrowed toward, because none exists in the
+      corpus to narrow toward.
+
+      SOURCES.md A1, A3, A10, Part G; F10.
 
   # -------------------------------------------------------------- ball lift
   elbow_slot_ball_lift:
     name: "Ball Set Position"
     metric: elbow
     phases: [ball_lift]
+    # min: the set point is where the ball is held closest before the drive,
+    # i.e. the most flexed elbow of the lift.
+    aggregate: min
+    max_rate: 2000          # deg/s, physical ceiling; see scorer._despike
     min: 60
     max: 118
     ideal_min: 74
@@ -149,12 +290,13 @@ rules:
       values do not vary systematically with distance or skill, but that
       rests on non-significant results (p=0.471, p=0.706) from samples of
       10-34 in one laboratory — which is low statistical power, NOT
-      demonstrated invariance. Treated as a tunable prior. resources.md D2.
+      demonstrated invariance. Treated as a tunable prior. SOURCES.md D2.
 
   shoulder_alignment_lift:
     name: "Shoulder Elevation"
     metric: shoulder
     phases: [ball_lift, jump]
+    aggregate: worst        # unscored anyway; displayed only
     min: 55
     max: 135
     severity: info
@@ -163,74 +305,294 @@ rules:
     message_low: "Shoulder elevation, for reference — this one isn't scored."
     message_high: "Shoulder elevation, for reference — this one isn't scored."
     evidence: >
-      NOT SUPPORTED FOR SCORING — held back by MEASUREMENT, not by biology.
-      This distinction matters, because the biomechanical evidence here is
-      now stronger than for the knee, which IS scored.
+      NOT SUPPORTED FOR SCORING — held back by MEASUREMENT first, and by an
+      unverified citation second.
 
-      Shoulder angle at the preparatory phase separated proficiency:
-      Cabarkapa et al. (2023), N=18 female players, two-point range —
-          proficient (>=50% made)      52.3 deg (SD 11.6)
-          non-proficient (<50% made)   63.8 deg (SD 6.7)    p=0.025
-      i.e. better shooters carried a LOWER shoulder. It also decreases with
-      distance (57.4 deg at 5.10 m vs 54.2 deg at 6.32 m, p=0.006).
+      ⚠️ UNVERIFIED AGAINST OUR CORPUS. The proficiency result quoted here —
 
-      WHY IT STAYS UNSCORED ANYWAY: single-camera shoulder angle carries a
-      bias of -16 to -26 deg and RMSE of 24-36 deg depending on camera
-      azimuth. The published proficiency gap is 11.5 deg — roughly half our
-      measurement error. We would be scoring noise. Displayed for
-      observability only.
+          Cabarkapa et al. (2023), N=18 female players, two-point range
+              proficient (>=50% made)      52.3 deg (SD 11.6)
+              non-proficient (<50% made)   63.8 deg (SD 6.7)    p=0.025
 
-      NOTE ON THE RANGE: min/max 55-135 predates this evidence and implies
-      that a high shoulder is acceptable while a low one is not, which is
-      backwards relative to the finding above (proficient mean 52.3 sits
-      BELOW our minimum). The range is left unchanged on purpose, because
-      changing display bounds on an unscored rule would alter what the
-      report shows without improving what it knows. Revisit together with
-      the camera-geometry limitation, not before.
+      — i.e. better shooters carrying a LOWER shoulder, and the distance trend
+      beside it (57.4 deg at 5.10 m vs 54.2 deg at 6.32 m, p=0.006), are both
+      attributed to PMC10531893. SOURCES.md A10 records that paper as NOT
+      VERIFIED: no full text retrieved, no number confirmed. Neither figure
+      appears anywhere else in the corpus.
 
-      resources.md D4; PMC10531893.
+      This block previously argued from those figures that "the biomechanical
+      evidence here is now stronger than for the knee, which IS scored". That
+      comparison is withdrawn: it rested entirely on numbers the corpus does
+      not hold. What the corpus does hold for the shoulder is A1's preparatory
+      means (78.9 / 72.7 / 65.8 deg by increasing distance, SD 26.4-31.4 —
+      roughly 40% of the mean), with NO significant proficiency difference.
+
+      WHY IT STAYS UNSCORED REGARDLESS: this rule would be excluded on
+      measurement grounds even if every figure above were confirmed tomorrow.
+      Single-camera shoulder angle carries a bias of -16 to -26 deg and RMSE of
+      24-36 deg depending on camera azimuth (SOURCES.md D4, which IS verified).
+      The claimed proficiency gap is 11.5 deg — roughly half that measurement
+      error. We would be scoring noise. Displayed for observability only.
+
+      CONFIRMED ON OUR OWN FOOTAGE. The published figure above came from the
+      literature; it has now been reproduced here. Measured on salah_video.mp4,
+      the 3D shoulder angle sits +11.6 deg from the same angle measured flat in
+      the image, and MediaPipe's full and heavy models disagree with each other
+      about it by a mean of 8.6 deg. Both are of the same order as the entire
+      effect the rule would be detecting. The decision to display and not score
+      is therefore ours by measurement, not only by citation.
+      scripts/measure_angle_uncertainty.py; docs/LIMITS.md.
+
+      NOTE ON THE RANGE: min/max 55-135 is an ENGINEERING DECISION that
+      predates all of the above. It implies a high shoulder is acceptable while
+      a low one is not, which is backwards relative to the unverified finding
+      above (its proficient mean of 52.3 sits BELOW our minimum) and is not
+      obviously right against A1's much higher means either. The range is left
+      unchanged on purpose, because changing display bounds on an unscored rule
+      would alter what the report shows without improving what it knows.
+      Revisit together with the camera-geometry limitation and F10, not before.
+
+      SOURCES.md D4 (verified), A1, A10 (⚠️ unverified), F10.
+
+  # -------------------------------------------------------------------- jump
+  jump_elevation:
+    name: "Elevation"
+    metric: takeoff_elevation
+    phases: [jump]
+    shot_types: [jump_shot]   # a set shot has no flight to assess
+    aggregate: max            # the highest the body got
+    min: 0.12
+    max: 0.35
+    ideal_min: 0.15
+    ideal_max: 0.28
+    unit: ""
+    severity: info
+    scored: true
+    message_excellent: "You get up well and shoot from the top of the jump."
+    refine_low: "Good elevation. A little more lift would give you more room over the defender."
+    refine_high: "Good elevation. Ease it down slightly so the jump stays repeatable shot to shot."
+    message_low: "You barely leave the floor on this one. Ride the jump up and release near the top."
+    message_high: "You're jumping harder than the shot needs, and it costs you consistency. Take the lift down and let the arm do the work."
+    evidence: >
+      ENGINEERING DECISION, at `info` severity, on a measurement whose failure
+      mode is known and handled. Read the whole block before changing a number.
+
+      THE LOWER BOUND DOES FAIL, WHICH WAS NOT EXPECTED. `min: 0.12` is the
+      classifier's own threshold, and this rule runs only on shots the
+      classifier already called jump shots, so it was written here that the
+      floor could not fail by construction. Measured, it does: elevation over
+      the `jump` PHASE ranges down to 0.06, against a classifier that had
+      measured 0.12 or more for the same shot.
+
+      The two are not contradictory, they are different windows. The classifier
+      measures peak elevation in a tight window either side of the shooting
+      event (`shots/elevation.py`, EVENT_HALF_WINDOW_S), deliberately, to keep
+      the player walking to collect the ball out of the measurement. This rule
+      aggregates over the `jump` phase, which ENDS at the release -- so it sees
+      the way up and not the top, and a player still rising when the ball goes
+      reads lower here than there.
+
+      That is worth knowing before the number is trusted: a failure on the
+      lower bound may be telling you the phase boundary sits early, not that
+      the player did not jump. Kept at `info` for that reason.
+
+      WHAT IT SEPARATES ON REAL FOOTAGE. Measured over 53 clips, the jump shots
+      whose elevation was measurable read:
+
+          0.128  0.165  0.197  0.211  0.253  0.301
+
+      Against ideal 0.15-0.28 that is four EXCELLENT, two GOOD, none failed --
+      a real spread rather than a guaranteed 100.
+
+      THE UPPER BOUND IS THE WEAKEST NUMBER HERE. 0.35 says a jump shot can be
+      over-jumped, which is ordinary coaching but has NO published threshold in
+      the corpus. A1's jump shots sit at 26.9-31.2 cm, near 0.15-0.17 body
+      heights, so 0.35 is roughly twice the published centre -- deliberately
+      well clear of it, because it is our number and should only fire on
+      something obvious.
+
+      HIGHER IS NOT KNOWN TO BE BETTER EITHER. A6 found successful shots had
+      significantly greater jump height, but compares made against missed
+      attempts WITHIN shooters and reports R-squared of 0.005-0.012 between
+      biomechanical parameters and accuracy. Direction only, and weakly.
+
+      THE FAILURE MODE, AND WHY IT DOES NOT REACH THE SCORE. `body_rise_ratio`
+      cannot separate the player rising from the camera falling, so on
+      broadcast footage with pans and zooms it saturates at
+      MAX_BODY_RISE_RATIO. Measured: 4 of 53 clips, including a FREE THROW that
+      read the full 0.500. `analysis/engine.py` now returns None on a clamped
+      reading rather than scoring a number already known to be false, so those
+      shots report `jump` unscored instead of judged. That is the honest
+      outcome and it is why this rule can be scored at all.
+
+      RELATED LIMIT, RECORDED HERE BECAUSE IT BOUNDS THIS RULE. The classifier
+      that decides which shots reach this rule is 17/23 = 74% against filename
+      labels across the corpus, and all six errors are in ONE direction: a jump
+      shot called a set shot. So this rule is not evaluated on roughly a
+      quarter of real jump shots. `shots/elevation.py` records 14/14 on our own
+      static-camera footage; the gap is the footage, not a contradiction.
+
+      ---- earlier assessment, kept because the reasoning still applies ----
+
+      THE MEASUREMENT IS SOUND; THE BAND IS NOT YET EARNED. Those are separate
+      claims and only the first is settled.
+
+      WHY THE PHASE HAD NOTHING TRUSTWORTHY IN IT BEFORE. `jump` carried
+      exactly two rules, `shoulder_alignment_lift` and `head_stability`, and
+      both are withdrawn from scoring on measured grounds recorded in their own
+      blocks: single-camera shoulder angle carries RMSE 24-36 deg against an
+      11.5 deg effect, and head velocity is computed from hip-centred landmarks
+      where it reads the head's motion relative to the hips rather than in
+      space. So the phase was fully measured on every shot -- 5 to 31 frames,
+      zero unmeasurable -- and still could not be scored, because nothing in it
+      was worth scoring. This rule adds the phase's first trustworthy number.
+
+      THE SIGNAL. `body_rise_ratio`, in IMAGE space, as a fraction of the
+      player's own on-screen height. Not `ankle_rise` and not
+      `vertical_displacement`: both of those ask this question of hip-centred
+      world landmarks, where the hip is the origin and whole-body translation
+      is invisible. The shot classifier and the phase refiner already decide
+      whether the feet left the floor from this same signal, so scoring against
+      it keeps three components describing one event.
+
+      IT REPRODUCES A1 WITH NO ENTERED HEIGHT. Measured across 16 shots:
+
+          set shots (15)      0.011 .. 0.108 body heights
+          jump shot  (1)      0.211
+
+      Taking nose-to-ankle as roughly 0.87 of stature, those are near 14 cm and
+      33 cm for a ~1.8 m player, against A1's published 15.3 cm for free throws
+      and 26.9-31.2 cm for jump shots. That is corroboration of the
+      MEASUREMENT. It is not permission to report centimetres: the conversion
+      needs a stature we do not have, so the value stays in body heights.
+
+      WHY IT IS NOT SCORED YET, AND WHAT WOULD CHANGE THAT.
+
+      1. n=1. `shots/elevation.py` states it plainly -- "only ONE labelled jump
+         shot has been measured this way. Set-shot detection is well evidenced;
+         jump detection is not yet." A band drawn through one point is a band
+         drawn through nothing.
+
+      2. `min: 0.12` COULD NOT FAIL. It is the classifier's own threshold, and
+         this rule only runs on shots the classifier already called jump shots
+         -- so every shot reaching it has cleared 0.12 by construction. Scoring
+         a rule that cannot fail would add a guaranteed 100 to the phase and
+         inflate every jump shot's overall score. The bounds are kept because
+         they are the validated ones (14/14 correct, `scripts/peak_probe.py`),
+         and honest as display bounds; they are not a scoring band.
+
+      3. HIGHER IS NOT KNOWN TO BE BETTER. A6 found successful shots had
+         significantly greater jump height, but it compares made against missed
+         attempts WITHIN shooters and reports R-squared of 0.005-0.012 between
+         biomechanical parameters and accuracy. That supports a direction far
+         too weakly to coach toward, and no source in the corpus reports an
+         elevation a player should aim for.
+
+      To score this, we need labelled jump shots in numbers -- enough to see
+      the spread, not just the centre -- and a reason to believe some part of
+      the range shoots better than another. Until then the number is shown, the
+      phase reports honestly that it was observed and not judged, and nobody is
+      penalised for our sample size. SOURCES.md A1, A6; shots/elevation.py.
 
   trunk_posture:
     name: "Upper Body Posture"
     metric: trunk
-    phases: [ready_stance, loading, ball_lift, jump, release]
+    aggregate: worst
+    max_rate: 600          # deg/s, physical ceiling; see scorer._despike
+    phases: [release]
     min: 0
     max: 25
     ideal_min: 0
     ideal_max: 13
-    severity: warning
+    severity: info
     scored: true
-    message_excellent: "You stay tall and square the whole way through."
-    refine_high: "Your posture is good. Stay a little taller through the top of the shot to keep the ball on line."
-    message_high: "You're leaning your upper body through the shot, and it pulls the ball off line. Keep your chest facing the rim start to finish."
+    message_excellent: "You stay tall and square as the ball leaves."
+    refine_high: "Your posture is good. Keep your chest pointed at the rim as the ball goes."
+    message_high: "You're leaning your upper body as the ball leaves, and it pulls the shot off line. Keep your chest pointed at the rim through the release."
     evidence: >
-      SUPPORTED WITH LIMITATIONS. Reduced forward trunk lean at release
-      distinguished proficient free-throw shooters. Trunk lean is measured
-      against a fixed vertical axis, so it depends on the coordinate
-      convention — see docs/ACCEPTANCE_Y_AXIS.md. resources.md A2.
+      DIRECTION supported; THRESHOLD is an ENGINEERING DECISION. Those are two
+      different claims and were previously presented as one.
+
+      SCOPE NARROWED TO `release`. It ran across loading, ball_lift, jump and
+      release under a single threshold, which was wrong twice over.
+
+      First, `loading` is a preparation phase whose whole purpose is hip and
+      trunk flexion -- the player is MEANT to fold forward there. We already
+      score that mechanic separately and in the opposite direction with
+      hip_hinge_loading, so the two rules contradicted each other on the same
+      frames: one rewarding the hinge, the other penalising it. Measured on
+      salah_video shot 1, all three frames that failed this rule were in
+      `loading`, reading 25.1-25.3 deg against a limit of 25, across 0.10 s --
+      while the shot's MEDIAN trunk lean was 8.6 deg. A player who stayed
+      upright throughout scored zero for the natural lean of his own
+      countermovement.
+
+      Second, the published support is specifically about lean AT RELEASE.
+      Applying a release-derived direction to the dip extends it past its
+      evidence. ball_lift and jump are deliberately NOT re-added: there is no
+      phase-specific evidence for either, and one threshold covering four
+      different postures is how this rule went wrong to begin with.
+
+      ON THE THRESHOLD ITSELF -- 0-25 and 0-13 ARE OURS. No published trunk
+      angle appears anywhere in SOURCES.md. The corpus records A2's release
+      height, release angle, knee preparation and elbow preparation values,
+      and no trunk measurement at all; the lone "A2 (trunk lean)" citation in
+      the SOURCES rule table carries no number behind it. The previous label
+      SUPPORTED WITH LIMITATIONS therefore overstated what we hold.
+
+      And a proficient/non-proficient group difference, where one exists, is
+      still not a diagnostic cutoff. It says the groups differ on average. It
+      does not say an individual crossing a line shoots worse. Severity drops
+      to `info` accordingly -- the rule informs without carrying a warning's
+      weight behind a number we chose ourselves.
+
+      Trunk lean is measured against a FIXED vertical axis, so unlike the
+      three-landmark joint angles it depends on the coordinate convention
+      being right. See pose/landmarks.py and tests/test_coordinates.py.
 
   head_stability:
     name: "Eyes and Head"
     metric: head_velocity
+    aggregate: worst        # continuous
     phases: [loading, ball_lift, jump, release]
     max: 0.08
     ideal_max: 0.05
     unit: "m/s"
     severity: info
-    scored: true
-    message_excellent: "Your head stays still, so your eyes stay on target."
-    refine_high: "Head control is good. Hold your eyes on the rim a moment longer after the ball leaves."
-    message_high: "You're moving your head mid-shot. Lock your eyes on the front of the rim and keep them there until the ball lands."
+    scored: false          # measured and displayed, never scored
+    message_excellent: "Head movement, for reference — this one isn't scored."
+    refine_high: "Head movement, for reference — this one isn't scored."
+    message_high: "Head movement, for reference — this one isn't scored."
     evidence: >
-      ENGINEERING DECISION. No published threshold for head movement during
-      shooting was found. Retained because a stable gaze is standard coaching
-      practice and the measurement is reliable. Threshold is ours.
+      NOT SUPPORTED FOR SCORING — the threshold never had a basis, and now has
+      a measurement against it.
+
+      It was always an ENGINEERING DECISION: no published threshold for head
+      movement during shooting was found. The old note claimed "the
+      measurement is reliable". That claim is now contradicted by data.
+
+      Measured across five videos, head velocity during the shot ran
+      p10 = 0.00, median = 0.20, p90 = 0.50 m/s against a maximum of 0.08 --
+      so the rule failed 59 of 80 evaluations, roughly three players in four.
+      A threshold nobody derived, which almost nobody meets, is not measuring
+      head stability; it is measuring the threshold.
+
+      There is a second problem it cannot escape. head_velocity is computed
+      from hip-centred world landmarks, so it is the head's motion RELATIVE TO
+      THE HIPS, not in space. A player who rises smoothly with a perfectly
+      still gaze still registers motion here. Re-deriving it against an
+      image-space reference is the honest fix, and until that exists the
+      number is shown and not scored.
+
+      Displayed because a stable gaze is genuine coaching practice.
 
   # ---------------------------------------------------------------- release
   elbow_extension_release:
     name: "Reach at Release"
     metric: elbow
     phases: [release]
+    aggregate: max          # the reach ACHIEVED, not the frame before it
+    max_rate: 2000          # deg/s, physical ceiling; see scorer._despike
     min: 142
     max: 180
     ideal_min: 152
@@ -243,26 +605,50 @@ rules:
     message_low: "Straighten your elbow more at release. It's still bent when the ball leaves, and that flattens the arc."
     message_high: "You're snapping your elbow straight too hard. Reach toward the rim and let the arm finish soft."
     evidence: >
-      SUPPORTED WITH LIMITATIONS — and the strongest numeric anchor in this
-      file.
+      DIRECTION AND CENTRE supported by A3; THE BAND IS AN ENGINEERING
+      DECISION. It was previously labelled "SUPPORTED WITH LIMITATIONS - and
+      the strongest numeric anchor in this file", which was true only of
+      figures the corpus does not contain.
 
-      Cabarkapa et al. (2023), markerless mocap at 120 Hz, N=34 free-throw
-      shooters, elbow angle AT BALL RELEASE:
-          proficient (>=70% made, n=19)      159.6 deg (SD 1.4)
-          non-proficient (<70% made, n=15)   159.8 deg (SD 1.3)
+      CITATION CORRECTED. This block previously read:
+
+          "Cabarkapa et al. (2023), markerless mocap at 120 Hz, N=34
+           free-throw shooters ... proficient (>=70% made, n=19) 159.6 deg
+           (SD 1.4); non-proficient (<70% made, n=15) 159.8 deg (SD 1.3)
+           ... p=0.336 ... PMC10436204"
+
+      Not one of those figures survives a check against SOURCES.md. The
+      corpus's only elbow-at-release values are A3's -- 158.8 vs 159.3,
+      p=0.228, n=24, the 2026 THREE-POINT study -- and SOURCES.md Part E
+      names A3 as this rule's source explicitly. PMC10436204 is A2, whose
+      only elbow figure is PREPARATORY (78.0 vs 85.1, p=0.471). The
+      standard deviations 1.4 and 1.3, the subgroup sizes 19 and 15, the
+      >=70% proficiency criterion and p=0.336 appear nowhere in the corpus.
+
+      That mattered more than a wrong reference. The SD of 1.3-1.4 was the
+      load-bearing number: it justified calling this a convergence norm,
+      it produced the "+/-3 SD is 155.5-163.7" argument, and that argument
+      justified the ideal band the player is scored against. A band was
+      being defended with a dispersion figure we do not hold.
+
+      WHAT THE CORPUS ACTUALLY SUPPORTS (A3, n=24, three-point):
+          proficient       159.3 deg
+          non-proficient   158.8 deg     p=0.228 (n.s.)
 
       Two things follow, and they must not be confused.
 
       1. The value is a CONVERGENCE NORM, not a proficiency discriminator.
-         An SD of 1.3-1.4 deg across 34 shooters is extremely tight: everyone
-         releases near 160 deg. But the two groups are indistinguishable
-         (p=0.336 at the preparatory phase; the release means differ by
-         0.2 deg), so a player matching 160 deg has a NORMAL release, not a
-         good one. The rule may say "this is where the ball should leave";
-         it may NOT say "this is why you make shots".
+         The two groups are indistinguishable (p=0.228; the means differ by
+         0.5 deg), so a player reaching ~159 deg has a NORMAL release, not a
+         good one. The rule may say "this is roughly where the ball leaves";
+         it may NOT say "this is why you make shots". And SOURCES.md warns
+         that a non-significant result at n=24 from one lab is evidence of
+         low power, not of equivalence.
 
-      2. The literature band is far tighter than we can measure. +/-3 SD is
-         roughly 155.5-163.7 deg. We do not reproduce 1.4 deg precision:
+      2. THE BAND IS OURS. With no published dispersion in the corpus there
+         is no literature interval to narrow toward, so 142-180 and 152-168
+         are an ENGINEERING DECISION centred on A3's ~159 deg. We could not
+         reproduce a tight band in any case:
          release is located to within one frame at 24-30 fps, and
          single-camera elbow error is around 17 deg RMSD in a
          basketball-throwing validation. The ideal band is therefore
@@ -273,30 +659,71 @@ rules:
       Also note 180 deg is NOT the target. Full lockout is outside the norm
       in both groups, which is why message_high exists.
 
-      resources.md A3, D4; Cabarkapa et al. 2023 (PMC10436204).
+      DO NOT NARROW THE IDEAL BAND. Measured since: MediaPipe's own full and
+      heavy models, on the same frames of salah_video.mp4, disagree about the
+      elbow by a mean of 11.5 deg (median 9.2, p90 23.8) and differ by more
+      than 10 deg on 46% of frames. That is a LOWER bound on our error, and it
+      does not improve on high-confidence frames -- restricted to landmarks
+      scoring visibility > 0.9 it rises slightly, to 11.6 deg and 52%.
+
+      The ideal band 152-168 has a half-width of 8 deg, roughly the size of
+      that uncertainty. Consequence, stated plainly so it is not rediscovered
+      as a bug: the EXCELLENT-versus-GOOD split on this rule is a WEAK signal.
+      A player truly at 160 can measure anywhere from about 148 to 172. The
+      outer band (142-180, 38 deg wide) is comfortably clear of the noise, so
+      the NEEDS WORK verdict remains trustworthy -- it is only the inner
+      distinction that is soft.
+
+      The band is kept wide on purpose. Tightening it toward the published
+      SD of 1.4 deg would make the rule look precise while making it less
+      true. Re-measure with scripts/measure_angle_uncertainty.py before
+      revisiting. docs/LIMITS.md carries the full table.
+
+      SOURCES.md A3 (Cabarkapa et al. 2026, PMC-pending), D4.
 
   index_alignment_release:
     name: "Finger Direction"
     metric: index_align
     phases: [release]
+    aggregate: max          # the straightest finger line the release reached
     min: 148
     max: 180
     ideal_min: 160
     ideal_max: 180
-    severity: warning
-    scored: true
-    message_excellent: "The ball comes off your fingertips clean."
-    refine_low: "Good release. Push a little further through the fingertips to add backspin."
-    message_low: "Snap your wrist down through the ball at release. Right now it's coming off a flat hand."
+    severity: info
+    scored: false          # measured and displayed, never scored
+    message_excellent: "Fingertip direction, for reference — this one isn't scored."
+    refine_low: "Fingertip direction, for reference — this one isn't scored."
+    message_low: "Fingertip direction, for reference — this one isn't scored."
     evidence: >
-      ENGINEERING DECISION. No published norm for an elbow-wrist-index
-      alignment angle was found; this is a Swichy-defined proxy for a clean
-      fingertip release. Thresholds are ours.
+      NOT SUPPORTED FOR SCORING — withdrawn from the score on MEASUREMENT
+      grounds, exactly as shoulder_alignment_lift was.
+
+      It was never more than an ENGINEERING DECISION: no published norm for an
+      elbow-wrist-index alignment angle exists, and this is a Swichy-defined
+      proxy for a clean fingertip release. What has changed is that its
+      reliability is now measured rather than assumed.
+
+      MediaPipe's full and heavy models, on the same 448 frames of
+      salah_video.mp4, disagree about this angle by a mean of 39.2 deg
+      (median 41.3, p90 62.0) and differ by more than 10 deg on 92.4% of
+      frames. The ideal band is 20 deg wide. The uncertainty is TWICE the
+      entire band, so every tier boundary sits well inside the noise.
+
+      The cause is not mysterious: the index landmark is the least reliable
+      point used anywhere in this project (visibility p10 = 0.58 on the same
+      footage), and the angle is built from a short elbow-wrist-index chain
+      where a small positional error becomes a large angular one.
+
+      Kept and displayed because a fingertip release is real coaching and the
+      number is worth showing. Scoring it would penalise players for our
+      measurement. scripts/measure_angle_uncertainty.py; docs/LIMITS.md.
 
   release_height:
     name: "Release Height"
     metric: release_height
     phases: [release]
+    aggregate: max          # the highest point the ball was let go from
     min: 0.06
     max: 0.62
     ideal_min: 0.16
@@ -310,46 +737,161 @@ rules:
     message_low: "You're letting it go too early, low in the motion. Release at the top of your rise, not on the way up."
     message_high: "You're over-reaching at release and losing control. Let it go a touch earlier."
     evidence: >
-      SUPPORTED WITH LIMITATIONS. Release height was the only variable that
-      separated proficient from non-proficient free-throw shooters (p=0.010),
-      while release ANGLE did not (p=0.179); independently replicated. This
-      metric is measured relative to the head, so it is scale-free and works
-      without a recorded player height. resources.md A2, A6.
+      DIRECTION supported from a single laboratory; THE THRESHOLDS ARE AN
+      ENGINEERING DECISION with no counterpart in any cited source.
+
+      "INDEPENDENTLY REPLICATED" WAS WRONG AND IS WITHDRAWN. This block used to
+      claim it. SOURCES.md Part G #2 states the opposite, verbatim:
+
+          "No independent replication of the Cabarkapa group's shooting
+           kinematics exists. Single-lab dependency is the largest credibility
+           risk in this corpus."
+
+      docs/LIMITS.md records the same thing. The proficiency finding behind this
+      rule — release height separated proficient from non-proficient free-throw
+      shooters (p=0.010) while release ANGLE did not (p=0.179) — is A2 alone,
+      n=34, recreationally active males, one lab, one proprietary 3D system.
+      A6 is a different group and also found release height higher on successful
+      shots, but it measures MADE versus MISSED attempts within shooters, not
+      proficient versus non-proficient shooters, and it reports R-squared of
+      0.005-0.012 between biomechanical parameters and accuracy. It supports the
+      direction; it does not replicate the finding.
+
+      THE NUMBERS IN THIS RULE ARE NOT FROM ANY SOURCE. 0.06 / 0.16 / 0.46 /
+      0.62 m are measured HEAD-RELATIVE — the ball's release point relative to
+      the player's head — and no source in the corpus reports that quantity in
+      any form. A2 reports release height only as a RATIO OF BODY HEIGHT (1.12
+      non-proficient vs 1.17 proficient). A6 and A8 report absolute height above
+      the floor (2.02-2.13 m; 2.46 down to 2.33 m with distance). There is no
+      published interval to narrow toward here and no conversion between those
+      units and ours, so the band is ours, chosen to span what this pipeline
+      measures.
+
+      The head-relative construction is deliberate and is the rule's one real
+      advantage: it is scale-free, so it works without a recorded player height.
+      `release_height_ratio` carries the body-height comparison that the
+      literature actually supports, and is skipped when no height is given.
+
+      A group mean is also not an individual cutoff. A2 says two groups of
+      recreational adults differed on average by 0.05 body heights. It does not
+      say a player crossing a line shoots worse.
+
+      SOURCES.md A2, A6, Part G #2; docs/LIMITS.md.
 
   release_height_ratio:
     name: "Release Height (relative to your height)"
     metric: release_height_ratio
     phases: [release]
+    aggregate: max
     min: 1.02
     max: 1.58
     ideal_min: 1.14
     ideal_max: 1.46
     unit: ""
     severity: info
-    scored: true
-    message_excellent: "Strong release height for your build."
-    refine_low: "Good release height for your build. A little more lift would steepen the arc further."
-    refine_high: "Your release is high for your build. Keep it repeatable rather than pushing higher."
-    message_low: "Your release is low for your height. Let it go at the top of your rise to get more arc."
-    message_high: "That release reads unusually high for your height — check your whole body is in frame."
+    scored: false          # measured and displayed, never scored — see below
+    message_excellent: "Release height relative to your build, for reference — this one isn't scored."
+    refine_low: "Release height relative to your build, for reference — this one isn't scored."
+    refine_high: "Release height relative to your build, for reference — this one isn't scored."
+    message_low: "Release height relative to your build, for reference — this one isn't scored."
+    message_high: "Release height relative to your build, for reference — this one isn't scored."
     evidence: >
-      SUPPORTED WITH LIMITATIONS. Published release heights are reported ONLY
-      as a ratio of body height (1.12 non-proficient vs 1.17 proficient,
-      p=0.010), which is why this rule exists alongside the head-relative one.
+      NOT SUPPORTED FOR SCORING — withdrawn on MEASUREMENT grounds, exactly as
+      shoulder_alignment_lift and index_alignment_release were. The direction
+      below is unchanged and still supported; what is withdrawn is the claim
+      that THIS pipeline measures it well enough to penalise anyone for it.
+
+      IT FAILED 15 OF 15 ATTEMPTS. Measured across every clip in the corpus —
+      salah_video.mp4 (5 shots), video8 (10 shots), video9 (1 shot):
+
+          observed  0.65 .. 0.97      band starts at 1.02
+          failures  15/15 = 100%
+
+      A rule that no observed human has ever passed is not measuring the
+      player. Compare release_height, the head-relative sibling, on the same
+      frames: 0 failures in 15, observed 0.13-0.28 m inside a 0.06-0.62 band.
+      Same concept, same footage, opposite verdict — so the discrepancy is in
+      this metric, not in the shooting.
+
+      WHY IT READS LOW, STRUCTURALLY. The subtraction behind it is NOT
+      same-frame: `wrist_y` is this frame's hip-relative wrist, while
+      `ankle_baseline_y` was averaged while the player stood still before the
+      shot. In hip-centred world coordinates the origin therefore does not
+      cancel, because the hip itself moved between the two moments.
+      `analysis/engine.py` adds `body_rise_ratio` back to restore the missing
+      elevation term, and even so the result lands a full 0.05-0.37 below the
+      published floor. The correction is not sufficient, and the reason it is
+      needed at all is that the quantity is assembled from two different
+      instants in a coordinate frame that is blind to whole-body translation.
+
+      IT ALSO PENALISED HONESTY. This was the ONLY height-dependent scored
+      rule, so entering a height could only ever lower a score:
+
+          salah_video  height=None   92, 90, 79, 85, 83
+          salah_video  height=185    85, 83, 73, 79, 77
+
+      Six to seven points on every shot, for supplying correct information.
+      A player who told us the truth about themselves was scored worse than
+      one who left the field blank, which inverts the incentive the height
+      field exists to create.
+
+      THE CONCEPT IS NOT LOST. `release_height` carries the same coaching idea
+      head-relative, same-frame, scale-free, needs no entered height, and
+      passes on real footage. Nothing the player is told changes by withdrawing
+      this rule from the score; it is still measured and still displayed.
+
+      TO RESTORE IT, the ratio must be rebuilt in IMAGE space against the
+      player's own on-screen height, the way `wrist_height_ratio` and
+      `body_rise_ratio` already are, and the band re-derived from what that
+      produces. Do not simply widen the band downward to fit: 1.02-1.58 is
+      centred on A2's published means, and moving it to admit values a broken
+      subtraction happens to emit would keep the citation while discarding what
+      it says. scripts/ phase audit, 15 shots across 9 videos.
+
+      ---- the original evidence, unchanged, for whenever it is rebuilt ----
+
+      DIRECTION supported from a single laboratory; THE BAND IS AN ENGINEERING
+      DECISION.
+
+      The Cabarkapa group reports release height ONLY as a ratio of body
+      height, never as raw metres — A2 gives 1.12 non-proficient vs 1.17
+      proficient, p=0.010 — and that consistent precedent across four of its
+      papers is why this rule exists alongside the head-relative one.
+      SOURCES.md B2 classes the normalisation itself SUPPORTED WITH
+      LIMITATIONS, on the explicit ground that all four papers come from one
+      group with no independent replication (Part G #2). Other groups report
+      release height in absolute metres (A6 2.02-2.13 m; A8 2.46 down to
+      2.33 m with distance), which is not comparable across players and is not
+      what this rule measures.
+
+      THE BAND IS OURS. 1.02-1.58 and 1.14-1.46 are centred on A2's two group
+      means, which differ by 0.05 body heights. No published dispersion for
+      this ratio is recorded in the corpus, so there was no interval to narrow
+      toward, and a two-group mean difference is not an individual cutoff in
+      any case.
+
       SKIPPED ENTIRELY when no player height is provided — never estimated
-      from the camera. resources.md A2, B2, B3.
+      from the camera. SOURCES.md A2, A6, A8, B2, B3, Part G #2.
+
+      The head-relative construction in `release_height` is what makes that
+      rule scale-free; this one is the version the literature actually reports,
+      and it is the one that needs a height. That trade is why both exist.
 
   # --------------------------------------------------------- follow-through
   follow_through_elbow:
     name: "Follow-Through"
     metric: elbow
     phases: [follow_through]
+    # max: the finish is a HELD position. Scoring its worst frame scores the
+    # arm on its way back down, which every shot does and no rule intends.
+    aggregate: max
+    max_rate: 2000          # deg/s, physical ceiling; see scorer._despike
     min: 145
     max: 180
     ideal_min: 155
     ideal_max: 180
     severity: warning
-    scored: true
+    scored: false          # redundant with release -- see evidence
     message_excellent: "You hold the finish well after the ball's gone."
     refine_low: "Good finish. Hold the reach toward the rim a moment longer."
     message_low: "Keep your elbow up after the ball leaves. It drops straight away — hold the reach toward the rim until the ball gets there."
@@ -357,52 +899,164 @@ rules:
       ENGINEERING DECISION. Holding the follow-through is standard coaching
       practice; no published angular threshold was found. Thresholds are ours.
 
+  follow_through_hold:
+    name: "Holding the Finish"
+    metric: hold_duration          # SHOT-LEVEL: see scorer._hold_rule
+    phases: [follow_through]
+    min: 0.25
+    ideal_min: 0.50
+    unit: "s"
+    severity: warning
+    scored: true
+    message_excellent: "You hold the finish while the ball is in the air. That is exactly it."
+    refine_low: "Good finish. Keep the hand up there until the ball reaches the rim."
+    message_low: "The arm comes down as soon as the ball goes. Leave it up and pointed at the rim until the shot lands."
+    evidence: >
+      ENGINEERING DECISION, and it replaces a rule that was measuring the wrong
+      thing. No published threshold for follow-through duration was found; the
+      numbers are ours.
+
+      WHY THIS EXISTS: THE ELBOW RULE WAS A DUPLICATE. `follow_through_elbow`
+      and `elbow_extension_release` are the same metric with the same
+      aggregation in adjacent windows, and once `release` widened to cover the
+      real extension they became the same measurement. Measured across 45
+      shots:
+
+          release   p25 147.0   median 152.3   p75 157.0   max 178.9
+          follow    p25 143.7   median 151.9   p75 160.3   max 178.8
+          decay     p25  -9.9   median   2.3   p75   6.9
+
+      A median decay of 2.3 deg, distributed symmetrically about zero with a
+      NEGATIVE lower quartile. The two distributions are indistinguishable, so
+      scoring both counted the elbow twice in the overall score and told the
+      player nothing new the second time.
+
+      An earlier note in this file guessed the opposite -- that the widened
+      release had left `follow_through_elbow` measuring the hold at last, and
+      that its rising failure rate was a real finding about players dropping
+      their arms. The measurement above refutes that. It is recorded because
+      the guess was reasonable and wrong, and the only reason it did not become
+      a band change is that it was measured first.
+
+      WHAT THE PHASE ACTUALLY CONTAINS THAT NOTHING ELSE DOES: duration.
+      Observed hold across the same shots runs 0.03 s to 1.17 s -- a factor of
+      forty between a player who holds the finish and one who drops it at
+      release. That spread was sitting unscored while the angle was scored
+      twice.
+
+      THE NUMBERS ARE OURS AND ARE NOT DERIVED FROM THE OBSERVED SPREAD.
+      0.25 s is roughly the point below which the arm is falling at release
+      rather than being held at all. 0.50 s is the coached behaviour -- hold
+      until the ball is well on its way. Deliberately NOT fitted to our
+      distribution's quartiles, because a band drawn through the sample would
+      simply relabel whatever these particular shooters happen to do.
+
+      HOW IT IS MEASURED, and why it is not an ordinary rule. The engine
+      evaluates one frame at a time and has no way to know when the release
+      happened, so this cannot be a per-frame metric. It comes from
+      `feedback.phase_refiner.hold_duration_s`, which measures the arm directly
+      -- from the shooting event until the hand falls back below the shoulder,
+      across every captured frame regardless of phase label -- and is injected
+      into this phase by `feedback.scorer`. It deliberately ignores the
+      `follow_through` phase boundaries: that phase is pinned to
+      `min_follow_through_s` at one end and to the landing at the other, and on
+      salah_video it was exactly 5 frames on all five shots, which makes it
+      useless as a witness for the thing it is named after.
+
+      NOT OBSERVED IS NOT ZERO. When the hand never comes back down inside the
+      clip, `hold_duration_s` returns None and this rule is skipped rather than
+      scored -- a recording that stopped early must not be read as a perfect
+      follow-through, nor as a dropped one.
+
   follow_through_index:
     name: "Finish Position"
     metric: index_align
     phases: [follow_through]
+    aggregate: max          # the held finish, as above
     min: 150
     max: 180
     ideal_min: 162
     ideal_max: 180
-    severity: warning
-    scored: true
-    message_excellent: "Your hand finishes pointing into the rim. That's it — hold it there."
-    refine_low: "Good finish. Let the fingers relax further down toward the floor."
-    message_low: "Your wrist stops flat after release. Finish with your fingers pointing down into the front of the rim, and hold it a second."
+    severity: info
+    scored: false          # measured and displayed, never scored
+    message_excellent: "Finish position, for reference — this one isn't scored."
+    refine_low: "Finish position, for reference — this one isn't scored."
+    message_low: "Finish position, for reference — this one isn't scored."
     evidence: >
-      ENGINEERING DECISION. Same basis as follow_through_elbow. Thresholds are ours.
+      NOT SUPPORTED FOR SCORING. Same metric as index_alignment_release and
+      withdrawn from the score for the same measured reason: 39.2 deg mean
+      model disagreement against an 18 deg ideal band.
+
+      follow_through_elbow remains SCORED. The two are not equivalent: the
+      elbow angle carries 11.5 deg of uncertainty against a 25 deg band, which
+      is tight but usable, while the finger line carries 39 deg against 18.
+      Same phase, same footage, different verdict, because the measurement
+      quality is different -- not because the coaching idea is.
 
   # ---------------------------------------------------------------- landing
   landing_balance:
     name: "Landing"
-    metric: ankle_rise
+    metric: landing_settle
     phases: [landing]
-    min: -0.06
-    max: 0.06
-    ideal_min: -0.03
-    ideal_max: 0.03
-    unit: "m"
+    # min: the LOWEST the body got. That is the question -- did you come back
+    # down, and how far did you absorb? `worst` cannot ask it: a landing phase
+    # opens while the player is still descending, so its early frames are
+    # legitimately high, and the worst of them would penalise every genuine
+    # jump shot for the part of the landing that is still a fall.
+    aggregate: min
+    min: -0.10
+    max: 0.02
+    unit: ""
     severity: info
     scored: true
     message_excellent: "You land settled, with your legs back under you."
-    refine_low: "Settled landing. Let the knees absorb a little more on the way down."
-    refine_high: "Settled landing. Let the knees absorb a little more on the way down."
-    message_low: "You're still sinking when the shot ends. Absorb the landing and come back to a balanced stance."
-    message_high: "You land stiff, without absorbing. Let the knees give a little as you come down."
+    message_low: "You're sinking a long way past your stance on the landing. Absorb it and come back to a balanced position."
+    message_high: "You finish the shot without settling back onto the floor. Come down under control and find your stance again."
     evidence: >
-      ENGINEERING DECISION. Thresholds are ours; no published value was found.
+      ENGINEERING DECISION, but with a PRINCIPLED ZERO. Thresholds are ours;
+      no published value was found.
 
-      CORRECTED CLAIM: this rule previously said "you're drifting on the
-      landing — land where you took off". That is a HORIZONTAL claim, but the
-      metric `ankle_rise` is VERTICAL (ankle height minus standing baseline),
-      so the message described something the rule never measured. The wording
-      now matches the measurement.
+      THE METRIC WAS REPLACED, NOT RETUNED. It was `ankle_rise`, computed from
+      hip-centred world landmarks where the hip IS the origin -- so it could
+      not see the body return to the floor at all. What it actually tracked was
+      the hip-to-ankle distance changing, i.e. the legs folding, which it then
+      reported as a balance fault. `phase_detection/features.py` states the
+      general form of this in its own comment: "whole-body vertical motion is
+      measured in image space (`body_rise_ratio`), because hip-centred world
+      coordinates are blind to it."
 
-      KNOWN LIMITATION: `ankle_rise` is computed from hip-centred world
-      landmarks, where it tracks leg extension rather than the body's height
-      above the floor. It is a weak proxy for "settled". Measuring genuine
-      take-off-to-landing drift needs the horizontal image-space signal
-      (`hip_x_ratio`) compared across the jump and landing phases, which the
-      per-frame rule engine cannot express today. Severity is `info` partly
-      for this reason.
+      MEASURED CONSEQUENCE. Across 18 shots the old metric read -0.246 to
+      +0.045 with no relation to shot type, and failed 11 of 13 attempts
+      outside salah_video while failing only 1 of 5 inside it. Same rule, same
+      band, two unrelated distributions -- the rule was measuring the framing,
+      not the player.
+
+      WHY THE NEW ZERO IS NOT A CHOICE. `body_rise_ratio` is measured against
+      the player's own stance in the seconds before this attempt, so "back
+      where you started" is 0 by construction. The band does not have to be
+      fitted to a sample; only its WIDTH does, and that width is a measurement
+      of our own noise: the set shots never left the floor and must therefore
+      read exactly 0, and they read -0.009 to +0.034. That is the instrument's
+      spread, and the bounds sit outside it.
+
+      THE BOUNDS ARE ASYMMETRIC ON PURPOSE. Sinking below the stance is
+      absorption, which is normal and coached for, so the lower bound is
+      generous at -0.10. Staying ABOVE the stance means the player never came
+      back down, so the upper bound is tight at +0.02, just outside the noise.
+
+      NO IDEAL SUB-BAND. Declaring one would invent a gradation between
+      "settled" and "very settled" that the measurement cannot support at this
+      resolution. Inside the band is the target; see the note at the top of
+      this file on how a rule with no ideal band is classified.
+
+      RESULT ON THE SAME 18 SHOTS: one failure, `video8_shot10_jump`, whose
+      landing frames read +0.048 rising to +0.064 -- the clip ends before the
+      player is back on the floor. That is a true statement about the footage.
+      Whether a truncated clip should cost a score is a separate question,
+      tracked with the capture notes, not with this rule.
+
+      STILL NOT MEASURED: horizontal drift, "did you land where you took off".
+      That needs `hip_x_ratio` compared across the jump and landing phases,
+      which the per-frame rule engine cannot express. Observed drift ranged
+      0.008-0.180 body heights over the same shots, so there is a real signal
+      there for whenever the engine can carry cross-phase state.

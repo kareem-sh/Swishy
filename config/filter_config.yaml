@@ -1,6 +1,51 @@
-# One Euro Filter parameters
-# Tuned for real-time basketball pose estimation (30 FPS)
+# One Euro filter parameters, applied to WORLD landmarks (metres).
+#
+# The filter's adaptive cutoff is:
+#
+#     cutoff = min_cutoff + beta * |speed|
+#
+# so `beta` is only meaningful RELATIVE TO THE UNITS OF `speed`. That is the
+# whole reason these numbers changed, and why the old ones looked reasonable
+# while doing nothing.
+#
+# ---------------------------------------------------------------------------
+# WHY beta IS NOT 0.007 ANY MORE
+# ---------------------------------------------------------------------------
+# 0.007 is the value quoted for PIXEL-space signals, where speeds run to
+# hundreds of units per second. These landmarks are in METRES, where a fast
+# wrist reaches about 3 m/s. At beta=0.007 that adds
+#
+#     0.007 * 3 = 0.021 Hz
+#
+# to a 1.0 Hz cutoff -- a two percent change. The filter never adapted. It
+# behaved as a fixed 1 Hz low-pass through the entire shot, including the
+# release, which is the fastest and most heavily scored moment in it.
+#
+# Measured cost of that, as mean |filtered - unfiltered| on frames where the
+# joint moves faster than 200 deg/s, over three videos:
+#
+#     beta    elbow lag        knee lag         jitter at rest (elbow)
+#     0.007   13.7 19.4 8.4    14.9 15.3 8.0    0.83 1.78 0.21
+#     3.0      8.8  9.8 6.5     9.8 10.0 7.0    0.75 0.94 0.21
+#     10.0     5.9  6.0 4.7     6.2  6.5 5.3    0.74 1.48 0.21
+#     30.0     3.6  3.5 2.6     3.7  3.5 3.3    0.99 2.15 0.21
+#
+# Lag more than halves; jitter at rest barely moves, because at rest the speed
+# term is near zero and `min_cutoff` alone governs -- that is precisely what
+# One Euro is designed to do. So the usual smoothing-versus-lag trade barely
+# applies here: the old value was paying the lag without buying the smoothing.
+#
+# 10.0 rather than 30.0: at 30 the jitter on video8 starts to climb (1.78 ->
+# 2.15) for a further gain of only ~2 deg. 10.0 sits at the knee of the curve.
+#
+# For context, the irreducible error underneath all of this is larger still:
+# MediaPipe's own full and heavy models disagree with each other by a mean of
+# 11.5 deg on the elbow. Fixing beta removes error WE add; it does not make the
+# angles precise. See docs/LIMITS.md.
+#
+# Re-measure with scripts/measure_angle_uncertainty.py before changing again,
+# and record scores with scripts/filter_baseline.py either side of the change.
 
-min_cutoff: 1.0    # Baseline smoothing when subject is still
-beta: 0.007        # Responsiveness during fast motion (release, jump)
-d_cutoff: 1.0      # Derivative smoothing cutoff
+min_cutoff: 1.0    # governs smoothing when the player is nearly still
+beta: 10.0         # governs responsiveness during fast motion; metre-scale
+d_cutoff: 1.0      # derivative smoothing cutoff

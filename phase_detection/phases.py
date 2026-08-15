@@ -60,9 +60,20 @@ PHASE_LABELS: Dict[str, str] = {
     **{p: _ANALYSIS_LABELS.get(p, p.replace("_", " ").title()) for p in PHASE_ORDER},
 }
 
-# Analysis phases excluding the resting one -- the parts of the motion that
-# carry coaching rules.
-ACTIVE_PHASES = frozenset(PHASE_ORDER[1:]) if PHASE_ORDER else frozenset()
+# Analysis phases that carry coaching rules.
+#
+# Derived from biomechanics.yaml, NOT from position in the list. This was
+# `PHASE_ORDER[1:]`, which happened to be right only while the first entry was
+# the rule-less `ready_stance`: removing that entry would have silently started
+# excluding `loading` -- the phase carrying the knee and hip rules -- with
+# nothing to raise. A positional assumption about a config-driven list is a
+# trap for whoever edits the config next.
+_RULE_PHASES = {
+    phase
+    for rule in ((load_yaml("biomechanics.yaml") or {}).get("rules", {}) or {}).values()
+    for phase in (rule.get("phases") or [])
+}
+ACTIVE_PHASES = frozenset(p for p in PHASE_ORDER if p in _RULE_PHASES)
 
 
 def phase_index(phase: str) -> int:

@@ -75,11 +75,18 @@ class AnalysisRun:
     video: Path
     fps: float
     shots: List[ShotSummary] = field(default_factory=list)
+    # Playback data, present only when the caller asked to keep it.
+    landmarks: Optional[list] = None
+    overlay: dict = field(default_factory=dict)
     pose_share: float = 0.0
     discarded_candidates: int = 0
     frames_read: int = 0
     rejection: Optional[RejectionReason] = None
     rejection_detail: str = ""
+    # Why segmentation found nothing, when it found nothing. See
+    # shots.segmenter.explain_absence -- "no shot found" alone tells the person
+    # filming nothing about what to change.
+    no_shot_reason: Optional[str] = None
 
     @property
     def is_rejected(self) -> bool:
@@ -137,14 +144,23 @@ def _decode_and_analyse(video_path, fps, pipe, progress):
             )
             if result.has_pose:
                 pose_frames += 1
-            if result.shot_summary is not None:
-                shots.append(result.shot_summary)
             index += 1
             if progress is not None:
-                progress.advance(
-                    note=f"{len(shots)} shot(s) found" if shots else ""
-                )
+                progress.advance(note="reading")
         cap.release()
+
+    # Segmentation happens HERE, once, with the whole video decoded -- not
+    # frame by frame on the way past.
+    #
+    # A shot is a shape in time: the hand rises out of a stance and comes back
+    # down. Deciding at frame 400 whether frame 400 is part of one means
+    # guessing at what frames 401-460 will do, and every timeout, hysteresis
+    # window and latch in the old detector existed to cover that guess. None of
+    # them is needed once the file has been read, because it has all already
+    # happened.
+    shots = pipe.segment_offline()
+    if progress is not None:
+        progress.advance(note=f"{len(shots)} shot(s) found")
     return shots, pose_frames, index
 
 
@@ -155,6 +171,7 @@ def analyze_video(
     on_start: Optional[Callable[[VideoMetadata, PlayerProfile], None]] = None,
     progress_factory: Optional[Callable[[VideoMetadata], ProgressReporter]] = None,
     enable_ball: Optional[bool] = None,
+    keep_landmarks: bool = False,
 ) -> AnalysisRun:
     """Run one video through the real pipeline and return what was found.
 
@@ -194,15 +211,17 @@ def analyze_video(
     fps = meta.fps
     pipe = ShotAnalysisPipeline(enable_ball=enable_ball, player=profile)
     pipe.set_fps(fps)
+    # Uploading a file is an offline task, so it is analysed as one.
+    pipe.enable_offline_segmentation(keep_landmarks=keep_landmarks)
 
     progress = progress_factory(meta) if progress_factory is not None else None
     shots, pose_frames, index = _decode_and_analyse(video_path, fps, pipe, progress)
     if progress is not None:
         progress.finish(f"Analysed {index} frames in {progress.elapsed_s:.0f}s.")
 
-    trailing = pipe.finalize_session()
-    if trailing is not None:
-        shots.append(trailing)
+    # No `finalize_session()` here. That exists to close an attempt the live
+    # detector still had open when the video ended -- a problem that cannot
+    # arise when segmentation runs after the last frame is already read.
 
     pose_share = pose_frames / max(index, 1)
     run = AnalysisRun(
@@ -212,7 +231,11 @@ def analyze_video(
         pose_share=pose_share,
         discarded_candidates=pipe.shot_tracker.discarded_candidates,
         frames_read=index,
+        no_shot_reason=getattr(pipe, "_no_shot_reason", None),
     )
+    # Carried so a viewer can redraw without paying for pose detection again.
+    run.landmarks = pipe.offline_landmarks
+    run.overlay = pipe.offline_overlay
 
     # No person in frame => this is not footage of someone shooting.
     if pose_share < MIN_POSE_FRAME_SHARE:
@@ -223,7 +246,10 @@ def analyze_video(
         )
     elif not shots:
         run.rejection = RejectionReason.NO_SHOOTING_EVENT
-        run.rejection_detail = (
+        # Prefer the measured cause. The candidate count is a statistic about
+        # our own search; the reason says what to do differently, and on the
+        # offline path the count is usually 0, which explains nothing at all.
+        run.rejection_detail = run.no_shot_reason or (
             f"{run.discarded_candidates} candidate movement(s) were examined "
             "and none contained a release."
         )
@@ -276,9 +302,11 @@ def _print_phase_notes(ph) -> None:
     reported once under "Through the Whole Shot". Printing an empty heading
     for such a phase just looks broken.
     """
-    if not (ph.strengths or ph.refinements or ph.fixes or ph.measured):
+    if not (ph.strengths or ph.refinements or ph.fixes or ph.measured
+            or ph.unmeasured_reason):
         return
-    print(f"\n  --- {ph.label}  ({ph.score}/100) ---")
+    header = f"{ph.score}/100" if ph.score is not None else "not scored"
+    print(f"\n  --- {ph.label}  ({header}) ---")
     for msg in ph.strengths:
         print(f"    [ON TARGET] {msg}")
     for msg in ph.refinements:
@@ -286,9 +314,33 @@ def _print_phase_notes(ph) -> None:
     for msg in ph.fixes:
         print(f"    [CHANGE]    {msg}")
     for rule in ph.measured:
-        value = rule.measured_value
-        shown = f"{value:.1f}{rule.unit}" if value is not None else "n/a"
-        print(f"    [MEASURED]  {rule.name}: {shown} (not scored)")
+        print(f"    [MEASURED]  {rule.name}: {_format_measured(rule)} (not scored)")
+    if ph.unmeasured_reason:
+        # The player did this phase. We could not measure it. Saying so, and
+        # saying it is the recording, is the only honest report -- a blank
+        # reads as "nothing happened here", which is a different and untrue
+        # statement about their shot.
+        print(f"    [FILMING]   {ph.unmeasured_reason}")
+
+
+# Angles are printed as whole degrees, not to one decimal.
+#
+# A tenth of a degree is a claim we cannot support. MediaPipe's own full and
+# heavy models disagree about the elbow by 11.5 deg on average and about the
+# finger line by 39 deg (scripts/measure_angle_uncertainty.py), so "157.3" and
+# "157" are equally true and only one of them looks honest. False precision in
+# a coaching report is worse than a rounded number: it invites the player to
+# chase a change smaller than the instrument can see.
+#
+# Distances keep two decimals -- they are metres, where 0.01 is a centimetre
+# and genuinely resolvable.
+def _format_measured(rule) -> str:
+    value = rule.measured_value
+    if value is None:
+        return "n/a"
+    if rule.unit in ("", None, "deg"):
+        return f"{value:.0f}{rule.unit or ''}"
+    return f"{value:.2f}{rule.unit}"
 
 
 def _print_next_steps(summary: ShotSummary) -> None:
@@ -322,11 +374,31 @@ def print_shot(summary: ShotSummary) -> None:
     print(f"  {'Phase':<22} {'Score':>5}  {'':<20}  Grade")
     print(f"  {'-' * 22} {'-' * 5}  {'-' * 20}  {'-' * 11}")
     for ph in summary.phase_scores:
+        if ph.score is None:
+            # Nothing scoreable in this phase. Printing 0 would read as a
+            # failed phase, which is a different and untrue statement.
+            #
+            # The two blanks are not the same and the grade column says which:
+            # "not filmed clearly" means the player DID this and the recording
+            # is why it carries no mark; "not applicable" means there was
+            # nothing here to assess, which is the honest description of the
+            # flight phase of a shot taken with both feet on the floor.
+            note = "not filmed clearly" if ph.unmeasured_reason else "not applicable"
+            print(f"  {ph.label:<22}    --  {'-' * 20}  {note}")
+            continue
         print(f"  {ph.label:<22} {ph.score:>3}/100  {_bar(ph.score)}  {ph.grade}")
 
     print("\n  NOTES BY PHASE")
     for ph in summary.phase_scores:
         _print_phase_notes(ph)
+
+    # Shown, never scored. There is no published norm for how long a
+    # follow-through should be held, and inventing a threshold here would
+    # repeat the mistake this measurement exists to correct.
+    if summary.hold_duration_s is not None:
+        print(f"\n    [MEASURED]  Finish held: {summary.hold_duration_s:.2f}s "
+              "after release (not scored)")
+
     _print_next_steps(summary)
 
     if summary.capture_note:

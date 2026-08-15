@@ -52,9 +52,19 @@ from phase_detection.phases import PHASE_LABELS
 from player.profile import PlayerProfile, load_player_profile
 from pose.landmarks import extract_all_landmarks
 from pose.visibility import VisibilityGate
+from feedback.phase_refiner import hold_duration_s, refine_phases
+from shots.segmenter import explain_absence, segment
 from utils.config_loader import load_yaml
 from utils.frame_buffer import FrameBuffer, FrameSnapshot
 from visualization.hud_display import HudDisplay, HudDisplaySmoother
+
+
+# How rarely a wrist may be trackable before that side is ruled out as the
+# shooting arm entirely. Measured on salah_video, where the player is filmed
+# from his right: the left wrist was reliable on 0 of 45 frames in every shot
+# while the right was reliable on 45 of 45, i.e. a ratio of 0. Anything below
+# this is not a weaker candidate, it is not a candidate.
+SIDE_VISIBILITY_RATIO = 0.15
 
 
 @dataclass
@@ -171,6 +181,19 @@ class ShotAnalysisPipeline:
         self._biomechanics = BiomechanicsEngine(self._player)
         self._shot_tracker = ShotTracker()
         self._frame_buffer = FrameBuffer(max_frames=FRAME_BUFFER_SIZE)
+        # Offline segmentation needs the whole video, not the rolling window
+        # the live path uses. Kept as a plain list, and only when a caller has
+        # asked for it, so a live session never grows without bound.
+        self._offline_history: Optional[List[FrameSnapshot]] = None
+        # Normalised (x, y) for every pose landmark, per frame, kept only when
+        # playback was asked for. Enough to redraw the skeleton in a second
+        # pass without paying for pose detection twice.
+        self._offline_landmarks: Optional[List[Optional[List[Tuple[float, float]]]]] = None
+        # frame index -> (shot number, final phase label, score). Filled by
+        # `segment_offline`, which is the first moment any of it is known.
+        self._offline_overlay: Dict[int, Tuple[int, str, Optional[int]]] = {}
+        # Set by segment_offline when it finds nothing; see explain_absence.
+        self._no_shot_reason: Optional[str] = None
         # The tracker opens shots BACKWARDS from a detected release, so it needs
         # the recent past, and it re-scores the captured frames against the
         # refined coaching phases, so it needs this engine rather than one of
@@ -188,6 +211,10 @@ class ShotAnalysisPipeline:
             )
         )
         self._resolved_side = "right"
+        # Evidence for which arm shoots, accumulated across the whole video
+        # rather than read off a single frame. See _resolve_shooting_side.
+        self._side_reliable = {"left": 0, "right": 0}
+        self._side_peak = {"left": float("-inf"), "right": float("-inf")}
         self._frame_index = 0
         self._fps = DEFAULT_FPS
         self._prev_timestamp_ms: Optional[int] = None
@@ -668,6 +695,25 @@ class ShotAnalysisPipeline:
     ) -> FrameResult:
         self._frame_index += 1
         timestamp_s = timestamp_ms / 1000.0
+
+        # Recorded for EVERY call, before any early return.
+        #
+        # This used to sit further down, after the no-pose branch had already
+        # returned, so frames where MediaPipe found nobody were simply absent
+        # from the list. The list then ran shorter than the video, and playback
+        # drew frame N's skeleton over frame N+k's pixels -- the skeleton
+        # appearing to run ahead of the player, by one frame for every frame
+        # ever missed. A parallel array is only parallel if it is appended to
+        # unconditionally.
+        if self._offline_landmarks is not None:
+            marks = None
+            if detection_result and getattr(detection_result, "pose_landmarks", None):
+                marks = [
+                    (float(lm.x), float(lm.y))
+                    for lm in detection_result.pose_landmarks[0]
+                ]
+            self._offline_landmarks.append((timestamp_ms, marks))
+
         ball, rim, ball_snapshot = self._process_ball(bgr_frame, timestamp_ms)
 
         raw = extract_all_landmarks(detection_result, width, height)
@@ -731,10 +777,20 @@ class ShotAnalysisPipeline:
         dt_s = self._compute_dt(timestamp_ms)
         prev_snapshot = self._frame_buffer.latest
 
-        ankle_y = 0.0
-        ankle_avg = _avg_y(world, ("left_ankle", "right_ankle"))
-        if ankle_avg is not None:
-            ankle_y = ankle_avg
+        # Kept as Optional all the way into update_ankle_baseline.
+        #
+        # This used to collapse to 0.0 when neither ankle was reliable, and
+        # 0.0 in hip-centred coordinates means "ankles level with the hips" --
+        # not "ankles not seen". On a still frame that fabricated value was
+        # blended straight into the long-lived standing baseline, or seeded it
+        # outright on the first still frame. Footage that crops the feet, which
+        # is common when filming shooting form, would drag the floor reference
+        # up toward hip height and then compare real ankles against it.
+        #
+        # The image-space sibling `update_ankle_image_baseline` has guarded
+        # this from the start, with a comment describing exactly this failure.
+        # The world-space one never received it.
+        ankle_y = _avg_y(world, ("left_ankle", "right_ankle"))
 
         features = extract_features(
             world_landmarks=world,
@@ -814,6 +870,8 @@ class ShotAnalysisPipeline:
             analysis=analysis,
         )
         self._frame_buffer.push(snapshot)
+        if self._offline_history is not None:
+            self._offline_history.append(snapshot)
 
         completed_shot = self._shot_tracker.update(
             phase,
@@ -1385,16 +1443,141 @@ class ShotAnalysisPipeline:
             self._resolved_side = self._shooting_hand
             return self._resolved_side
 
-        left_wrist = world_landmarks.get("left_wrist")
-        right_wrist = world_landmarks.get("right_wrist")
+        # Accumulate evidence rather than deciding from this frame alone.
+        #
+        # This used to compare the two wrists on whatever frame it was given
+        # and, if either was unreliable, silently keep whatever it had decided
+        # before. Two failures compounded:
+        #
+        #   A momentary comparison decided it. One frame with the off hand
+        #   raised -- collecting a ball, waving -- was enough to flip it.
+        #
+        #   Then it LATCHED. Once flipped to a side whose wrist is never
+        #   reliable again, the `if` can never fire again, so the wrong answer
+        #   became permanent.
+        #
+        # Measured on salah_video: shots 3 and 4 resolved to `left` while the
+        # left elbow sat at visibility 0.15-0.19 and was rejected on all 45
+        # frames of each, and the right arm was tracked at 0.98 on all 45 of
+        # every shot in the video. The player is filmed from his right, so his
+        # left arm is occluded throughout -- it could not have been the
+        # shooting arm on any frame. Both shots lost every arm rule.
+        for side in ("left", "right"):
+            wrist = world_landmarks.get(f"{side}_wrist")
+            if wrist and wrist.get("is_reliable"):
+                self._side_reliable[side] += 1
+                height = float(wrist["position"][1])
+                if height > self._side_peak[side]:
+                    self._side_peak[side] = height
 
-        if left_wrist and right_wrist and left_wrist.get("is_reliable") and right_wrist.get("is_reliable"):
-            if left_wrist["position"][1] > right_wrist["position"][1]:
-                self._resolved_side = "left"
-            else:
-                self._resolved_side = "right"
+        left_seen = self._side_reliable["left"]
+        right_seen = self._side_reliable["right"]
+        if left_seen + right_seen == 0:
+            return self._resolved_side
+
+        # A side we cannot see cannot be the shooting side. This is not a
+        # preference between two candidates -- it is a statement that one of
+        # them was never a candidate.
+        stronger, weaker = ("left", "right") if left_seen >= right_seen else ("right", "left")
+        if self._side_reliable[weaker] < SIDE_VISIBILITY_RATIO * self._side_reliable[stronger]:
+            self._resolved_side = stronger
+        elif self._side_peak["left"] > self._side_peak["right"]:
+            # Both arms are trackable, so the shooting arm is the one that goes
+            # highest -- over the whole video so far, not on one frame.
+            self._resolved_side = "left"
+        else:
+            self._resolved_side = "right"
 
         return self._resolved_side
+
+    def enable_offline_segmentation(self, keep_landmarks: bool = False) -> None:
+        """Record every frame so the video can be segmented once, at the end.
+
+        Call before the first frame. A caller that never calls this behaves
+        exactly as before, which keeps live capture unchanged and unbounded
+        memory opt-in.
+
+        `keep_landmarks` additionally stores each frame's pose landmarks, which
+        is what lets a viewer redraw the skeleton afterwards with the FINAL
+        phase labels on it. Those labels do not exist while the video is
+        playing -- a frame's phase is decided by where the knee bottomed out
+        and where the hand peaked, which are only known once the shot is over.
+        """
+        self._offline_history = []
+        self._offline_landmarks = [] if keep_landmarks else None
+        self._offline_overlay = {}
+
+    @property
+    def offline_landmarks(self):
+        return self._offline_landmarks
+
+    @property
+    def offline_overlay(self) -> Dict[int, Tuple[int, str, Optional[int]]]:
+        return self._offline_overlay
+
+    def segment_offline(self) -> List[ShotSummary]:
+        """Find and score every shot in the recorded video.
+
+        Replaces the live detector's running commentary with a single pass
+        over the finished signal. The live tracker's own results are discarded
+        rather than merged: they were produced by a detector that could not see
+        ahead, and mixing two segmentations would double-count every shot
+        found by both.
+        """
+        if not self._offline_history:
+            return []
+
+        fps = self._fps if self._fps and self._fps > 0 else DEFAULT_FPS
+        signal = [
+            f.features.wrist_height_ratio if f.features is not None else None
+            for f in self._offline_history
+        ]
+        windows = segment(signal, fps)
+
+        # Why nothing was found, kept for the report. Computed here because
+        # this is the only place that still holds the signal it is derived
+        # from; recovering it later would mean re-running the whole pass.
+        self._no_shot_reason = (
+            None if windows else explain_absence(signal, fps)
+        )
+
+        self._shot_tracker.reset()
+        self._offline_overlay = {}
+        summaries: List[ShotSummary] = []
+        for start, peak, end in windows:
+            frames = self._offline_history[start:end + 1]
+            summary = self._shot_tracker.finalize_window(
+                frames, peak_ms=self._offline_history[peak].timestamp_ms
+            )
+            if summary is None:
+                continue
+            # Measured here because this is where the shot's frames and its
+            # event index are both in hand. It deliberately ignores the phase
+            # labels: the arm's hold and the feet's landing are independent.
+            summary.hold_duration_s = hold_duration_s(frames, peak - start)
+            summaries.append(summary)
+            # Record the per-frame labels a viewer needs. These are the refined
+            # coaching phases, not the four detector states, so what is drawn
+            # on the video is what the report talks about.
+            # Keyed by TIMESTAMP, not by index. `_offline_history` holds only
+            # frames where a pose was found, so its indices are not video frame
+            # numbers and never were; the timestamp is the one identifier both
+            # sides agree on.
+            labels = refine_phases(frames, peak - start)
+            for snap, label in zip(frames, labels):
+                angles = {
+                    name: round(result.degrees, 1)
+                    for name, result in (snap.angles or {}).items()
+                    if result is not None and result.is_valid
+                    and result.degrees is not None
+                }
+                self._offline_overlay[snap.timestamp_ms] = {
+                    "shot": summary.shot_number,
+                    "phase": label,
+                    "score": summary.score,
+                    "angles": angles,
+                }
+        return summaries
 
     def finalize_session(self) -> Optional[ShotSummary]:
         """Close any shot still in progress (e.g. video ended mid-rep)."""

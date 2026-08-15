@@ -9,6 +9,29 @@ from typing import List, Optional
 
 from analysis.models import AnalysisResult, RuleOutcome, RuleResult
 from phase_detection.features import KinematicFeatures
+
+# Above this much whole-body elevation, in the player's own body heights, the
+# reading is rejected as unmeasured rather than scored.
+#
+# This is NOT the rule's band, and the difference is the point. `jump_elevation`
+# allows up to 0.35 and calls anything above it over-jumping -- a judgement
+# about the player. This is a judgement about the INSTRUMENT: past 0.40 body
+# heights, roughly 72 cm on a 1.8 m player, the number is no longer describing
+# a basketball shot. A1's jump shots reach 26.9-31.2 cm, near 0.15-0.17 body
+# heights, and the highest elevation we believe anywhere in our own corpus is
+# 0.301.
+#
+# The readings it removes are camera motion, not athletes. `body_rise_ratio`
+# measures the player against the frame, so it cannot separate the player
+# rising from the camera falling: on broadcast clips that pan and zoom it runs
+# up toward MAX_BODY_RISE_RATIO and stops there. Measured across 53 clips it
+# produced 0.47-0.49 on three Curry clips and a full 0.500 on a FREE THROW.
+#
+# A ceiling exactly AT the clamp was tried first and was not enough -- the
+# Curry readings sit just under it and were scored, failing the 0.35 bound and
+# reporting 0 for the jump phase. A player scored 0 for the camera panning is
+# the failure this whole class of fix exists to prevent.
+MAX_SHOOTING_ELEVATION = 0.40
 from player.profile import PlayerProfile
 from utils.config_loader import load_yaml
 
@@ -29,6 +52,7 @@ class BiomechanicsEngine:
         angles: dict,
         features: KinematicFeatures,
         shooting_side: str,
+        shot_type: Optional[str] = None,
     ) -> AnalysisResult:
         active: List[RuleResult] = []
         violations: List[RuleResult] = []
@@ -38,6 +62,8 @@ class BiomechanicsEngine:
         for rule_id, rule in self._rules.items():
             phases = rule.get("phases", [])
             if phase not in phases:
+                continue
+            if not self._applies_to(rule, shot_type):
                 continue
 
             result = self._evaluate_rule(rule_id, rule, angles, features, shooting_side, phase)
@@ -58,6 +84,26 @@ class BiomechanicsEngine:
             passed_count=passed,
             total_count=total,
         )
+
+    @staticmethod
+    def _applies_to(rule: dict, shot_type: Optional[str]) -> bool:
+        """Does this rule run for this kind of shot?
+
+        A rule with no `shot_types` runs for every shot, which is what almost
+        all of them want: a knee bend is a knee bend. A rule that names them
+        runs only for those, so a mechanic that exists in one shot type can be
+        assessed without inventing a verdict for a shot that never performs it.
+
+        `shot_type is None` means the caller could not tell us -- the live path,
+        where the classification is not settled until the attempt closes. A
+        scoped rule is SKIPPED there rather than guessed at, because running a
+        jump-shot rule on an unclassified attempt is exactly the kind of quiet
+        assumption that turns "not observed" into a measurement.
+        """
+        allowed = rule.get("shot_types")
+        if not allowed:
+            return True
+        return shot_type is not None and shot_type in allowed
 
     def _evaluate_rule(
         self,
@@ -186,25 +232,114 @@ class BiomechanicsEngine:
         if metric == "head_velocity":
             return abs(features.nose_velocity_y)
 
+        # Both release metrics are built from `wrist_y`, which is fabricated as
+        # 0.0 when the visibility gate rejects the wrist -- and in hip-centred
+        # world coordinates 0.0 reads as "the wrist is exactly at hip height",
+        # a perfectly plausible number that nothing downstream can question.
+        #
+        # `release` is the worst phase for this: it is the fastest-moving and
+        # most motion-blurred part of the shot, so it is where the gate is most
+        # likely to reject. The failure would read as "released far too low"
+        # and produce a whole coaching sentence out of a landmark nobody saw.
+        #
+        # `wrist_world_valid` exists precisely for this and is checked at every
+        # other read site in the project. These two were the exceptions.
+        if metric in ("release_height", "release_height_ratio"):
+            if not features.wrist_world_valid:
+                return None
+
         if metric == "release_height":
-            # Body-relative: how far the hand clears the head. This is already
-            # scale-free, so it works for every player with or without a
-            # recorded height.
+            # Body-relative: how far the hand clears the head. Both landmarks
+            # come from the SAME frame, so the hip-centred origin cancels and
+            # the result is a true body-relative height, scale-free and usable
+            # with or without a recorded player height.
             if features.nose_y == 0:
                 return None
             return features.wrist_y - features.nose_y
 
         if metric == "release_height_ratio":
-            # Floor-relative release height as a fraction of standing height —
-            # the representation used in the literature (Cabarkapa et al. 2023,
-            # resources.md A2), where it was the only variable that separated
-            # proficient from non-proficient free-throw shooters (p=0.010).
+            # Floor-relative release height as a fraction of standing height,
+            # the representation the literature uses (SOURCES.md A2).
             #
-            # Requires a user-provided height. Returns None otherwise, which
-            # makes the engine skip the rule instead of inventing a value.
-            return self._player.normalized(
+            # THIS SUBTRACTION IS NOT SAME-FRAME, and that is why the ankle
+            # reference has to come from image space.
+            #
+            # `wrist_y` is this frame's hip-relative wrist. `ankle_baseline_y`
+            # is a hip-relative ankle height averaged while the player stood
+            # still BEFORE the shot. Subtracting one from the other does not
+            # cancel the origin, because the two are measured against the hip
+            # at different moments -- and between those moments the hip itself
+            # rose. The result is `arm_reach + leg_length`, with the jump term
+            # missing entirely: structurally blind to the elevation, which is
+            # the one thing a release height is supposed to capture.
+            #
+            # Measured consequence on salah_video: all five shots read 0.4-0.9
+            # against a band starting at 1.02 and published values of
+            # 1.12-1.17. The rule failed 100% of attempts and told every player
+            # they release too low.
+            #
+            # `takeoff_ratio` is the same elevation the shot classifier uses,
+            # measured in IMAGE space where whole-body translation is visible
+            # at all, in body-height units. Adding it back restores the term
+            # the world-space subtraction discards.
+            # Added AFTER normalising, because `body_rise_ratio` is already a
+            # fraction of the player's on-screen height -- the same unit
+            # `normalized` produces. Converting it to metres first would need
+            # `height_m`, which is None whenever no height was entered, and
+            # would reintroduce a division this term does not require.
+            ratio = self._player.normalized(
                 features.wrist_y - features.ankle_baseline_y
             )
+            if ratio is None:
+                return None
+            return ratio + max(0.0, features.body_rise_ratio or 0.0)
+
+        if metric in ("takeoff_elevation", "landing_settle"):
+            # How far the whole body left the floor, as a fraction of the
+            # player's own on-screen height.
+            #
+            # IMAGE SPACE, deliberately. `ankle_rise` and
+            # `vertical_displacement` below both ask this question of
+            # hip-centred world landmarks, where the hip IS the origin and
+            # whole-body translation is therefore invisible -- what they
+            # actually return is the hip-to-ankle distance changing, i.e. the
+            # legs folding. This is the same signal the shot classifier and the
+            # phase refiner already trust to decide whether the feet left the
+            # floor at all, so scoring against it keeps the three components
+            # describing one event rather than three.
+            #
+            # Corroborated against A1 without any entered height. Measured
+            # across 16 shots, peak elevation was 0.011-0.108 body heights for
+            # set shots and 0.211 for the one labelled jump shot. Taking
+            # nose-to-ankle as roughly 0.87 of stature, those land near 14 cm
+            # and 33 cm for a ~1.8 m player -- against A1's published 15.3 cm
+            # for free throws and 26.9-31.2 cm for jump shots. The agreement is
+            # a check on the measurement, NOT a licence to report centimetres:
+            # the conversion needs a stature we do not have, so the value stays
+            # in body heights, which is what we actually observe.
+            #
+            # `landing_settle` reads the SAME signal at the other end of the
+            # shot. Its zero is not a chosen threshold: `body_rise_ratio` is
+            # measured against the player's own stance before this attempt, so
+            # "back where you started" IS zero by construction. That is what
+            # makes a band around it principled rather than fitted.
+            #
+            # A CLAMPED VALUE IS NOT A MEASUREMENT. `body_rise_ratio` is capped
+            # at MAX_BODY_RISE_RATIO on the ground that nobody jumps half their
+            # own height, so a reading sitting ON the cap means the signal went
+            # somewhere impossible and was cut off there -- we know it is wrong,
+            # not how wrong. Measured across 53 clips it saturates on 4 of them,
+            # including a FREE THROW that read the full 0.500; those are
+            # broadcast clips where the camera pans and zooms, and the ratio
+            # cannot separate the player rising from the camera falling.
+            #
+            # Returning the cap would let a number we already know to be false
+            # be scored, which is the same error as reporting an unobserved
+            # landmark's 0.0. The rule is skipped instead, and a phase left with
+            # nothing measurable reports itself unscored rather than judged.
+            if abs(features.body_rise_ratio) >= MAX_SHOOTING_ELEVATION:
+                return None
+            return features.body_rise_ratio
 
         if metric == "wrist_height":
             return features.wrist_y

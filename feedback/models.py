@@ -26,12 +26,28 @@ class PhaseScore:
 
     phase: str
     label: str
-    score: int  # 0-100
+    # 0-100, or None when the phase carries nothing scoreable.
+    #
+    # None is NOT zero. A phase whose rules are all unscored (or which has no
+    # rules at all) has not been failed -- it has not been assessed. Emitting 0
+    # made `jump` read as a total failure on every shot the moment its last
+    # scored rule was withdrawn, which is the same class of error as letting an
+    # unobserved landmark report 0.0.
+    score: Optional[int]
     rules: List[RuleResult] = field(default_factory=list)
     strengths: List[str] = field(default_factory=list)
     refinements: List[str] = field(default_factory=list)
     fixes: List[str] = field(default_factory=list)
     measured: List[RuleResult] = field(default_factory=list)  # displayed, not scored
+    # Why this phase carries no score, when it carries none.
+    #
+    # A phase the player PERFORMED must never be shown as a silent blank. If it
+    # happened and we could not measure it, that is a fact about the FOOTAGE,
+    # and the report says so and says which measurement was missing. Empty
+    # string means the phase either has a score or has nothing to score by
+    # design -- `jump` in a set shot, where no rule applies because the player
+    # never left the floor.
+    unmeasured_reason: str = ""
 
     @property
     def evaluated(self) -> bool:
@@ -39,6 +55,8 @@ class PhaseScore:
 
     @property
     def grade(self) -> str:
+        if self.score is None:
+            return "not scored"
         if self.score >= 90:
             return "Excellent"
         if self.score >= 75:
@@ -71,6 +89,11 @@ class ShotSummary:
     entry_phase: Optional[str] = None
     missing_phases: List[str] = field(default_factory=list)
     capture_note: str = ""
+    # Seconds the shooting arm stayed up after release, or None if it never
+    # came down inside the clip. Measured directly from the arm, NOT from the
+    # length of the `follow_through` phase -- see phase_refiner.hold_duration_s
+    # for why that phase cannot answer this.
+    hold_duration_s: Optional[float] = None
     # What to work on next, and the drills for it. `performance_actions` used
     # to sit here too, holding `next_rep_focus` with a "Fix X:" prefix on each
     # line -- it was written on every shot and read by nothing.

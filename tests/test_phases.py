@@ -1,5 +1,6 @@
 """Tests for phase detection and biomechanical rules."""
 
+import dataclasses
 import sys
 from pathlib import Path
 
@@ -19,9 +20,9 @@ from phase_detection.phases import (
 
 def _make_features(**kwargs) -> KinematicFeatures:
     defaults = dict(
-        wrist_y=0.5, wrist_velocity_y=0.0, ankle_y_avg=0.1, ankle_velocity_y=0.0,
+        wrist_y=0.5, wrist_velocity_y=0.0, ankle_y_avg=0.1,
         ankle_baseline_y=0.1, knee_angle=120.0, knee_angle_delta=0.0,
-        hip_y_avg=0.6, hip_velocity_y=0.0,         elbow_angle=90.0,
+        hip_y_avg=0.6, elbow_angle=90.0,
         index_y=0.55,
         index_velocity_y=0.0,
         index_align_angle=170.0,
@@ -52,20 +53,27 @@ def test_knee_dip_alone_does_not_start_a_shot():
     assert det.phase == CORE_REST
 
 
-def test_hip_velocity_alone_cannot_start_a_shot():
-    """Hip velocity is a dead signal, not a weak one.
+def test_hip_velocity_is_not_a_feature_at_all():
+    """Hip velocity is gone, which is a stronger guarantee than "unused".
 
-    If this ever fails, someone has reintroduced a condition that reads
-    whole-body motion out of hip-centred coordinates, where it does not exist:
-    the hip midpoint IS the origin, so `hip_velocity_y` is identically zero on
-    every real frame.
+    It used to exist, be computed on every frame, and be readable by any new
+    condition -- while being arithmetically incapable of holding anything but
+    zero, because MediaPipe world landmarks are hip-centred and the hip
+    midpoint IS the origin. A threshold reading it could never fire, which is
+    exactly why nobody noticed.
+
+    The previous version of this test asserted that a fabricated hip velocity
+    could not start a shot. That guarded the symptom. Removing the field
+    guards the cause: whole-body motion has to come from image space
+    (`body_rise_ratio`), and there is no longer a hip-space velocity to reach
+    for by mistake.
+
+    `ankle_velocity_y` went with it -- real arithmetic, every frame, with no
+    reader anywhere in the detector, the rules or the refiner.
     """
-    det = ShotPhaseDetector()
-    hip_only = _make_features(hip_velocity_y=-0.05, knee_angle_delta=0.0,
-                              wrist_y=0.7, shoulder_y=0.8)
-    for _ in range(8):
-        det.update(hip_only)
-    assert det.phase == CORE_REST
+    fields = {f.name for f in dataclasses.fields(KinematicFeatures)}
+    assert "hip_velocity_y" not in fields
+    assert "ankle_velocity_y" not in fields
 
 
 def test_biomechanics_knee_rule():
@@ -100,12 +108,31 @@ def test_detector_stays_small():
 
 def test_phase_order_complete():
     """The coaching vocabulary is independent of the detector's."""
-    assert len(PHASE_ORDER) == 7
-    assert PHASE_ORDER[0] == "ready_stance"
+    assert len(PHASE_ORDER) == 6
+    assert PHASE_ORDER[0] == "loading"
     assert PHASE_ORDER[-1] == "landing"
     # `knee_flexion` was removed: it carried exactly the same two rules as
     # `loading`, so one dip was reported twice under two headings.
     assert "knee_flexion" not in PHASE_ORDER
+    # `ready_stance` was removed for the same reason -- it owned no rule at all,
+    # and its frames now open `loading`.
+    assert "ready_stance" not in PHASE_ORDER
+
+
+def test_every_analysis_phase_carries_a_rule():
+    """No heading without something to say under it.
+
+    Guards the merge above: a phase in the order that no rule names produces an
+    empty section in the report, which is what `ready_stance` did for months.
+    """
+    from utils.config_loader import load_yaml
+
+    named = {
+        phase
+        for rule in load_yaml("biomechanics.yaml")["rules"].values()
+        for phase in (rule.get("phases") or [])
+    }
+    assert set(PHASE_ORDER) <= named, f"phases with no rule: {set(PHASE_ORDER) - named}"
 
 
 def test_rest_to_rise_on_wrist_rise():

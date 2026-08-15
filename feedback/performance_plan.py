@@ -133,6 +133,25 @@ def build_capture_note(
     return " ".join(parts)
 
 
+def _lifted_off_on_a_set_shot(summary: ShotSummary) -> bool:
+    """Was this a set shot whose feet still left the floor?
+
+    Read from the classifier's own notes rather than re-deriving the
+    elevation. The classifier already measured it, already applied both
+    thresholds, and already declined to call it a jump shot -- recomputing here
+    would mean two places that could disagree about the same attempt.
+    """
+    classification = getattr(summary, "classification", None)
+    if classification is None:
+        return False
+    if getattr(summary.shot_type, "name", "") != "SET_SHOT":
+        return False
+    # The classifier calls this field `evidence`: the tuple of measured
+    # statements behind its verdict.
+    return any("still left the floor" in note
+               for note in (getattr(classification, "evidence", ()) or ()))
+
+
 def build_shot_performance_plan(summary: ShotSummary) -> ShotSummary:
     """Attach drills, focus items, and capture notes to a scored shot."""
     missing_start, missing_end = compute_missing_phases(
@@ -166,6 +185,26 @@ def build_shot_performance_plan(summary: ShotSummary) -> ShotSummary:
         key=lambda r: {"error": 3, "warning": 2, "info": 1}.get(r.severity, 0),
         reverse=True,
     )
+
+    # A set shot the player did not stay down for.
+    #
+    # This is not a rule violation in `biomechanics.yaml`, because it is not a
+    # property of any frame or phase -- it is a property of the WHOLE attempt,
+    # decided by the classifier from the elevation it measured. The rule engine
+    # has no way to express "the shot as a whole was between two categories".
+    #
+    # It goes first because it is more actionable than any joint angle: the
+    # player is doing something they can change by deciding to, and the
+    # half-committed version is the least repeatable of the three options.
+    if _lifted_off_on_a_set_shot(summary):
+        focus.append(
+            "Your feet left the floor, but not enough to be a jump shot. "
+            "Pick one and repeat it: stay planted through the release, or "
+            "commit to the jump. Half of each is the hardest to repeat. On a "
+            "free throw, staying planted is also the safer choice — leaving "
+            "the floor is legal, but landing over the line before the ball "
+            "reaches the ring is a violation."
+        )
 
     seen = set()
     for violation in sorted_violations[:3]:
