@@ -219,6 +219,77 @@ over the clip, so a drift would bias that baseline instead of breaking it — an
 error that survives review because the output still looks like data. Those
 clips are marked `drop_elevation` and their target is reported missing.
 
+## Result: no model beats predicting the mean
+
+Four families were fitted — ridge, k-NN, boosted stumps, and a small 1-D CNN
+over the sequences — against a constant predictor, with leave-one-group-out
+cross-validation and the knob chosen inside each fold.
+
+**None of them beat the constant baseline.**
+
+```
+                out-of-fold (18 dev)        held-out test (8)
+constant        MAE 0.0339   acc 89%        MAE 0.0665   acc 62%
+ridge           MAE 0.0372   acc 89%        MAE 0.0650   acc 62%
+knn             MAE 0.0355   acc 89%        MAE 0.0638   acc 62%
+stumps          MAE 0.0424   acc 89%        MAE 0.0662   acc 62%
+tempnet         MAE 0.0414   acc 78%        MAE 0.0578   acc 62%
+```
+
+Every family is WORSE than the constant out-of-fold. The 62% test accuracy is
+not an achievement — it is what predicting "set shot" for everything scores,
+because elevation is compressed below the 0.12 boundary. The 95% interval on
+test accuracy, resampling groups, is **[40%, 100%]**: eight shots from two
+groups cannot resolve anything.
+
+The models memorise instantly, exactly as the sample size predicts:
+
+```
+                    in-sample MAE      out-of-fold MAE
+knn (k=3)              0.0000              0.0355
+ridge (alpha=1)        0.0024              0.0372
+constant               0.0306              0.0339
+```
+
+k-NN reproduces all eighteen development targets perfectly and still
+generalises worse than the mean. The nested CV responded correctly by choosing
+the most regularised setting available in every fold.
+
+### The controls, including the one that failed
+
+**Positive control (passed).** On a synthetic target built to be linear in
+three of the real features, with the same 26 samples and the same group folds,
+ridge halves the constant's error — 0.0222 against 0.0435. The harness learns
+when there is something to learn.
+
+**Leakage control (inconclusive, and I expected otherwise).** The first
+attempt was to hand the models the excluded channels and watch the score go
+near-perfect. It did not: the contaminated run scored the same as the clean
+one. That is not evidence the harness is broken — `takeoff_elevation` is a
+median stance baseline subtracted from a minimum inside a window around the
+wrist peak, and ridge over per-channel min/max/mean cannot express that
+whichever channels it gets. The control tested the wrong thing, which is why
+the synthetic target exists.
+
+The exclusion list stays regardless. It is justified by what the target IS,
+not by a score.
+
+### So: data shortage, and it is measurable
+
+18 development samples and 8 test samples. The corpus has 43 shots but only 26
+carry a target — **17 are lost to measurement, not to labelling**:
+
+```
+10   camera pans: player rise is not separable
+ 7   no stance before the shot, or the feet were never seen
+```
+
+Recovering those is worth more than any modelling change. Ten of them need
+stabilisation or a different elevation estimator; seven need footage that
+starts before the shot rather than at it. That alone would take 26 targets to
+43, and the second-largest group in the split from 2 shots to something that
+can validate.
+
 ## How accuracy is measured
 
 `evaluate.py` takes `{clip#shot: predicted_elevation}` and the frozen split. It

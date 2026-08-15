@@ -1,0 +1,176 @@
+{
+  "constant": {
+    "oof": {
+      "n": 18,
+      "mae": 0.03393306510729922,
+      "acc": 0.8888888888888888
+    },
+    "test": {
+      "n": 8,
+      "mae": 0.06652361177839339,
+      "acc": 0.625
+    },
+    "final_params": {},
+    "per_fold_params": {
+      "Klay": {},
+      "Mikedunn": {},
+      "Salah": {},
+      "Stephcurry": {},
+      "video8": {},
+      "video9": {},
+      "video_0x": {}
+    }
+  },
+  "ridge": {
+    "oof": {
+      "n": 18,
+      "mae": 0.03717944651774214,
+      "acc": 0.8888888888888888
+    },
+    "test": {
+      "n": 8,
+      "mae": 0.06496782023549191,
+      "acc": 0.625
+    },
+    "final_params": {
+      "alpha": 1000.0
+    },
+    "per_fold_params": {
+      "Klay": {
+        "alpha": 1000.0
+      },
+      "Mikedunn": {
+        "alpha": 1000.0
+      },
+      "Salah": {
+        "alpha": 1000.0
+      },
+      "Stephcurry": {
+        "alpha": 1000.0
+      },
+      "video8": {
+        "alpha": 1000.0
+      },
+      "video9": {
+        "alpha": 10.0
+      },
+      "video_0x": {
+        "alpha": 1000.0
+      }
+    }
+  },
+  "knn": {
+    "oof": {
+      "n": 18,
+      "mae": 0.03548827591455645,
+      "acc": 0.8888888888888888
+    },
+    "test": {
+      "n": 8,
+      "mae": 0.0638172950129956,
+      "acc": 0.625
+    },
+    "final_params": {
+      "k": 5
+    },
+    "per_fold_params": {
+      "Klay": {
+        "k": 3
+      },
+      "Mikedunn": {
+        "k": 3
+      },
+      "Salah": {
+        "k": 7
+      },
+      "Stephcurry": {
+        "k": 5
+      },
+      "video8": {
+        "k": 7
+      },
+      "video9": {
+        "k": 3
+      },
+      "video_0x": {
+        "k": 3
+      }
+    }
+  },
+  "stumps": {
+    "oof": {
+      "n": 18,
+      "mae": 0.04244181569220842,
+      "acc": 0.8888888888888888
+    },
+    "test": {
+      "n": 8,
+      "mae": 0.06622192850118182,
+      "acc": 0.625
+    },
+    "final_params": {
+      "rounds": 10
+    },
+    "per_fold_params": {
+      "Klay": {
+        "rounds": 10
+      },
+      "Mikedunn": {
+        "rounds": 10
+      },
+      "Salah": {
+        "rounds": 10
+      },
+      "Stephcurry": {
+        "rounds": 10
+      },
+      "video8": {
+        "rounds": 10
+      },
+      "video9": {
+        "rounds": 60
+      },
+      "video_0x": {
+        "rounds": 10
+      }
+    }
+  },
+  "tempnet": {
+    "oof": {
+      "n": 18,
+      "mae": 0.04143335039003028,
+      "acc": 0.7777777777777778
+    },
+    "test": {
+      "n": 8,
+      "mae": 0.0577533058822155,
+      "acc": 0.625
+    },
+    "final_params": {
+      "epochs": 100
+    },
+    "per_fold_params": {
+      "Klay": {
+        "epochs": 100
+      },
+      "Mikedunn": {
+        "epochs": 100
+      },
+      "Salah": {
+        "epochs": 300
+      },
+      "Stephcurry": {
+        "epochs": 100
+      },
+      "video8": {
+        "epochs": 300
+      },
+      "video9": {
+        "epochs": 300
+      },
+      "video_0x": {
+        "epochs": 300
+      }
+    }
+  }
+}

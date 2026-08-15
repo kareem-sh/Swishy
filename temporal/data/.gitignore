@@ -8,3 +8,9 @@ clips/
 # dataset; these two are scratch from a comparison run.
 shots_raw.json
 shots_prepared.json
+
+# Feature caches are derived: temporal/build_features.py rebuilds both from
+# the videos. The leaky one is a control artefact and must never be mistaken
+# for the dataset.
+features.npz
+features_leaky.npz
