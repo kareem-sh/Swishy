@@ -160,6 +160,9 @@ class Shot:
     score: Optional[int]
     needs_crop: bool
     drop_elevation: bool
+    # which footage this row came from: "prepared", "raw" (a --raw run), or
+    # "raw_fallback" (the crop made the pipeline refuse it, the raw did not)
+    source: str = "prepared"
 
 
 def _classify(elev: Optional[float]) -> Optional[str]:
@@ -167,6 +170,80 @@ def _classify(elev: Optional[float]) -> Optional[str]:
     if elev is None:
         return None
     return "jump_shot" if elev >= JUMP_VERTICAL_DISPLACEMENT_RATIO else "set_shot"
+
+
+def _analyse(path: Path):
+    """One pass over one clip, with the scored frames captured. None on error."""
+    _CAPTURED.clear()
+    try:
+        with quiet_native_stderr():
+            return analyze_video(path, height_cm=None, enable_ball=False)
+    except Exception:                                              # noqa: BLE001
+        return None
+
+
+def _rows(c: dict, run, source: str) -> tuple:
+    """Build (shots, rejected) for one analysed clip."""
+    out: List[Shot] = []
+    rejected: List[dict] = []
+    for s in run.shots:
+        if s.is_rejected:
+            rejected.append({
+                "clip": c["filename"],
+                "shot_number": s.shot_number,
+                "split": c["split"],
+                "filename_label": c.get("label"),
+                "shot_type": s.shot_type.value if s.shot_type else None,
+                "source": source,
+                "reason": (
+                    s.rejection.value if s.rejection else "score_is_None"
+                ),
+                "evidence": list(
+                    s.classification.evidence if s.classification else ()
+                ),
+            })
+            continue
+        frames = _CAPTURED.get(s.shot_number) or []
+        # None, not 0.0, when nothing was measurable. The whole point.
+        elev, why = _elevation(frames)
+        # A clip whose camera pans cannot report elevation at all: the
+        # signal cannot separate the player rising from the camera falling.
+        if c["drop_elevation"]:
+            elev, why = None, "camera pans: player rise is not separable"
+
+        ptype = s.shot_type.value if s.shot_type else None
+        flabel = c.get("label")
+        out.append(
+            Shot(
+                clip=c["filename"],
+                path=c["path"],
+                shot_number=s.shot_number,
+                split=c["split"],
+                group=c["group"],
+                player=c["player"],
+                elevation=None if elev is None else round(float(elev), 4),
+                elevation_class=_classify(elev),
+                ambiguous_elevation=(
+                    elev is not None and AMBIGUOUS_LOW <= elev <= AMBIGUOUS_HIGH
+                ),
+                pipeline_type=ptype,
+                filename_label=flabel,
+                label_agrees=None if not flabel or not ptype else (flabel == ptype),
+                no_elevation_reason=why,
+                n_frames=len(frames),
+                duration_s=round(len(frames) / (run.fps or 30.0), 3),
+                fps=round(run.fps, 2),
+                score=s.score,
+                needs_crop=bool(c["needs_crop"]),
+                drop_elevation=bool(c["drop_elevation"]),
+                source=source,
+            )
+        )
+    return out, rejected
+
+
+def _refused_as_unsupported(rejected: List[dict]) -> bool:
+    return any(r["reason"] == "shot_type_not_supported_yet" for r in rejected)
 
 
 def extract(raw: bool = False) -> tuple:
@@ -180,6 +257,32 @@ def extract(raw: bool = False) -> tuple:
     driving threshold, and the totals were the only sign.
 
     Excluded from training, named in the report. Both.
+
+    THE RAW FALLBACK
+    ----------------
+    Cropping changes any measurement whose denominator is the FRAME, and the
+    driving gate is one: it compares hip travel to frame width, so shrinking
+    the frame scales it directly. Preserving the crop's aspect ratio does not
+    help -- that fixes the x-versus-y comparison, not this. Measured on
+    video8_shot03_set.mp4, an owner-labelled set shot from the fixed-camera
+    fixture: 0.093 raw, 0.20 cropped, past the 0.18 gate, refused.
+
+    So when a PREPARED clip refuses a shot as an unsupported type, the raw
+    footage arbitrates -- it is the framing the threshold was calibrated
+    against. Raw refuses too, the refusal is real and stands; raw does not,
+    the refusal was ours and the raw analysis is used for that whole clip.
+
+    Whole clip, never spliced: two analyses segment independently, so a shot
+    number does not mean the same attempt in both, and taking shot 1 from one
+    run and shot 2 from another would silently pair a target with the wrong
+    footage.
+
+    Mixing raw and prepared targets is safe here, and that is measured, not
+    assumed: across the 19 shots with an elevation both ways the median
+    difference is 0.0008 and the largest is 0.0128, against a jump/set boundary
+    of 0.12 and a corpus spanning 0.003 to 0.274. `takeoff_elevation` is
+    normalised by the player's own height, which is why -- it is the frame-
+    relative measurements that the crop moves.
     """
     clips = json.loads(MANIFEST_JSON.read_text(encoding="utf-8"))
     included = [c for c in clips if c["status"] == "include"]
@@ -193,78 +296,38 @@ def extract(raw: bool = False) -> tuple:
         #
         # `--raw` forces the originals so the two can be compared directly.
         # Preprocessing is an intervention on the data and has to justify
-        # itself against the same measurements as everything else: cropping
-        # produced cleaner elevations but detected fewer shots, and only an
+        # itself against the same measurements as everything else, and only an
         # A/B on identical code says which way that trade goes.
-        path = PROJECT / (c["path"] if raw else (c.get("prepared_path") or c["path"]))
+        original = PROJECT / c["path"]
+        prepared = PROJECT / (c.get("prepared_path") or c["path"])
+        path = original if raw else prepared
         print(f"[{i:3d}/{len(included)}] {c['filename'][:52]:54s}", end="", flush=True)
-        _CAPTURED.clear()
-        try:
-            with quiet_native_stderr():
-                run = analyze_video(path, height_cm=None, enable_ball=False)
-        except Exception as exc:                                   # noqa: BLE001
-            print(f"  ERROR {type(exc).__name__}")
-            continue
 
+        run = _analyse(path)
+        if run is None:
+            print("  ERROR")
+            continue
         if run.is_rejected or not run.shots:
             print(f"  no shot ({run.rejection.value if run.rejection else '-'})")
             continue
 
-        kept = 0
-        for s in run.shots:
-            if s.is_rejected:
-                rejected.append({
-                    "clip": c["filename"],
-                    "shot_number": s.shot_number,
-                    "split": c["split"],
-                    "filename_label": c.get("label"),
-                    "shot_type": s.shot_type.value if s.shot_type else None,
-                    "reason": (
-                        s.rejection.value if s.rejection else "score_is_None"
-                    ),
-                    "evidence": list(
-                        s.classification.evidence if s.classification else ()
-                    ),
-                })
-                continue
-            frames = _CAPTURED.get(s.shot_number) or []
-            # None, not 0.0, when nothing was measurable. The whole point.
-            elev, why = _elevation(frames)
-            # A clip whose camera pans cannot report elevation at all: the
-            # signal cannot separate the player rising from the camera falling.
-            if c["drop_elevation"]:
-                elev, why = None, "camera pans: player rise is not separable"
+        rows, rej = _rows(c, run, "raw" if raw else "prepared")
+        note = ""
 
-            ptype = s.shot_type.value if s.shot_type else None
-            flabel = c.get("label")
-            out.append(
-                Shot(
-                    clip=c["filename"],
-                    path=c["path"],
-                    shot_number=s.shot_number,
-                    split=c["split"],
-                    group=c["group"],
-                    player=c["player"],
-                    elevation=None if elev is None else round(float(elev), 4),
-                    elevation_class=_classify(elev),
-                    ambiguous_elevation=(
-                        elev is not None and AMBIGUOUS_LOW <= elev <= AMBIGUOUS_HIGH
-                    ),
-                    pipeline_type=ptype,
-                    filename_label=flabel,
-                    label_agrees=None if not flabel or not ptype else (flabel == ptype),
-                    no_elevation_reason=why,
-                    n_frames=len(frames),
-                    duration_s=round(len(frames) / (run.fps or 30.0), 3),
-                    fps=round(run.fps, 2),
-                    score=s.score,
-                    needs_crop=bool(c["needs_crop"]),
-                    drop_elevation=bool(c["drop_elevation"]),
-                )
-            )
-            kept += 1
-        n_rej = sum(1 for r in rejected if r["clip"] == c["filename"])
-        print(f"  {kept} shot(s)" + (f", {n_rej} refused" if n_rej else ""))
+        if _refused_as_unsupported(rej) and path != original:
+            raw_run = _analyse(original)
+            if raw_run is not None and raw_run.shots:
+                raw_rows, raw_rej = _rows(c, raw_run, "raw_fallback")
+                if not _refused_as_unsupported(raw_rej):
+                    rows, rej = raw_rows, raw_rej
+                    note = "  <- refused when cropped, accepted raw; used raw"
+                else:
+                    note = "  <- refused raw too; refusal stands"
+
+        out.extend(rows)
+        rejected.extend(rej)
+        print(f"  {len(rows)} shot(s)"
+              + (f", {len(rej)} refused" if rej else "") + note)
     return out, rejected
 
 
@@ -290,6 +353,16 @@ def report(shots: List[Shot], rejected: List[dict]) -> str:
             f"\nelevation  n={n}  min={have[0]:.3f}  p25={have[n//4]:.3f}  "
             f"median={have[n//2]:.3f}  p75={have[(3*n)//4]:.3f}  max={have[-1]:.3f}"
         )
+
+    fell_back = [s for s in shots if s.source == "raw_fallback"]
+    if fell_back:
+        lines.append(f"\n{len(fell_back)} shots taken from RAW footage, because "
+                     "the cropped copy made the pipeline refuse them:")
+        for s in fell_back:
+            lines.append(f"    {s.clip[:44]:46s} #{s.shot_number} {s.split:<6s} "
+                         f"elev={s.elevation}")
+        lines.append("    (the crop changes frame-relative measurements; "
+                     "raw is the framing the thresholds were calibrated on)")
 
     # Refused shots, always, even when there are none -- "0 refused" is a
     # measurement and its absence would be indistinguishable from nobody

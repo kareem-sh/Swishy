@@ -18,7 +18,8 @@
     "fps": 29.99,
     "score": 89,
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "source": "prepared"
   },
   {
     "clip": "salah_video.mp4",
@@ -39,7 +40,8 @@
     "fps": 29.99,
     "score": 95,
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "source": "prepared"
   },
   {
     "clip": "salah_video.mp4",
@@ -60,7 +62,8 @@
     "fps": 29.99,
     "score": 98,
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "source": "prepared"
   },
   {
     "clip": "salah_video.mp4",
@@ -81,7 +84,8 @@
     "fps": 29.99,
     "score": 86,
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "source": "prepared"
   },
   {
     "clip": "salah_video.mp4",
@@ -102,7 +106,8 @@
     "fps": 29.99,
     "score": 88,
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "source": "prepared"
   },
   {
     "clip": "video_01_free_throw.mp4",
@@ -123,7 +128,8 @@
     "fps": 24.0,
     "score": 83,
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "source": "prepared"
   },
   {
     "clip": "video_07_side_jump_shot.mp4",
@@ -144,7 +150,8 @@
     "fps": 29.99,
     "score": 84,
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "source": "prepared"
   },
   {
     "clip": "video8_shot01_set.mp4",
@@ -165,7 +172,8 @@
     "fps": 30.0,
     "score": 89,
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "source": "prepared"
   },
   {
     "clip": "video8_shot02_set.mp4",
@@ -186,7 +194,30 @@
     "fps": 30.0,
     "score": 91,
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "source": "prepared"
+  },
+  {
+    "clip": "video8_shot03_set.mp4",
+    "path": "C:/Users/karim/Desktop/Swichy/assets/videos/single_shot/video8_shot03_set.mp4",
+    "shot_number": 1,
+    "split": "train",
+    "group": "video8",
+    "player": "video8",
+    "elevation": null,
+    "elevation_class": null,
+    "ambiguous_elevation": false,
+    "pipeline_type": "set_shot",
+    "filename_label": "set_shot",
+    "label_agrees": true,
+    "no_elevation_reason": "no stance before the shot, or the feet were never seen",
+    "n_frames": 50,
+    "duration_s": 1.667,
+    "fps": 30.0,
+    "score": 35,
+    "needs_crop": true,
+    "drop_elevation": false,
+    "source": "raw_fallback"
   },
   {
     "clip": "video8_shot04_set.mp4",
@@ -207,7 +238,8 @@
     "fps": 30.0,
     "score": 91,
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "source": "prepared"
   },
   {
     "clip": "video8_shot05_set.mp4",
@@ -228,7 +260,8 @@
     "fps": 30.0,
     "score": 86,
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "source": "prepared"
   },
   {
     "clip": "video8_shot06_set.mp4",
@@ -249,7 +282,8 @@
     "fps": 30.0,
     "score": 91,
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "source": "prepared"
   },
   {
     "clip": "video8_shot07_set.mp4",
@@ -270,7 +304,8 @@
     "fps": 30.0,
     "score": 95,
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "source": "prepared"
   },
   {
     "clip": "video8_shot08_set.mp4",
@@ -291,7 +326,8 @@
     "fps": 30.0,
     "score": 84,
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "source": "prepared"
   },
   {
     "clip": "video8_shot09_set.mp4",
@@ -312,7 +348,8 @@
     "fps": 30.0,
     "score": 93,
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "source": "prepared"
   },
   {
     "clip": "video8_shot10_jump.mp4",
@@ -333,7 +370,8 @@
     "fps": 30.0,
     "score": 80,
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "source": "prepared"
   },
   {
     "clip": "video9_shot01_jump.mp4",
@@ -354,7 +392,8 @@
     "fps": 30.0,
     "score": 30,
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "source": "prepared"
   },
   {
     "clip": "video9_shot02_jump.mp4",
@@ -375,7 +414,8 @@
     "fps": 30.0,
     "score": 70,
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "source": "prepared"
   },
   {
     "clip": "video9_shot03_jump.mp4",
@@ -396,7 +436,8 @@
     "fps": 30.0,
     "score": 98,
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "source": "prepared"
   },
   {
     "clip": "Bookerfreethrowshooting1_set.mp4",
@@ -417,7 +458,8 @@
     "fps": 30.0,
     "score": 95,
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "source": "prepared"
   },
   {
     "clip": "Bookerrightcornershooting1_jumpshoot.mp4",
@@ -438,7 +480,8 @@
     "fps": 30.0,
     "score": 59,
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "source": "prepared"
   },
   {
     "clip": "Bookerrightwingshooting2miss_set_Shot.mp4",
@@ -459,7 +502,8 @@
     "fps": 30.0,
     "score": 100,
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "source": "prepared"
   },
   {
     "clip": "Couch2rightcourner3ptshooting1_jumpshoot.mp4",
@@ -480,7 +524,8 @@
     "fps": 30.0,
     "score": 68,
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "source": "prepared"
   },
   {
     "clip": "Couch2rightcourner3ptshooting2_jumpshoot.mp4",
@@ -501,7 +546,8 @@
     "fps": 30.0,
     "score": 60,
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "source": "prepared"
   },
   {
     "clip": "Couch2rightcournershooting1_set_Shot.mp4",
@@ -522,7 +568,8 @@
     "fps": 30.0,
     "score": 89,
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "source": "prepared"
   },
   {
     "clip": "Couch2rightwing3ptshooting1_jump.mp4",
@@ -543,7 +590,8 @@
     "fps": 30.0,
     "score": 41,
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "source": "prepared"
   },
   {
     "clip": "Couchleftwing3ptshooting1_jumpshot.mp4",
@@ -564,7 +612,8 @@
     "fps": 30.0,
     "score": 92,
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "source": "prepared"
   },
   {
     "clip": "Couchrightcornershooting1_jump_shot.mp4",
@@ -585,7 +634,8 @@
     "fps": 30.0,
     "score": 52,
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "source": "prepared"
   },
   {
     "clip": "Kevindurantrightcournor3ptshooting1_jump_shoot.mp4",
@@ -606,7 +656,8 @@
     "fps": 30.0,
     "score": 84,
     "needs_crop": true,
-    "drop_elevation": true
+    "drop_elevation": true,
+    "source": "prepared"
   },
   {
     "clip": "Kevindurantrightcournor3ptshooting2_jump_shot.mp4",
@@ -627,7 +678,8 @@
     "fps": 30.0,
     "score": 78,
     "needs_crop": false,
-    "drop_elevation": true
+    "drop_elevation": true,
+    "source": "prepared"
   },
   {
     "clip": "Kevindurantrightwing3ptshooting2miss_jump_shot.mp4",
@@ -648,7 +700,8 @@
     "fps": 30.0,
     "score": 82,
     "needs_crop": false,
-    "drop_elevation": true
+    "drop_elevation": true,
+    "source": "prepared"
   },
   {
     "clip": "Klay3ptshooting1_jump_shot.mp4",
@@ -669,7 +722,8 @@
     "fps": 30.0,
     "score": 79,
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "source": "prepared"
   },
   {
     "clip": "small_jump_shot.mp4",
@@ -690,7 +744,8 @@
     "fps": 30.0,
     "score": 94,
     "needs_crop": false,
-    "drop_elevation": true
+    "drop_elevation": true,
+    "source": "prepared"
   },
   {
     "clip": "LethalShooterRightCourner3ptshooting1_jump_shot.mp4",
@@ -711,7 +766,8 @@
     "fps": 30.0,
     "score": 44,
     "needs_crop": true,
-    "drop_elevation": true
+    "drop_elevation": true,
+    "source": "prepared"
   },
   {
     "clip": "Lethalshooterpractice3ptshooting2_jump_shot.mp4",
@@ -732,7 +788,8 @@
     "fps": 30.0,
     "score": 75,
     "needs_crop": true,
-    "drop_elevation": true
+    "drop_elevation": true,
+    "source": "prepared"
   },
   {
     "clip": "Mikedunn3ptshooting3_set_shot.mp4",
@@ -753,7 +810,8 @@
     "fps": 30.0,
     "score": 98,
     "needs_crop": true,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "source": "prepared"
   },
   {
     "clip": "Stephcurryleftcourner3ptshooting1_jump_shot.mp4",
@@ -774,7 +832,8 @@
     "fps": 30.0,
     "score": 59,
     "needs_crop": false,
-    "drop_elevation": true
+    "drop_elevation": true,
+    "source": "prepared"
   },
   {
     "clip": "curry_jump_shot.mp4",
@@ -795,7 +854,8 @@
     "fps": 30.0,
     "score": 70,
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "source": "prepared"
   },
   {
     "clip": "Stephcurryleftcourner3ptshooting4miss_jump_shot.mp4",
@@ -816,7 +876,8 @@
     "fps": 30.0,
     "score": 80,
     "needs_crop": false,
-    "drop_elevation": true
+    "drop_elevation": true,
+    "source": "prepared"
   },
   {
     "clip": "Stephcurryleftcourner3ptshooting4miss_jump_shot.mp4",
@@ -837,7 +898,8 @@
     "fps": 30.0,
     "score": 52,
     "needs_crop": false,
-    "drop_elevation": true
+    "drop_elevation": true,
+    "source": "prepared"
   },
   {
     "clip": "Stephcurryleftcourner3ptshooting5_jump_shot.mp4",
@@ -858,7 +920,8 @@
     "fps": 30.0,
     "score": 69,
     "needs_crop": false,
-    "drop_elevation": false
+    "drop_elevation": false,
+    "source": "prepared"
   },
   {
     "clip": "Stephcurryleftwing3ptshooting1_jumpshoot.mp4",
@@ -879,6 +942,7 @@
     "fps": 30.0,
     "score": 80,
     "needs_crop": true,
-    "drop_elevation": true
+    "drop_elevation": true,
+    "source": "prepared"
   }
 ]

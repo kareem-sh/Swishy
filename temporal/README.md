@@ -173,10 +173,33 @@ shrinking the frame scales it directly. Measured on `video8_shot03_set.mp4`:
 0.093 raw, **0.20 cropped**, past the 0.18 gate. The clip is an
 owner-labelled set shot from the fixed-camera fixture, and it is refused.
 
-That one refusal is the whole current cost, it is outside the 26 targets, and
-`extract_shots.py` now names it on every run. Recalibrating the threshold is
-out of scope for this version; the alternative fix, measuring travel against
-raw frame geometry, is a design change nobody has approved.
+**The raw footage arbitrates.** When a *prepared* clip has a shot refused as an
+unsupported type, `extract_shots.py` re-analyses the original and compares:
+
+- raw refuses it too → the refusal is real, and it stands
+- raw does not → the refusal was ours, and the raw analysis is used for that
+  **whole clip**, tagged `source: "raw_fallback"` and named in the report
+
+Whole clip, never spliced. Two analyses segment independently, so shot 1 does
+not mean the same attempt in both, and mixing rows across runs would pair a
+target with the wrong footage.
+
+Mixing raw and prepared targets in one dataset is safe here, and that is
+measured rather than assumed: across the 19 shots with an elevation both ways
+the median difference is **0.0008** and the largest is **0.0128**, against a
+jump/set boundary of 0.12 and a corpus spanning 0.003–0.274.
+`takeoff_elevation` is normalised by the player's own height, which is exactly
+why — it is the frame-relative measurements that cropping moves.
+
+This does not touch the 0.18 threshold, which stays as it is.
+
+**Measured outcome: refusals 1 → 0, usable targets 26 → 26.** The recovered
+shot classifies as `set_shot`, matching its owner label, and scores 35 — so a
+real misclassification is gone. It still carries no target, because its stance
+was never on camera: it is a single-shot cut that opens mid-attempt, and
+`takeoff_elevation` refuses to invent a floor it never saw. That was true of
+the raw footage all along, so this fix was never going to add a target. It
+removes a wrong answer, not a missing one.
 
 ### Scope: jump shots and set shots, nothing else
 
