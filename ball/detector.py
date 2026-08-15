@@ -167,6 +167,7 @@ class BallDetector:
             confidence=det.confidence * 0.9,
             frame_index=frame_index,
             timestamp_ms=timestamp_ms,
+            measurement_source="reused",
         )
 
     @staticmethod
@@ -326,6 +327,7 @@ class BallDetector:
                 confidence=conf,
                 frame_index=frame_index,
                 timestamp_ms=timestamp_ms,
+                measurement_source="yolo",
             )
 
         rim = None
@@ -385,5 +387,6 @@ class BallDetector:
                     confidence=float(conf),
                     frame_index=frame_index,
                     timestamp_ms=timestamp_ms,
+                    measurement_source="color",
                 )
         return best

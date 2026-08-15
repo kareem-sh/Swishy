@@ -23,7 +23,7 @@ def _detection(x: float, y: float, frame: int, timestamp_ms: int):
 
 def test_tracker_follows_fast_measurements_without_moving_average_lag():
     tracker = BallTracker(
-        max_gap_frames=2,
+        max_gap_ms=200,
         position_alpha=0.8,
         velocity_alpha=0.5,
     )
@@ -38,7 +38,7 @@ def test_tracker_follows_fast_measurements_without_moving_average_lag():
 
 
 def test_tracker_predicts_only_short_missing_gaps():
-    tracker = BallTracker(max_gap_frames=2)
+    tracker = BallTracker(max_gap_ms=200)
     tracker.update(_detection(0, 0, 0, 0), 0, 0)
     tracker.update(_detection(10, 0, 1, 100), 1, 100)
 
@@ -48,6 +48,22 @@ def test_tracker_predicts_only_short_missing_gaps():
     assert predicted.x > 10
 
     assert tracker.update(None, 4, 400) is None
+
+
+def test_tracker_labels_detection_and_prediction_provenance():
+    tracker = BallTracker(max_gap_ms=200)
+    detection = _detection(10, 20, 0, 0)
+    detection.measurement_source = "yolo"
+
+    measured = tracker.update(detection, 0, 0)
+    predicted = tracker.update(None, 99, 100)
+
+    assert measured is not None
+    assert measured.measurement_source == "yolo"
+    assert measured.is_direct_observation
+    assert predicted is not None
+    assert predicted.measurement_source == "predicted"
+    assert not predicted.is_visual_observation
 
 
 def test_rim_radius_uses_horizontal_opening_not_net_height():
@@ -91,6 +107,7 @@ def test_distant_rim_jump_is_rejected_after_lock():
 if __name__ == "__main__":
     test_tracker_follows_fast_measurements_without_moving_average_lag()
     test_tracker_predicts_only_short_missing_gaps()
+    test_tracker_labels_detection_and_prediction_provenance()
     test_rim_radius_uses_horizontal_opening_not_net_height()
     test_distant_rim_jump_is_rejected_after_lock()
     print("All ball tracking tests passed.")

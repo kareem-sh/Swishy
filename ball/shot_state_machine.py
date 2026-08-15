@@ -35,6 +35,7 @@ class BallTrackingStatus(str, Enum):
     """Whether the current ball point is measured, predicted, or absent."""
 
     OBSERVED = "observed"
+    TRACKED = "tracked"
     PREDICTED = "predicted"
     LOST = "lost"
 
@@ -65,6 +66,7 @@ class BallStateUpdate:
 
     state: BallShotState
     tracking_status: BallTrackingStatus
+    measurement_source: str = "none"
     outcome: Optional[ShotOutcome] = None
     released_this_frame: bool = False
     crossed_rim_this_frame: bool = False
@@ -93,8 +95,8 @@ class BallShotStateMachine:
         self.release_distance_px = float(
             state_cfg.get("release_distance_px", 60)
         )
-        self.release_distance_growth_px = float(
-            state_cfg.get("release_distance_growth_px", 12)
+        self.release_distance_growth_px_s = float(
+            state_cfg.get("release_distance_growth_px_s", 360.0)
         )
         self.release_min_speed_px_s = float(
             state_cfg.get("release_min_speed_px_s", 120)
@@ -139,11 +141,11 @@ class BallShotStateMachine:
             0.0,
             float(state_cfg.get("entry_containment_tolerance_scale", 0.05)),
         )
-        self.below_confirmation_frames = max(
-            1, int(state_cfg.get("below_confirmation_frames", 2))
+        self.made_confirmation_s = max(
+            0.0, float(state_cfg.get("made_confirmation_s", 0.0))
         )
-        self.miss_confirmation_frames = max(
-            1, int(state_cfg.get("miss_confirmation_frames", 2))
+        self.miss_confirmation_s = max(
+            0.0, float(state_cfg.get("miss_confirmation_s", 0.05))
         )
         self.outcome_timeout_ms = max(
             1, int(state_cfg.get("outcome_timeout_ms", 3000))
@@ -182,6 +184,7 @@ class BallShotStateMachine:
         self.previous_rim_center: Optional[Tuple[float, float]] = None
         self.previous_observed_rim_center: Optional[Tuple[float, float]] = None
         self.previous_wrist_distance: Optional[float] = None
+        self.previous_wrist_timestamp_ms: Optional[int] = None
         self.last_observed_timestamp_ms: Optional[int] = None
         self.last_ball_radius: Optional[float] = None
         self.saw_ball_above_rim = False
@@ -189,6 +192,8 @@ class BallShotStateMachine:
         self.saw_contact_center_inside_opening = False
         self.below_confirmation_count = 0
         self.miss_confirmation_count = 0
+        self.below_confirmation_started_ms: Optional[int] = None
+        self.miss_confirmation_started_ms: Optional[int] = None
         self.evidence: list[str] = []
         self.crossing_xy: Optional[Tuple[float, float]] = None
         self._rim_locked = False
@@ -222,7 +227,15 @@ class BallShotStateMachine:
             self._update_rim(rim_detection)
 
         tracking_status = self._tracking_status(ball_detection, ball_snapshot)
-        observed = tracking_status == BallTrackingStatus.OBSERVED
+        observed = tracking_status in {
+            BallTrackingStatus.OBSERVED,
+            BallTrackingStatus.TRACKED,
+        }
+        measurement_source = (
+            ball_snapshot.measurement_source
+            if ball_snapshot is not None
+            else "none"
+        )
 
         if observed and ball_detection is not None:
             self.last_ball_radius = float(ball_detection.radius)
@@ -230,12 +243,16 @@ class BallShotStateMachine:
 
         if not self.enabled or self.terminal:
             self._remember_pose_phase(pose_phase)
-            return self._result(tracking_status)
+            return self._result(
+                tracking_status, measurement_source=measurement_source
+            )
 
         if ball_snapshot is None:
             self._check_timeouts(timestamp_ms, tracking_status)
             self._remember_pose_phase(pose_phase)
-            return self._result(tracking_status)
+            return self._result(
+                tracking_status, measurement_source=measurement_source
+            )
 
         wrist_distance = self._ball_wrist_distance(ball_snapshot, wrist_xy)
         vx, vy = ball_snapshot.velocity_xy
@@ -265,6 +282,7 @@ class BallShotStateMachine:
                 speed=speed,
                 ankle_y=ankle_y,
                 player_height_px=player_height_px,
+                timestamp_ms=timestamp_ms,
             ):
                 print("ball release confirmed")
                 self.state = BallShotState.RELEASED
@@ -305,10 +323,12 @@ class BallShotStateMachine:
             self.previous_observed_rim_center = self.rim_center
         if wrist_distance is not None:
             self.previous_wrist_distance = wrist_distance
+            self.previous_wrist_timestamp_ms = timestamp_ms
         self._remember_pose_phase(pose_phase)
 
         return self._result(
             tracking_status,
+            measurement_source=measurement_source,
             released_this_frame=released_this_frame,
             crossed_rim_this_frame=crossed_this_frame,
         )
@@ -319,6 +339,10 @@ class BallShotStateMachine:
         snapshot: Optional[BallSnapshot],
     ) -> BallTrackingStatus:
         if detection is not None and snapshot is not None:
+            if detection.measurement_source == "nanotrack":
+                return BallTrackingStatus.TRACKED
+            if not detection.is_visual_observation:
+                return BallTrackingStatus.PREDICTED
             return BallTrackingStatus.OBSERVED
         if snapshot is not None and snapshot.is_interpolated:
             return BallTrackingStatus.PREDICTED
@@ -371,6 +395,7 @@ class BallShotStateMachine:
         speed: float,
         ankle_y: Optional[float],
         player_height_px: Optional[float],
+        timestamp_ms: int,
     ) -> bool:
         pose_release = pose_phase in _RELEASE_PHASES
         difference_from_ankle = (
@@ -404,12 +429,20 @@ class BallShotStateMachine:
             and wrist_distance >= self.release_distance_px * 1.5
         )
         separating = False
-        if wrist_distance is not None and self.previous_wrist_distance is not None:
+        if (
+            wrist_distance is not None
+            and self.previous_wrist_distance is not None
+            and self.previous_wrist_timestamp_ms is not None
+        ):
+            dt_s = (timestamp_ms - self.previous_wrist_timestamp_ms) / 1000.0
+            distance_growth_px_s = (
+                (wrist_distance - self.previous_wrist_distance) / dt_s
+                if dt_s > 1e-6
+                else 0.0
+            )
             separating = (
                 wrist_distance >= self.release_distance_px
-                and wrist_distance - self.previous_wrist_distance
-                >= self.release_distance_growth_px
-                
+                and distance_growth_px_s >= self.release_distance_growth_px_s
             )
         # print(separating , ball_fast , ankle_release)
         return ankle_release and(
@@ -627,24 +660,23 @@ class BallShotStateMachine:
                 and vertical_velocity >= 0.0
             )
             confirmed_made_exit = clean_inside_exit or contact_inside_exit
-            if confirmed_made_exit:
-                self.below_confirmation_count += 1
-                self.miss_confirmation_count = 0
-            elif observed:
-                self.below_confirmation_count = 0
-
             unverified_contact_exit = (
                 self.state == BallShotState.RIM_CONTACT
                 and observed
                 and below_rim
                 and not self.saw_contact_center_inside_opening
             )
-            if rebounding_up or (
+            miss_evidence = rebounding_up or (
                 self.state == BallShotState.RIM_CONTACT
                 and not self.saw_contact_center_inside_opening
                 and (outside_exit or unverified_contact_exit)
-            ):
-                self.miss_confirmation_count += 1
+            )
+            make_duration_s = self._update_made_confirmation(
+                confirmed_made_exit, observed, timestamp_ms
+            )
+            miss_duration_s = self._update_miss_confirmation(
+                miss_evidence, observed, timestamp_ms
+            )
 
             self._debug_outcome_event(
                 "POST_ENTRY",
@@ -664,17 +696,18 @@ class BallShotStateMachine:
                 ),
                 rebounding_up=rebounding_up,
                 outside_exit=outside_exit,
-                make_count=(
-                    f"{self.below_confirmation_count}/"
-                    f"{self.below_confirmation_frames}"
+                make_duration_s=(
+                    f"{make_duration_s:.3f}/{self.made_confirmation_s:.3f}"
                 ),
-                miss_count=(
-                    f"{self.miss_confirmation_count}/"
-                    f"{self.miss_confirmation_frames}"
+                miss_duration_s=(
+                    f"{miss_duration_s:.3f}/{self.miss_confirmation_s:.3f}"
                 ),
             )
 
-            if self.below_confirmation_count >= self.below_confirmation_frames:
+            if (
+                confirmed_made_exit
+                and make_duration_s >= self.made_confirmation_s
+            ):
                 contact_make = self.state == BallShotState.RIM_CONTACT
                 self._finish(
                     result="made",
@@ -686,7 +719,7 @@ class BallShotStateMachine:
                     ),
                     timestamp_ms=timestamp_ms,
                 )
-            elif self.miss_confirmation_count >= self.miss_confirmation_frames:
+            elif miss_evidence and miss_duration_s >= self.miss_confirmation_s:
                 if rebounding_up:
                     miss_reason = "Ball rebounded upward after rim crossing"
                 elif outside_exit:
@@ -703,11 +736,14 @@ class BallShotStateMachine:
                 )
 
         elif self.state == BallShotState.CROSSED_OUTSIDE:
-            if (
+            miss_evidence = (
                 observed
                 and (below_rim or rebounding_up or outside_exit)
-            ):
-                self.miss_confirmation_count += 1
+            )
+            self._update_made_confirmation(False, observed, timestamp_ms)
+            miss_duration_s = self._update_miss_confirmation(
+                miss_evidence, observed, timestamp_ms
+            )
             self._debug_outcome_event(
                 "OUTSIDE_ENTRY",
                 frame=snapshot.frame_index,
@@ -716,12 +752,11 @@ class BallShotStateMachine:
                 inside_inner_opening=inside_inner_opening,
                 rebounding_up=rebounding_up,
                 outside_exit=outside_exit,
-                miss_count=(
-                    f"{self.miss_confirmation_count}/"
-                    f"{self.miss_confirmation_frames}"
+                miss_duration_s=(
+                    f"{miss_duration_s:.3f}/{self.miss_confirmation_s:.3f}"
                 ),
             )
-            if self.miss_confirmation_count >= self.miss_confirmation_frames:
+            if miss_evidence and miss_duration_s >= self.miss_confirmation_s:
                 self._finish(
                     result="missed",
                     confidence=0.90,
@@ -732,13 +767,16 @@ class BallShotStateMachine:
         elif self.state == BallShotState.RIM_APPROACH:
             # Handles an airball when sparse frames do not capture the exact
             # plane crossing but the ball is visibly below and well outside.
-            if (
+            miss_evidence = (
                 observed
                 and below_rim
                 and horizontal_offset
                 > self.rim_inner_radius * self.rim_exit_channel_scale
-            ):
-                self.miss_confirmation_count += 1
+            )
+            self._update_made_confirmation(False, observed, timestamp_ms)
+            miss_duration_s = self._update_miss_confirmation(
+                miss_evidence, observed, timestamp_ms
+            )
             if observed and below_rim:
                 self._debug_outcome_event(
                     "AIRBALL_CHECK",
@@ -747,12 +785,11 @@ class BallShotStateMachine:
                     exit_limit=(
                         self.rim_inner_radius * self.rim_exit_channel_scale
                     ),
-                    miss_count=(
-                        f"{self.miss_confirmation_count}/"
-                        f"{self.miss_confirmation_frames}"
+                    miss_duration_s=(
+                        f"{miss_duration_s:.3f}/{self.miss_confirmation_s:.3f}"
                     ),
                 )
-            if self.miss_confirmation_count >= self.miss_confirmation_frames:
+            if miss_evidence and miss_duration_s >= self.miss_confirmation_s:
                 self._finish(
                     result="missed",
                     confidence=0.80,
@@ -761,6 +798,36 @@ class BallShotStateMachine:
                 )
 
         return crossed
+
+    def _update_made_confirmation(
+        self, condition: bool, observed: bool, timestamp_ms: int
+    ) -> float:
+        if not observed or not condition:
+            self.below_confirmation_started_ms = None
+            self.below_confirmation_count = 0
+            return 0.0
+        if self.below_confirmation_started_ms is None:
+            self.below_confirmation_started_ms = timestamp_ms
+        self.below_confirmation_count += 1
+        return max(
+            0.0,
+            (timestamp_ms - self.below_confirmation_started_ms) / 1000.0,
+        )
+
+    def _update_miss_confirmation(
+        self, condition: bool, observed: bool, timestamp_ms: int
+    ) -> float:
+        if not observed or not condition:
+            self.miss_confirmation_started_ms = None
+            self.miss_confirmation_count = 0
+            return 0.0
+        if self.miss_confirmation_started_ms is None:
+            self.miss_confirmation_started_ms = timestamp_ms
+        self.miss_confirmation_count += 1
+        return max(
+            0.0,
+            (timestamp_ms - self.miss_confirmation_started_ms) / 1000.0,
+        )
 
     def _ball_contour_fits_opening(
         self,
@@ -971,6 +1038,8 @@ class BallShotStateMachine:
                 "crossing_timestamp_ms": self.entry_timestamp_ms,
                 "below_confirmation_count": self.below_confirmation_count,
                 "miss_confirmation_count": self.miss_confirmation_count,
+                "made_confirmation_s": self.made_confirmation_s,
+                "miss_confirmation_s": self.miss_confirmation_s,
             },
         )
         return self.outcome
@@ -978,12 +1047,14 @@ class BallShotStateMachine:
     def _result(
         self,
         tracking_status: BallTrackingStatus,
+        measurement_source: str = "none",
         released_this_frame: bool = False,
         crossed_rim_this_frame: bool = False,
     ) -> BallStateUpdate:
         return BallStateUpdate(
             state=self.state,
             tracking_status=tracking_status,
+            measurement_source=measurement_source,
             outcome=self.outcome,
             released_this_frame=released_this_frame,
             crossed_rim_this_frame=crossed_rim_this_frame,

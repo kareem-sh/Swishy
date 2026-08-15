@@ -16,10 +16,13 @@ class ReleaseSync:
 
         self.config = load_yaml(config_name)
         sync = self.config.get("release_sync", {})
-        self.max_frame_offset = int(
-            sync.get(
-                "max_body_ball_frame_delta",
-                self.config.get("release_max_offset", 5),
+        self.max_time_offset_s = max(
+            0.0,
+            float(
+                sync.get(
+                    "max_body_ball_time_delta_s",
+                    self.config.get("release_max_offset_s", 0.10),
+                )
             )
         )
         self.distance_threshold = float(
@@ -31,6 +34,7 @@ class ReleaseSync:
         self.velocity_threshold = float(
             self.config.get("release_velocity_threshold", 100)
         )
+
     def find_release_frame(
         self,
         ball_buffer: BallTimeSeriesBuffer,
@@ -43,21 +47,37 @@ class ReleaseSync:
 
         # Method 1: Ball-wrist distance spike
         ball_release_idx = self._detect_by_distance(ball_buffer, wrist_positions)
-        
+
         if ball_release_idx is None:
             # Method 2: Velocity-based detection
             ball_release_idx = self._detect_by_velocity(ball_buffer)
 
-        # Align with body release if available
+        # Align by video time, never by frame count. Frame indices are only
+        # identifiers used to locate the corresponding timestamps.
         if body_release_frame is not None and ball_release_idx is not None:
-            offset = abs(ball_release_idx - body_release_frame)
-            if offset <= self.max_frame_offset:
-                return ball_release_idx
-            else:
-                # Use body release frame if within buffer range
+            ball_timestamp_ms = self._timestamp_for_frame(
+                ball_buffer, ball_release_idx
+            )
+            body_timestamp_ms = self._timestamp_for_frame(
+                ball_buffer, body_release_frame
+            )
+            if ball_timestamp_ms is None or body_timestamp_ms is None:
                 return body_release_frame
+            offset_s = abs(ball_timestamp_ms - body_timestamp_ms) / 1000.0
+            if offset_s <= self.max_time_offset_s:
+                return ball_release_idx
+            return body_release_frame
 
         return ball_release_idx
+
+    @staticmethod
+    def _timestamp_for_frame(
+        ball_buffer: BallTimeSeriesBuffer, frame_index: int
+    ) -> Optional[int]:
+        for snapshot in ball_buffer.buffer:
+            if snapshot.frame_index == frame_index:
+                return snapshot.timestamp_ms
+        return None
 
     def _detect_by_distance(self, buffer: BallTimeSeriesBuffer, wrist_positions: List[tuple]) -> Optional[int]:
         """Detect release by ball-wrist distance spike."""

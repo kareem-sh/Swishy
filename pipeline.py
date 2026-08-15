@@ -95,6 +95,7 @@ class FrameResult:
     ball_snapshot: Optional[BallSnapshot] = None
     ball_state: str = "waiting"
     ball_tracking_status: str = "lost"
+    ball_measurement_source: str = "none"
     shot_outcome: Optional[ShotOutcome] = None
     stabilized_rim_center_xy: Optional[Tuple[float, float]] = None
     stabilized_rim_inner_radius: Optional[float] = None
@@ -245,8 +246,8 @@ class ShotAnalysisPipeline:
                     "fit_outlier_threshold_rim_radii", 0.75
                 )
             ),
-            release_preroll_points=int(
-                trajectory_display_cfg.get("release_preroll_points", 12)
+            release_preroll_s=float(
+                trajectory_display_cfg.get("release_preroll_s", 0.4)
             ),
             release_near_wrist_scale=float(
                 trajectory_display_cfg.get("release_near_wrist_scale", 0.5)
@@ -298,8 +299,16 @@ class ShotAnalysisPipeline:
                     "minimum_wrist_release_to_rim_height_m", 0.05
                 )
             ),
-            velocity_fit_points=int(
-                trajectory_display_cfg.get("velocity_fit_points", 7)
+            velocity_fit_window_s=float(
+                trajectory_display_cfg.get("velocity_fit_window_s", 0.2)
+            ),
+            velocity_fit_min_points=int(
+                trajectory_display_cfg.get("velocity_fit_min_points", 3)
+            ),
+            velocity_fit_min_direct_points=int(
+                trajectory_display_cfg.get(
+                    "velocity_fit_min_direct_points", 2
+                )
             ),
             velocity_fit_outlier_threshold_rim_radii=float(
                 trajectory_display_cfg.get(
@@ -359,21 +368,27 @@ class ShotAnalysisPipeline:
         self._ball_detector: Optional[BallDetector] = None
         tracking_cfg = ball_cfg.get("tracking", {})
         self._ball_tracker = BallTracker(
-            max_gap_frames=int(tracking_cfg.get("max_missing_frames", 4)),
+            max_gap_ms=int(tracking_cfg.get("max_missing_ms", 200)),
             position_alpha=float(tracking_cfg.get("position_alpha", 0.80)),
             velocity_alpha=float(tracking_cfg.get("velocity_alpha", 0.50)),
         )
         self._ball_buffer = BallTimeSeriesBuffer()
         self._ball_shot_fsm = BallShotStateMachine("ball.yaml")
         self._last_rim: Optional[RimDetection] = None
-        self._last_yolo_frame = -1
+        self._last_yolo_timestamp_ms: Optional[int] = None
 
         visual_tracking_cfg = ball_cfg.get("visual_tracking", {})
         self._visual_tracking_enabled = bool(
             self._ball_enabled and visual_tracking_cfg.get("enabled", False)
         )
-        self._yolo_correction_interval = max(
-            1, int(visual_tracking_cfg.get("yolo_correction_interval", 10))
+        self._yolo_correction_interval_ms = max(
+            1,
+            int(
+                float(
+                    visual_tracking_cfg.get("yolo_correction_interval_s", 0.33)
+                )
+                * 1000
+            ),
         )
         self._yolo_reinitialize_confidence = float(
             visual_tracking_cfg.get("yolo_reinitialize_confidence", 0.05)
@@ -419,8 +434,14 @@ class ShotAnalysisPipeline:
         self._rim_tracking_enabled = bool(
             self._ball_enabled and rim_tracking_cfg.get("enabled", False)
         )
-        self._rim_yolo_correction_interval = max(
-            1, int(rim_tracking_cfg.get("yolo_correction_interval", 10))
+        self._rim_yolo_correction_interval_ms = max(
+            1,
+            int(
+                float(
+                    rim_tracking_cfg.get("yolo_correction_interval_s", 0.33)
+                )
+                * 1000
+            ),
         )
         self._rim_yolo_min_confidence = float(
             rim_tracking_cfg.get("yolo_reinitialize_confidence", 0.15)
@@ -446,7 +467,7 @@ class ShotAnalysisPipeline:
             center_y_fraction=rim_center_y_fraction,
         )
         self._nano_rim_tracker: Optional[NanoRimTracker] = None
-        self._last_rim_yolo_frame = -self._rim_yolo_correction_interval
+        self._last_rim_yolo_timestamp_ms: Optional[int] = None
 
         if self._rim_tracking_enabled:
             backbone_path = PROJECT_ROOT / rim_tracking_cfg.get(
@@ -583,16 +604,24 @@ class ShotAnalysisPipeline:
                 rim = self._rim_smoother.update(tracked_rim)
                 self._last_rim = rim
 
-        frames_since_yolo = self._frame_index - self._last_yolo_frame
-        rim_frames_since_yolo = self._frame_index - self._last_rim_yolo_frame
+        ball_correction_due = (
+            self._last_yolo_timestamp_ms is None
+            or timestamp_ms - self._last_yolo_timestamp_ms
+            >= self._yolo_correction_interval_ms
+        )
+        rim_correction_elapsed = (
+            self._last_rim_yolo_timestamp_ms is None
+            or timestamp_ms - self._last_rim_yolo_timestamp_ms
+            >= self._rim_yolo_correction_interval_ms
+        )
         rim_correction_due = (
             self._rim_tracking_enabled
-            and rim_frames_since_yolo >= self._rim_yolo_correction_interval
+            and rim_correction_elapsed
         )
         run_yolo = (
             not self._visual_tracking_enabled
             or ball is None
-            or frames_since_yolo >= self._yolo_correction_interval
+            or ball_correction_due
             or rim_correction_due
         )
 
@@ -602,8 +631,8 @@ class ShotAnalysisPipeline:
                 self._frame_index,
                 timestamp_ms,
             )
-            self._last_yolo_frame = self._frame_index
-            self._last_rim_yolo_frame = self._frame_index
+            self._last_yolo_timestamp_ms = timestamp_ms
+            self._last_rim_yolo_timestamp_ms = timestamp_ms
 
             if (
                 court.rim is not None
@@ -962,7 +991,7 @@ class ShotAnalysisPipeline:
         if update.released_this_frame:
             self._release_comparison_debug_printed = False
             self._final_comparison_debug_printed = False
-            points = self._observed_trajectory.relative_points()
+            points = self._observed_trajectory.relative_measurements()
             (
                 historical_wrist_relative_xy,
                 historical_wrist_distance_px,
@@ -1016,9 +1045,7 @@ class ShotAnalysisPipeline:
         comparison = self._ideal_trajectory.comparison()
         if self._debug_trajectory_comparison and comparison is not None:
             release_comparison_ready = (
-                comparison.observed_point_count
-                >= self._ideal_trajectory.velocity_fit_points
-                and comparison.observed_release_angle_deg is not None
+                comparison.observed_release_angle_deg is not None
                 and comparison.observed_release_speed_m_s is not None
             )
             if (
@@ -1045,7 +1072,7 @@ class ShotAnalysisPipeline:
 
     def _release_calibration(
         self,
-        points: List[Tuple[float, float, int]],
+        points: List[tuple],
         update: BallStateUpdate,
         player_height_px: Optional[float],
         standing_ankle_y_px: Optional[float],
@@ -1357,6 +1384,8 @@ class ShotAnalysisPipeline:
             "path_rmse_radii": comparison.path_rmse_rim_radii,
             "rim_crossing_error_radii": comparison.rim_crossing_error_rim_radii,
             "points": comparison.observed_point_count,
+            "direct_points": comparison.observed_direct_point_count,
+            "tracked_points": comparison.observed_tracked_point_count,
             "calibration": comparison.velocity_calibration,
             "anchor": comparison.release_anchor_source,
         }
@@ -1395,6 +1424,7 @@ class ShotAnalysisPipeline:
         return {
             "ball_state": update.state.value,
             "ball_tracking_status": update.tracking_status.value,
+            "ball_measurement_source": update.measurement_source,
             "shot_outcome": update.outcome,
             "stabilized_rim_center_xy": update.rim_center_xy,
             "stabilized_rim_inner_radius": update.rim_inner_radius,
@@ -1628,8 +1658,8 @@ class ShotAnalysisPipeline:
         self._release_comparison_debug_printed = False
         self._final_comparison_debug_printed = False
         self._last_rim = None
-        self._last_yolo_frame = -1
-        self._last_rim_yolo_frame = -self._rim_yolo_correction_interval
+        self._last_yolo_timestamp_ms = None
+        self._last_rim_yolo_timestamp_ms = None
         self._rim_smoother.reset()
         if self._nano_ball_tracker is not None:
             self._nano_ball_tracker.reset()

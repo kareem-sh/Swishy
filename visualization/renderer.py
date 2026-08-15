@@ -196,7 +196,8 @@ def _draw_ball_rim(annotated: np.ndarray, frame_result: FrameResult) -> None:
 
     state_text = (
         f"Ball: {frame_result.ball_state.upper()} | "
-        f"{frame_result.ball_tracking_status.upper()}"
+        f"{frame_result.ball_tracking_status.upper()} | "
+        f"{frame_result.ball_measurement_source.upper()}"
     )
     if frame_result.shot_outcome is not None:
         state_text += f" | {frame_result.shot_outcome.result.upper()}"

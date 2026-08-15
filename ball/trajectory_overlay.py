@@ -21,6 +21,8 @@ class _RelativeTrajectoryPoint:
     timestamp_ms: int
     wrist_distance_px: Optional[float] = None
     wrist_relative_xy: Optional[Point] = None
+    measurement_source: str = "unknown"
+    is_direct_observation: bool = True
 
 
 class ObservedTrajectoryRecorder:
@@ -39,7 +41,7 @@ class ObservedTrajectoryRecorder:
         fit_min_points: int = 5,
         fit_samples: int = 60,
         fit_outlier_threshold_rim_radii: float = 0.75,
-        release_preroll_points: int = 12,
+        release_preroll_s: float = 0.4,
         release_near_wrist_scale: float = 0.5,
     ) -> None:
         self.max_points = max(2, int(max_points))
@@ -54,10 +56,9 @@ class ObservedTrajectoryRecorder:
         self.release_near_wrist_scale = max(
             0.05, float(release_near_wrist_scale)
         )
+        self.release_preroll_ms = max(0, int(float(release_preroll_s) * 1000))
         self._segments: List[List[_RelativeTrajectoryPoint]] = []
-        self._preroll: Deque[_RelativeTrajectoryPoint] = deque(
-            maxlen=max(2, int(release_preroll_points))
-        )
+        self._preroll: Deque[_RelativeTrajectoryPoint] = deque()
         self._kinematics_start_timestamp_ms: Optional[int] = None
         self._active = False
         self._gap_before_next_point = False
@@ -90,7 +91,9 @@ class ObservedTrajectoryRecorder:
             and math.isfinite(float(rim_radius))
             and float(rim_radius) > 1e-6
         )
-        observed_snapshot = snapshot is not None and not snapshot.is_interpolated
+        observed_snapshot = (
+            snapshot is not None and snapshot.is_visual_observation
+        )
         relative_point = None
         if observed_snapshot and valid_rim:
             rim_x, rim_y = rim_center_xy
@@ -112,12 +115,15 @@ class ObservedTrajectoryRecorder:
                 timestamp_ms=snapshot.timestamp_ms,
                 wrist_distance_px=wrist_distance,
                 wrist_relative_xy=wrist_relative,
+                measurement_source=snapshot.measurement_source,
+                is_direct_observation=snapshot.is_direct_observation,
             )
             if (
                 not self._preroll
                 or relative_point.timestamp_ms != self._preroll[-1].timestamp_ms
             ):
                 self._preroll.append(relative_point)
+                self._trim_preroll(relative_point.timestamp_ms)
 
         if released_this_frame:
             self._segments.clear()
@@ -146,6 +152,22 @@ class ObservedTrajectoryRecorder:
         """Return recorded points for calculations in rim-radius units."""
         return [
             (point.x, point.y, point.timestamp_ms)
+            for segment in self._segments
+            for point in segment
+        ]
+
+    def relative_measurements(
+        self,
+    ) -> List[Tuple[float, float, int, str, bool]]:
+        """Return points plus detector provenance for numeric calculations."""
+        return [
+            (
+                point.x,
+                point.y,
+                point.timestamp_ms,
+                point.measurement_source,
+                point.is_direct_observation,
+            )
             for segment in self._segments
             for point in segment
         ]
@@ -330,3 +352,11 @@ class ObservedTrajectoryRecorder:
             excess -= remove_count
             if not first:
                 self._segments.pop(0)
+
+    def _trim_preroll(self, newest_timestamp_ms: int) -> None:
+        while (
+            len(self._preroll) > 1
+            and newest_timestamp_ms - self._preroll[0].timestamp_ms
+            > self.release_preroll_ms
+        ):
+            self._preroll.popleft()

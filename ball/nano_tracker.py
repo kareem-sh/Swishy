@@ -199,6 +199,7 @@ class NanoBallTracker:
             confidence=self._last_score,
             frame_index=frame_index,
             timestamp_ms=timestamp_ms,
+            measurement_source="nanotrack",
         )
 
     def _tracking_score(self) -> float:

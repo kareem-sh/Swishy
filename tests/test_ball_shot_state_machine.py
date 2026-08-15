@@ -6,7 +6,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from ball.models import BallDetection, BallSnapshot, RimDetection, ShotOutcome
-from ball.shot_state_machine import BallShotState, BallShotStateMachine
+from ball.shot_state_machine import (
+    BallShotState,
+    BallShotStateMachine,
+    BallTrackingStatus,
+)
 from feedback.console import shot_summary_to_dict
 from feedback.shot_tracker import ShotTracker
 from utils.frame_buffer import FrameSnapshot
@@ -143,13 +147,31 @@ def test_outside_crossing_becomes_missed() -> None:
     assert missed.outcome.result == "missed"
 
 
+def test_miss_confirmation_uses_elapsed_time_not_frame_count() -> None:
+    machine = BallShotStateMachine()
+    machine.miss_confirmation_s = 0.05
+    _release(machine)
+
+    _update(machine, 570, 250, 2, 200, (100, -150))
+    _update(machine, 570, 280, 3, 300, (0, 200))
+    crossing = _update(machine, 570, 310, 4, 400, (0, 300))
+    first = _update(machine, 575, 340, 20, 420, (50, 300))
+    too_soon = _update(machine, 580, 345, 40, 460, (50, 125))
+    confirmed = _update(machine, 585, 350, 41, 470, (50, 125))
+
+    assert crossing.state == BallShotState.CROSSED_OUTSIDE
+    assert first.state == BallShotState.CROSSED_OUTSIDE
+    assert too_soon.state == BallShotState.CROSSED_OUTSIDE
+    assert confirmed.state == BallShotState.MISSED
+
+
 def test_front_rim_contact_can_deflect_in_and_become_made() -> None:
     machine = BallShotStateMachine()
     _release(machine)
 
-    _update(machine, 530, 245, 2, 200, (100, -180))
-    _update(machine, 530, 280, 3, 300, (0, 180))
-    contact = _update(machine, 530, 315, 4, 400, (0, 350))
+    _update(machine, 545, 245, 2, 200, (100, -180))
+    _update(machine, 545, 280, 3, 300, (0, 180))
+    contact = _update(machine, 545, 310, 4, 400, (0, 350))
     made = _update(machine, 512, 338, 5, 500, (-180, 230))
 
     assert contact.state == BallShotState.RIM_CONTACT
@@ -164,9 +186,9 @@ def test_back_rim_contact_can_deflect_in_and_become_made() -> None:
     machine = BallShotStateMachine()
     _release(machine)
 
-    _update(machine, 470, 245, 2, 200, (-100, -180))
-    _update(machine, 470, 280, 3, 300, (0, 180))
-    contact = _update(machine, 470, 315, 4, 400, (0, 350))
+    _update(machine, 455, 245, 2, 200, (-100, -180))
+    _update(machine, 455, 280, 3, 300, (0, 180))
+    contact = _update(machine, 455, 310, 4, 400, (0, 350))
     made = _update(machine, 488, 338, 5, 500, (180, 230))
 
     assert contact.state == BallShotState.RIM_CONTACT
@@ -179,9 +201,9 @@ def test_rim_contact_that_bounces_away_becomes_missed() -> None:
     machine = BallShotStateMachine()
     _release(machine)
 
-    _update(machine, 530, 245, 2, 200, (100, -180))
-    _update(machine, 530, 280, 3, 300, (0, 180))
-    contact = _update(machine, 530, 315, 4, 400, (0, 350))
+    _update(machine, 545, 245, 2, 200, (100, -180))
+    _update(machine, 545, 280, 3, 300, (0, 180))
+    contact = _update(machine, 545, 310, 4, 400, (0, 350))
     first_bounce = _update(machine, 548, 285, 5, 500, (180, -300))
     missed = _update(machine, 568, 260, 6, 600, (200, -250))
 
@@ -198,7 +220,7 @@ def test_predicted_points_cannot_confirm_a_make() -> None:
 
     _update(machine, 500, 250, 2, 200, (100, -150))
     _update(machine, 500, 280, 3, 300, (0, 200))
-    crossed = _update(machine, 500, 315, 4, 400, (0, 350))
+    crossed = _update(machine, 500, 310, 4, 400, (0, 350))
     assert crossed.state == BallShotState.CROSSED_INSIDE
 
     _update(machine, 500, 340, 5, 600, (0, 150), observed=False)
@@ -221,8 +243,30 @@ def test_ball_flight_continues_when_pose_is_missing() -> None:
     assert made.state == BallShotState.MADE
 
 
+def test_nanotrack_evidence_is_labelled_separately_from_yolo() -> None:
+    machine = BallShotStateMachine()
+    detection, snapshot = _ball(100, 500, 0, 0)
+    assert detection is not None
+    detection.measurement_source = "nanotrack"
+    snapshot.measurement_source = "nanotrack"
+
+    result = machine.update(
+        ball_detection=detection,
+        ball_snapshot=snapshot,
+        rim_detection=_rim(),
+        wrist_xy=(100, 500),
+        ankle_y=_STANDING_ANKLE_Y,
+        pose_phase="rise",
+        timestamp_ms=0,
+    )
+
+    assert result.tracking_status == BallTrackingStatus.TRACKED
+    assert result.measurement_source == "nanotrack"
+
+
 def test_moving_camera_uses_ball_position_relative_to_rim() -> None:
     machine = BallShotStateMachine()
+    machine.dynamic_rim = True
 
     def moving_update(
         base_ball_xy,
@@ -368,11 +412,13 @@ def test_ball_outcome_can_finish_after_body_grace_when_pose_never_lands() -> Non
 if __name__ == "__main__":
     test_clean_inside_crossing_becomes_made()
     test_outside_crossing_becomes_missed()
+    test_miss_confirmation_uses_elapsed_time_not_frame_count()
     test_front_rim_contact_can_deflect_in_and_become_made()
     test_back_rim_contact_can_deflect_in_and_become_made()
     test_rim_contact_that_bounces_away_becomes_missed()
     test_predicted_points_cannot_confirm_a_make()
     test_ball_flight_continues_when_pose_is_missing()
+    test_nanotrack_evidence_is_labelled_separately_from_yolo()
     test_moving_camera_uses_ball_position_relative_to_rim()
     test_shot_tracker_waits_for_ball_after_body_finishes()
     test_ball_outcome_can_finish_after_body_grace_when_pose_never_lands()

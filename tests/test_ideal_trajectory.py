@@ -66,7 +66,8 @@ def test_tracker_calculates_angle_speed_and_path_error() -> None:
     tracker = IdealTrajectoryTracker(
         release_angle_deg=45.0,
         samples=21,
-        velocity_fit_points=3,
+        velocity_fit_window_s=0.2,
+        velocity_fit_min_points=3,
         comparison_min_points=3,
     )
     rim = (500.0, 200.0)
@@ -257,7 +258,9 @@ def test_tracker_can_use_wrist_proxy_as_ideal_release_anchor() -> None:
 
 
 def test_release_kinematics_skip_pre_separation_preroll() -> None:
-    tracker = IdealTrajectoryTracker(velocity_fit_points=3)
+    tracker = IdealTrajectoryTracker(
+        velocity_fit_window_s=0.066, velocity_fit_min_points=3
+    )
     tracker.start_from_relative_points(
         [
             (-10.0, 5.0, 0),
@@ -276,8 +279,72 @@ def test_release_kinematics_skip_pre_separation_preroll() -> None:
     assert comparison.observed_release_speed_m_s is not None
 
 
+def test_release_kinematics_requires_direct_detector_anchors() -> None:
+    tracker = IdealTrajectoryTracker(
+        velocity_fit_window_s=0.2,
+        velocity_fit_min_points=3,
+        velocity_fit_min_direct_points=2,
+    )
+    tracker.start_from_relative_points(
+        [
+            (-5.0, 3.0, 0, "nanotrack", False),
+            (-4.0, 2.0, 100, "nanotrack", False),
+            (-3.0, 1.2, 200, "nanotrack", False),
+        ],
+        target_relative_xy=(0.0, 0.0),
+    )
+
+    comparison = tracker.comparison()
+    assert comparison is not None
+    assert comparison.observed_release_speed_m_s is None
+    assert comparison.early_kinematics_status == "insufficient_direct_detections"
+    assert comparison.observed_direct_point_count == 0
+    assert comparison.observed_tracked_point_count == 3
+
+
+def test_release_velocity_window_is_frame_rate_independent() -> None:
+    def comparison_for_step(step_ms: int):
+        tracker = IdealTrajectoryTracker(
+            velocity_fit_window_s=0.2,
+            velocity_fit_min_points=3,
+            velocity_fit_min_direct_points=2,
+        )
+        points = []
+        for timestamp_ms in range(0, 201, step_ms):
+            t = timestamp_ms / 1000.0
+            points.append(
+                (-5.0 + 10.0 * t, 3.0 - 8.0 * t + 4.0 * t * t, timestamp_ms)
+            )
+        tracker.start_from_relative_points(
+            points,
+            target_relative_xy=(0.0, 0.0),
+        )
+        return tracker.comparison()
+
+    low_fps = comparison_for_step(100)
+    high_fps = comparison_for_step(20)
+
+    assert low_fps is not None and high_fps is not None
+    assert low_fps.observed_release_angle_deg is not None
+    assert high_fps.observed_release_angle_deg is not None
+    assert low_fps.observed_release_speed_m_s is not None
+    assert high_fps.observed_release_speed_m_s is not None
+    assert math.isclose(
+        low_fps.observed_release_angle_deg,
+        high_fps.observed_release_angle_deg,
+        rel_tol=1e-9,
+    )
+    assert math.isclose(
+        low_fps.observed_release_speed_m_s,
+        high_fps.observed_release_speed_m_s,
+        rel_tol=1e-9,
+    )
+
+
 def test_invalid_away_from_rim_window_does_not_report_speed() -> None:
-    tracker = IdealTrajectoryTracker(velocity_fit_points=3)
+    tracker = IdealTrajectoryTracker(
+        velocity_fit_window_s=0.066, velocity_fit_min_points=3
+    )
     tracker.start_from_relative_points(
         [
             (-8.0, 5.0, 0),
@@ -297,7 +364,9 @@ def test_invalid_away_from_rim_window_does_not_report_speed() -> None:
 
 
 def test_rim_crossing_recovers_launch_when_early_fit_is_invalid() -> None:
-    tracker = IdealTrajectoryTracker(velocity_fit_points=3)
+    tracker = IdealTrajectoryTracker(
+        velocity_fit_window_s=0.066, velocity_fit_min_points=3
+    )
     tracker.start_from_relative_points(
         [
             (-8.0, 5.0, 0),
@@ -332,7 +401,9 @@ def test_rim_crossing_recovers_launch_when_early_fit_is_invalid() -> None:
 
 
 def test_release_to_rim_average_speed_uses_crossing_time() -> None:
-    tracker = IdealTrajectoryTracker(velocity_fit_points=3)
+    tracker = IdealTrajectoryTracker(
+        velocity_fit_window_s=0.2, velocity_fit_min_points=3
+    )
     tracker.start_from_relative_points(
         [(-10.0, 5.0, 0), (-9.0, 4.0, 100), (-8.0, 3.0, 200)],
         target_relative_xy=(0.0, 0.0),
@@ -474,6 +545,8 @@ if __name__ == "__main__":
     test_physical_tracker_uses_release_and_rim_heights_for_velocity()
     test_tracker_can_use_wrist_proxy_as_ideal_release_anchor()
     test_release_kinematics_skip_pre_separation_preroll()
+    test_release_kinematics_requires_direct_detector_anchors()
+    test_release_velocity_window_is_frame_rate_independent()
     test_invalid_away_from_rim_window_does_not_report_speed()
     test_rim_crossing_recovers_launch_when_early_fit_is_invalid()
     test_release_to_rim_average_speed_uses_crossing_time()

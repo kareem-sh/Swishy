@@ -61,8 +61,12 @@ trajectory_overlay:
   # These remain camera-scale estimates until full perspective calibration.
   rim_diameter_m: 0.457
   # Launch kinematics use real ball detections after hand separation only.
-  # Seven points are about 0.2 s at 30 FPS: enough for a stable quadratic fit.
-  velocity_fit_points: 7
+  # Fit the same 0.2-second launch interval at every source frame rate.
+  velocity_fit_window_s: 0.20
+  velocity_fit_min_points: 3
+  # NanoTrack may fill the interval, but at least two independently detected
+  # YOLO/color points must anchor a reported launch velocity.
+  velocity_fit_min_direct_points: 2
   velocity_fit_outlier_threshold_rim_radii: 0.75
   velocity_min_toward_rim_m_s: 0.25
   velocity_min_upward_m_s: 0.25
@@ -70,7 +74,7 @@ trajectory_overlay:
   comparison_min_points: 3
   # Release is confirmed a few frames late. Keep a short measured history and
   # begin both paths at the last near-wrist point before sustained separation.
-  release_preroll_points: 12
+  release_preroll_s: 0.40
   release_near_wrist_scale: 0.5
   observed_max_points: 120
   maximum_jump_rim_radii: 5.0

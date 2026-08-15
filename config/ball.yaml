@@ -35,20 +35,22 @@ detector:
   rim_refresh_frames: 1
 
 tracking:
-  max_missing_frames: 6
+  # Prediction is bounded by video time, so 12 FPS and 60 FPS footage receive
+  # the same missing-detection allowance.
+  max_missing_ms: 200
   position_alpha: 0.65
   velocity_alpha: 0.55
 
 # Hybrid visual tracker:
 # YOLO acquires/corrects the ball; NanoTrack follows it on every frame between
-# corrections. Lower yolo_correction_interval for accuracy, raise it for speed.
+# corrections. Lower yolo_correction_interval_s for accuracy, raise it for speed.
 visual_tracking:
   enabled: true
   device: auto  # auto | cpu | gpu; GPU requires an OpenCV CUDA build
   cuda_fp16: false
   backbone_path: models/nanotrack/nanotrack_backbone_sim.onnx
   neckhead_path: models/nanotrack/nanotrack_head_sim.onnx
-  yolo_correction_interval: 5
+  yolo_correction_interval_s: 0.16
   yolo_reinitialize_confidence: 0.20
   yolo_override_confidence: 0.35
   yolo_max_correction_distance_px: 100
@@ -64,7 +66,7 @@ rim_tracking:
   cuda_fp16: false
   backbone_path: models/nanotrack/nanotrack_backbone_sim.onnx
   neckhead_path: models/nanotrack/nanotrack_head_sim.onnx
-  yolo_correction_interval: 10
+  yolo_correction_interval_s: 0.33
   yolo_reinitialize_confidence: 0.25
   minimum_tracking_confidence: 0.10
   yolo_max_correction_distance_px: 120
@@ -82,11 +84,10 @@ rim_tracking:
 
 outcome:
   post_shot_capture_ms: 2000
-  min_flight_frames: 3
   rim_inner_scale: 0.95
 
 release_sync:
-  max_body_ball_frame_delta: 3
+  max_body_ball_time_delta_s: 0.10
   ball_wrist_release_distance_px: 40
 
 ball_state_machine:
@@ -97,7 +98,9 @@ ball_state_machine:
   debug_outcome: false
 
   release_distance_px: 33
-  release_distance_growth_px: 12
+  # Wrist separation rate, not per-frame displacement. The old 12 px/frame at
+  # 30 FPS is 360 px/s.
+  release_distance_growth_px_s: 360
   release_min_speed_px_s: 60
 
   # Ball height above the ankles as a fraction of visible nose-to-ankle
@@ -130,8 +133,8 @@ ball_state_machine:
   # A valid downward crossing plus one measured below-inside point is enough.
   # Requiring two consecutive points rejects real diagonal entries after the
   # ball naturally leaves the narrow rim-centered channel on the next frame.
-  below_confirmation_frames: 1
-  miss_confirmation_frames: 2
+  made_confirmation_s: 0.0
+  miss_confirmation_s: 0.05
   
   outcome_timeout_ms: 3000
   lost_timeout_ms: 800

@@ -118,9 +118,31 @@ def test_interpolated_snapshot_is_not_recorded() -> None:
     assert recorder.screen_segments((200, 100), 20) == [[(100.0, 100.0)]]
 
 
+def test_reused_detection_is_not_recorded_as_observed() -> None:
+    recorder = ObservedTrajectoryRecorder()
+    reused = _ball(120, 80, frame=1)
+    reused.measurement_source = "reused"
+    recorder.update(
+        _ball(100, 100),
+        released_this_frame=True,
+        shot_finished=False,
+        rim_center_xy=(200, 100),
+        rim_radius=20,
+    )
+    recorder.update(
+        reused,
+        released_this_frame=False,
+        shot_finished=False,
+        rim_center_xy=(200, 100),
+        rim_radius=20,
+    )
+
+    assert recorder.screen_segments((200, 100), 20) == [[(100.0, 100.0)]]
+
+
 def test_release_confirmation_backtracks_to_last_near_wrist_point() -> None:
     recorder = ObservedTrajectoryRecorder(
-        release_preroll_points=6,
+        release_preroll_s=0.2,
         release_near_wrist_scale=0.5,
     )
     recorder.update(
@@ -200,6 +222,7 @@ if __name__ == "__main__":
     test_missing_detection_starts_a_new_segment()
     test_finished_shot_stops_recording_until_next_release()
     test_interpolated_snapshot_is_not_recorded()
+    test_reused_detection_is_not_recorded_as_observed()
     test_release_confirmation_backtracks_to_last_near_wrist_point()
     test_robust_fit_ignores_one_jitter_outlier()
     print("All observed trajectory overlay tests passed.")

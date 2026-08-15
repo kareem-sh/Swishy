@@ -49,6 +49,8 @@ class TrajectoryComparison:
     apex_height_error_rim_radii: Optional[float]
     rim_crossing_error_rim_radii: Optional[float]
     observed_point_count: int
+    observed_direct_point_count: int
+    observed_tracked_point_count: int
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -59,6 +61,8 @@ class _RelativePoint:
     x: float
     y: float
     timestamp_ms: int
+    measurement_source: str = "unknown"
+    is_direct_observation: bool = True
 
 
 def ideal_trajectory_pixels(
@@ -331,7 +335,9 @@ class IdealTrajectoryTracker:
         rim_height_m: float = 3.05,
         minimum_vertical_difference_m: float = 0.25,
         minimum_wrist_vertical_difference_m: float = 0.05,
-        velocity_fit_points: int = 7,
+        velocity_fit_window_s: float = 0.2,
+        velocity_fit_min_points: int = 3,
+        velocity_fit_min_direct_points: int = 2,
         velocity_fit_outlier_threshold_rim_radii: float = 0.75,
         velocity_min_toward_rim_m_s: float = 0.25,
         velocity_min_upward_m_s: float = 0.25,
@@ -356,7 +362,11 @@ class IdealTrajectoryTracker:
             0.0,
             float(minimum_wrist_vertical_difference_m),
         )
-        self.velocity_fit_points = max(2, int(velocity_fit_points))
+        self.velocity_fit_window_s = max(0.01, float(velocity_fit_window_s))
+        self.velocity_fit_min_points = max(2, int(velocity_fit_min_points))
+        self.velocity_fit_min_direct_points = max(
+            1, int(velocity_fit_min_direct_points)
+        )
         self.velocity_fit_outlier_threshold_rim_radii = max(
             0.05,
             float(velocity_fit_outlier_threshold_rim_radii),
@@ -397,7 +407,7 @@ class IdealTrajectoryTracker:
 
     def start_from_relative_points(
         self,
-        points: Sequence[Tuple[float, float, int]],
+        points: Sequence[tuple],
         *,
         target_relative_xy: Point = (0.0, 0.0),
         release_height_m: Optional[float] = None,
@@ -443,15 +453,14 @@ class IdealTrajectoryTracker:
             self._release_height_m = float(release_height_m)
             self._meters_per_pixel_at_release = float(meters_per_pixel_at_release)
             self._release_rim_radius_px = float(rim_radius_px)
-        relative = [
-            _RelativePoint(float(x), float(y), int(timestamp_ms))
-            for x, y, timestamp_ms in points
-        ]
+        relative = [self._coerce_relative_point(point) for point in points]
         self._release = (
             _RelativePoint(
                 float(release_relative_xy[0]),
                 float(release_relative_xy[1]),
                 relative[0].timestamp_ms,
+                "wrist_proxy",
+                False,
             )
             if release_relative_xy is not None
             else relative[0]
@@ -490,7 +499,7 @@ class IdealTrajectoryTracker:
         crossing_timestamp_ms: Optional[int] = None,
     ) -> None:
         geometry = self._valid_geometry(rim_center_xy, rim_radius)
-        observed = snapshot is not None and not snapshot.is_interpolated
+        observed = snapshot is not None and snapshot.is_visual_observation
 
         if released_this_frame:
             self.reset()
@@ -708,6 +717,13 @@ class IdealTrajectoryTracker:
                 else None
             ),
             observed_point_count=len(self._observed),
+            observed_direct_point_count=sum(
+                point.is_direct_observation for point in self._observed
+            ),
+            observed_tracked_point_count=sum(
+                point.measurement_source == "nanotrack"
+                for point in self._observed
+            ),
         )
 
     def _observed_release_kinematics(
@@ -726,9 +742,18 @@ class IdealTrajectoryTracker:
             for point in self._observed
             if point.timestamp_ms >= start_timestamp_ms
         ]
-        points = eligible[: self.velocity_fit_points]
-        if len(points) < self.velocity_fit_points:
+        window_ms = int(round(self.velocity_fit_window_s * 1000.0))
+        window_end_ms = start_timestamp_ms + window_ms
+        if eligible[-1].timestamp_ms < window_end_ms:
+            return None, None, "incomplete_post_release_time_window"
+        points = [
+            point for point in eligible if point.timestamp_ms <= window_end_ms
+        ]
+        if len(points) < self.velocity_fit_min_points:
             return None, None, "insufficient_post_release_points"
+        direct_count = sum(point.is_direct_observation for point in points)
+        if direct_count < self.velocity_fit_min_direct_points:
+            return None, None, "insufficient_direct_detections"
 
         times = np.asarray(
             [(point.timestamp_ms - points[0].timestamp_ms) / 1000.0 for point in points],
@@ -1070,6 +1095,26 @@ class IdealTrajectoryTracker:
             x=(snapshot.x - float(rim_center_xy[0])) / rim_radius,
             y=(snapshot.y - float(rim_center_xy[1])) / rim_radius,
             timestamp_ms=snapshot.timestamp_ms,
+            measurement_source=snapshot.measurement_source,
+            is_direct_observation=snapshot.is_direct_observation,
+        )
+
+    @staticmethod
+    def _coerce_relative_point(point: tuple) -> _RelativePoint:
+        if len(point) < 3:
+            raise ValueError("A trajectory point requires x, y, and timestamp_ms")
+        source = str(point[3]) if len(point) >= 4 else "unknown"
+        direct = bool(point[4]) if len(point) >= 5 else source in {
+            "unknown",
+            "yolo",
+            "color",
+        }
+        return _RelativePoint(
+            float(point[0]),
+            float(point[1]),
+            int(point[2]),
+            source,
+            direct,
         )
 
     @staticmethod
