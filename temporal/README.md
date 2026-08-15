@@ -151,8 +151,12 @@ The footage and the classifier were both fine.
 The A/B against raw footage is in `compare_preprocessing.py`, and the number to
 watch is **class changed**: of the shots detected both ways, none moved across
 the jump/set boundary. That is the evidence the crop is not distorting the
-measurement. If a future change to this stage makes that number non-zero, the
+elevation. If a future change to this stage makes that number non-zero, the
 change is wrong no matter what it does to the totals.
+
+Note the scope of that evidence, which is narrower than it first reads: it
+covers the **elevation class only**. It says nothing about any other measure
+the crop feeds — see below for one it does not cover.
 
 ### Known, not fixed: the driving test is not scale-invariant
 
@@ -160,9 +164,31 @@ change is wrong no matter what it does to the totals.
 travel to **frame width**, while every other measurement in the project is
 normalised by the player's own on-screen height precisely so it survives zoom
 and camera distance. So the same physical sway reads differently depending on
-how tight the camera is: zoom in and a stationary shooter starts to look like a
-driving action. This is in shipped code and recalibrating the threshold is the
-owner's call, so it is recorded here rather than changed.
+how tight the camera is.
+
+**Preprocessing therefore changes it, and aspect preservation does not help.**
+Keeping the crop's aspect ratio fixes the x-versus-y comparison — hip travel
+against body height — but this ratio's denominator is the frame itself, so
+shrinking the frame scales it directly. Measured on `video8_shot03_set.mp4`:
+0.093 raw, **0.20 cropped**, past the 0.18 gate. The clip is an
+owner-labelled set shot from the fixed-camera fixture, and it is refused.
+
+That one refusal is the whole current cost, it is outside the 26 targets, and
+`extract_shots.py` now names it on every run. Recalibrating the threshold is
+out of scope for this version; the alternative fix, measuring travel against
+raw frame geometry, is a design change nobody has approved.
+
+### Scope: jump shots and set shots, nothing else
+
+A driving action is reported `UNKNOWN` and never scored — never as a layup,
+because the horizontal test measures that an attempt is *not* stationary
+shooting and says nothing about what it is instead.
+
+The gate is a **guard, not a feature**. It is tempting to read "we only support
+two types" as "delete the third", but removing it would not narrow the product;
+it would send drives into the jump-shot rules and produce confident, wrong
+coaching. Every shot in `shots.json` is `set_shot` or `jump_shot` because of
+that gate, not in spite of it.
 
 Panning clips are **not** stabilised. Residual stabilisation error is a slow
 drift, and every ratio feature here is normalised against a baseline gathered
