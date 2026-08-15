@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Sequence
 
 import cv2
 from mediapipe.tasks.python import vision
@@ -12,6 +12,7 @@ from config.settings import DEFAULT_FPS
 from feedback.console import session_report_to_dict
 from feedback.session_recorder import SessionRecorder
 from pipeline import ShotAnalysisPipeline
+from player.profile import build_player_profile
 from pose.detector import PoseDetector
 from utils.timestamps import frame_timestamp_ms
 from visualization.renderer import render_frame
@@ -20,6 +21,9 @@ from visualization.renderer import render_frame
 def analyze_video(
     video_path: str,
     *,
+    height_cm: Optional[float] = None,
+    rim_height_m: Optional[float] = None,
+    shot_xy_m: Optional[Sequence[float]] = None,
     save_key_frames: bool = True,
     key_frames_dir: Optional[str | Path] = None,
     save_report: bool = False,
@@ -31,7 +35,12 @@ def analyze_video(
     """
     video_path = str(video_path)
     detector = PoseDetector(running_mode=vision.RunningMode.VIDEO)
-    pipeline = ShotAnalysisPipeline()
+    profile = build_player_profile(height_cm=height_cm)
+    pipeline = ShotAnalysisPipeline(
+        player=profile,
+        rim_height_m=rim_height_m,
+        shot_xy_m=tuple(shot_xy_m) if shot_xy_m is not None else None,
+    )
     recorder = SessionRecorder(
         source_type="video",
         source_name=Path(video_path).name,
