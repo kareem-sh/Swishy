@@ -14,3 +14,4 @@ shots_prepared.json
 # for the dataset.
 features.npz
 features_leaky.npz
+phash64.json

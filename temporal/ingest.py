@@ -44,10 +44,11 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -57,6 +58,7 @@ PROJECT = TEMPORAL.parent
 sys.path.insert(0, str(PROJECT))
 
 from temporal.dataset import (  # noqa: E402
+    DATA,
     INVENTORY_CSV,
     QUALITY_CSV,
     VIDEO_SUFFIXES,
@@ -312,21 +314,72 @@ def measure(path: Path) -> Optional[Measured]:
     )
 
 
+PHASH_CACHE = DATA / "phash64.json"
+
+
+def _hash_file(path: Path) -> List[int]:
+    """Our 64-bit hashes for one clip, sampled the same way as `measure`."""
+    cap = cv2.VideoCapture(str(path))
+    n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+    if n <= 0:
+        cap.release()
+        return []
+    out: List[int] = []
+    for i in np.linspace(0, max(n - 1, 0), num=min(SAMPLE_FRAMES, n), dtype=int):
+        cap.set(cv2.CAP_PROP_POS_FRAMES, int(i))
+        ok, fr = cap.read()
+        if ok:
+            out.append(_phash(cv2.cvtColor(fr, cv2.COLOR_BGR2GRAY)))
+    cap.release()
+    return out
+
+
 def _known_hashes() -> List[Tuple[str, str, List[int]]]:
-    """(filename, dup_group, hashes) for everything already inventoried."""
-    out = []
-    if not INVENTORY_CSV.exists():
-        return out
-    with INVENTORY_CSV.open(encoding="utf-8") as fh:
-        for row in csv.DictReader(fh):
-            raw = (row.get("phash8") or "").strip()
-            if not raw:
+    """(filename, dup_group, hashes) for every clip on disk, OUR hashes.
+
+    Not read from `inventory.csv`. The `phash8` column there was written by a
+    script that is no longer in the repository and used a different hash size
+    -- 60 hex characters against our 16 -- so comparing the two produced
+    Hamming distances above 64 on 64-bit values, which is arithmetically
+    impossible and was silently accepted as "not a duplicate".
+
+    Every clip ingested before this fix was therefore checked against nothing.
+    A duplicate of `video8` was cleared as original that way, and only failed
+    the check because the owner asked the question directly.
+
+    So hashes are computed from the files themselves, with the same function
+    on both sides, and cached because that is the only expensive part.
+    """
+    cache: Dict[str, List[int]] = {}
+    if PHASH_CACHE.exists():
+        try:
+            cache = {k: [int(x, 16) for x in v]
+                     for k, v in json.loads(
+                         PHASH_CACHE.read_text(encoding="utf-8")).items()}
+        except (ValueError, OSError):
+            cache = {}
+
+    out: List[Tuple[str, str, List[int]]] = []
+    dirty = False
+    for rel in video_dirs():
+        d = PROJECT / rel
+        if not d.is_dir():
+            continue
+        for p in sorted(d.iterdir()):
+            if not (p.is_file() and p.suffix.lower() in VIDEO_SUFFIXES):
                 continue
-            try:
-                hs = [int(x, 16) for x in raw.split("|") if x]
-            except ValueError:
-                continue
-            out.append((row["filename"], row.get("dup_group") or "", hs))
+            key = f"{rel}/{p.name}"
+            if key not in cache:
+                cache[key] = _hash_file(p)
+                dirty = True
+            if cache[key]:
+                out.append((p.name, rel, cache[key]))
+
+    if dirty:
+        PHASH_CACHE.write_text(
+            json.dumps({k: [f"{v:016x}" for v in vs] for k, vs in cache.items()},
+                       indent=0),
+            encoding="utf-8")
     return out
 
 
