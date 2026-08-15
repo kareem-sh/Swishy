@@ -28,8 +28,104 @@ POSE_CONNECTIONS = [
 
 # BGR colors on an RGB canvas (OpenCV draw calls before RGB→BGR convert in modes)
 _BALL_COLOR = (255, 140, 0)   # orange-ish in RGB
+_PREDICTED_BALL_COLOR = (255, 220, 0)
 _RIM_COLOR = (0, 220, 80)     # green in RGB
-_SHOW_BALL_OVERLAY = bool(load_yaml("display.yaml").get("show_ball_overlay", True))
+_RIM_GEOMETRY_COLOR = (70, 150, 255)
+_FITTED_TRAJECTORY_COLOR = (40, 255, 170)
+_IDEAL_TRAJECTORY_COLOR = (80, 190, 255)
+_DISPLAY_CONFIG = load_yaml("display.yaml")
+_SHOW_BALL_OVERLAY = bool(_DISPLAY_CONFIG.get("show_ball_overlay", True))
+_TRAJECTORY_CONFIG = _DISPLAY_CONFIG.get("trajectory_overlay", {})
+_SHOW_OBSERVED_TRAJECTORY = bool(
+    _TRAJECTORY_CONFIG.get("show_observed", True)
+)
+_SHOW_OBSERVED_POLYLINE = bool(
+    _TRAJECTORY_CONFIG.get("show_observed_polyline", False)
+)
+_SHOW_FITTED_TRAJECTORY = bool(
+    _TRAJECTORY_CONFIG.get("show_fitted", True)
+)
+_SHOW_IDEAL_TRAJECTORY = bool(
+    _TRAJECTORY_CONFIG.get("show_ideal", True)
+)
+_OBSERVED_TRAJECTORY_THICKNESS = max(
+    1, int(_TRAJECTORY_CONFIG.get("observed_thickness", 3))
+)
+_OBSERVED_POINT_RADIUS = max(
+    1, int(_TRAJECTORY_CONFIG.get("observed_point_radius", 2))
+)
+_FITTED_TRAJECTORY_THICKNESS = max(
+    1, int(_TRAJECTORY_CONFIG.get("fitted_thickness", 3))
+)
+_IDEAL_TRAJECTORY_THICKNESS = max(
+    1, int(_TRAJECTORY_CONFIG.get("ideal_thickness", 2))
+)
+
+
+def _draw_observed_ball_trajectory(
+    annotated: np.ndarray,
+    frame_result: FrameResult,
+) -> None:
+    """Draw measured post-release points without bridging tracking gaps."""
+    if not _SHOW_OBSERVED_TRAJECTORY:
+        return
+
+    ideal = frame_result.ideal_ball_path
+    if _SHOW_IDEAL_TRAJECTORY and len(ideal) >= 2:
+        ideal_points = np.asarray(ideal, dtype=np.int32).reshape((-1, 1, 2))
+        cv2.polylines(
+            annotated,
+            [ideal_points],
+            False,
+            _IDEAL_TRAJECTORY_COLOR,
+            _IDEAL_TRAJECTORY_THICKNESS,
+            cv2.LINE_AA,
+        )
+        target = frame_result.ideal_rim_target_xy
+        if target is not None:
+            cv2.circle(
+                annotated,
+                (int(round(target[0])), int(round(target[1]))),
+                5,
+                _IDEAL_TRAJECTORY_COLOR,
+                2,
+                cv2.LINE_AA,
+            )
+
+    fitted = frame_result.fitted_observed_ball_path
+    if _SHOW_FITTED_TRAJECTORY and len(fitted) >= 2:
+        fitted_points = np.asarray(fitted, dtype=np.int32).reshape((-1, 1, 2))
+        cv2.polylines(
+            annotated,
+            [fitted_points],
+            False,
+            _FITTED_TRAJECTORY_COLOR,
+            _FITTED_TRAJECTORY_THICKNESS,
+            cv2.LINE_AA,
+        )
+
+    for segment in frame_result.observed_ball_path_segments:
+        if not segment:
+            continue
+        points = np.asarray(segment, dtype=np.int32).reshape((-1, 1, 2))
+        if _SHOW_OBSERVED_POLYLINE and len(segment) >= 2:
+            cv2.polylines(
+                annotated,
+                [points],
+                False,
+                _BALL_COLOR,
+                _OBSERVED_TRAJECTORY_THICKNESS,
+                cv2.LINE_AA,
+            )
+        for x, y in points[:, 0, :]:
+            cv2.circle(
+                annotated,
+                (int(x), int(y)),
+                _OBSERVED_POINT_RADIUS,
+                _BALL_COLOR,
+                -1,
+                cv2.LINE_AA,
+            )
 
 
 def _angle_color(result: AngleResult) -> tuple:
@@ -66,6 +162,56 @@ def _draw_ball_rim(annotated: np.ndarray, frame_result: FrameResult) -> None:
             cv2.LINE_AA,
         )
 
+    rim_center = frame_result.stabilized_rim_center_xy
+    rim_radius = frame_result.stabilized_rim_inner_radius
+    if rim_center is not None and rim_radius is not None:
+        rim_x, rim_y = map(int, rim_center)
+        radius = max(1, int(rim_radius))
+        cv2.line(
+            annotated,
+            (rim_x - radius, rim_y),
+            (rim_x + radius, rim_y),
+            _RIM_GEOMETRY_COLOR,
+            2,
+            cv2.LINE_AA,
+        )
+        cv2.circle(
+            annotated,
+            (rim_x, rim_y),
+            3,
+            _RIM_GEOMETRY_COLOR,
+            -1,
+            cv2.LINE_AA,
+        )
+
+    if frame_result.rim_crossing_xy is not None:
+        crossing = tuple(map(int, frame_result.rim_crossing_xy))
+        if frame_result.ball_state in ("crossed_inside", "made"):
+            crossing_color = (0, 230, 80)
+        elif frame_result.ball_state == "rim_contact":
+            crossing_color = (255, 210, 0)
+        else:
+            crossing_color = (255, 70, 70)
+        cv2.circle(annotated, crossing, 7, crossing_color, 2, cv2.LINE_AA)
+
+    state_text = (
+        f"Ball: {frame_result.ball_state.upper()} | "
+        f"{frame_result.ball_tracking_status.upper()} | "
+        f"{frame_result.ball_measurement_source.upper()}"
+    )
+    if frame_result.shot_outcome is not None:
+        state_text += f" | {frame_result.shot_outcome.result.upper()}"
+    cv2.putText(
+        annotated,
+        state_text,
+        (10, 94),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.52,
+        (255, 255, 255),
+        1,
+        cv2.LINE_AA,
+    )
+
     # Prefer smoothed track center when available
     ball = frame_result.ball
     snap = frame_result.ball_snapshot
@@ -83,7 +229,12 @@ def _draw_ball_rim(annotated: np.ndarray, frame_result: FrameResult) -> None:
 
     cx = int(snap.x) if snap is not None else int(ball.x)
     cy = int(snap.y) if snap is not None else int(ball.y)
-    cv2.circle(annotated, (cx, cy), 5, _BALL_COLOR, -1, cv2.LINE_AA)
+    center_color = (
+        _PREDICTED_BALL_COLOR
+        if frame_result.ball_tracking_status == "predicted"
+        else _BALL_COLOR
+    )
+    cv2.circle(annotated, (cx, cy), 5, center_color, -1, cv2.LINE_AA)
     cv2.putText(
         annotated,
         f"ball {conf:.2f}",
@@ -96,10 +247,25 @@ def _draw_ball_rim(annotated: np.ndarray, frame_result: FrameResult) -> None:
     )
 
 
+def draw_ball_overlays(
+    rgb_image: np.ndarray,
+    frame_result: FrameResult,
+) -> np.ndarray:
+    """Draw every ball/rim/trajectory layer used by video mode.
+
+    Keeping this separate from pose rendering lets offline replay reuse the
+    exact same basketball visualization without running YOLO or NanoTrack a
+    second time.
+    """
+    _draw_observed_ball_trajectory(rgb_image, frame_result)
+    _draw_ball_rim(rgb_image, frame_result)
+    return rgb_image
+
+
 def render_frame(rgb_image: np.ndarray, detection_result, frame_result: FrameResult) -> np.ndarray:
     """Draw ball/rim, skeleton, compact joint markers, and organized HUD."""
     annotated = np.copy(rgb_image)
-    _draw_ball_rim(annotated, frame_result)
+    draw_ball_overlays(annotated, frame_result)
 
     if not detection_result or not getattr(detection_result, "pose_landmarks", None):
         return annotated

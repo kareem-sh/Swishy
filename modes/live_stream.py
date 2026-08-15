@@ -20,8 +20,6 @@ def _save_result(result, output_image, timestamp_ms):
 
 
 def run_live_stream():
-    global latest_result
-
     detector = PoseDetector(
         running_mode=vision.RunningMode.LIVE_STREAM,
         result_callback=_save_result,

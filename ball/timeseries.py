@@ -36,21 +36,28 @@ class BallTimeSeriesBuffer:
                 result.append(snapshot)
         return result
 
-    def compute_velocity(self, snapshot: BallSnapshot) -> Tuple[float, float]:
+    def compute_velocity(
+        self, snapshot: BallSnapshot
+    ) -> Optional[Tuple[float, float]]:
         """Estimate smoothed vx, vy in px/s from recent history."""
         if len(self.buffer) < 3:
-            return (0.0, 0.0)
+            return None
 
         # Get recent snapshots before the current one
-        recent = [s for s in self.buffer if s.timestamp_ms < snapshot.timestamp_ms]
+        recent = [
+            s
+            for s in self.buffer
+            if s.timestamp_ms < snapshot.timestamp_ms
+            and s.is_visual_observation
+        ]
         if len(recent) < 2:
-            return (0.0, 0.0)
+            return None
 
         # Use last 5 snapshots for smoothing
         recent = recent[-5:]
         
         if len(recent) < 2:
-            return (0.0, 0.0)
+            return None
 
         # Calculate velocities between consecutive snapshots
         velocities_x = []
@@ -66,7 +73,7 @@ class BallTimeSeriesBuffer:
             velocities_y.append(vy)
 
         if not velocities_x:
-            return (0.0, 0.0)
+            return None
 
         # Return average velocity
         return (np.mean(velocities_x), np.mean(velocities_y))

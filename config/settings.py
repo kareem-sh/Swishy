@@ -19,9 +19,12 @@ PRESENCE_THRESHOLD = 0.5
 VISIBILITY_HOLD_FRAMES = 5
 VISIBILITY_REQUIRE_PRESENCE = True
 
-# One Euro filter defaults
+# One Euro filter defaults. Fallbacks for config/filter_config.yaml -- keep the
+# two in step, or a missing key silently restores a value nobody chose.
+# beta is metre-scale, because world landmarks are in metres; the pixel-scale
+# 0.007 that used to sit here made the filter non-adaptive. See the yaml.
 FILTER_MIN_CUTOFF = 1.0
-FILTER_BETA = 0.007
+FILTER_BETA = 10.0
 FILTER_D_CUTOFF = 1.0
 
 # Shooting analysis

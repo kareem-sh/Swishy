@@ -3,8 +3,6 @@
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 
-from ball.models import BallSnapshot
-
 
 @dataclass
 class TrajectoryEstimate:

@@ -1,0 +1,18 @@
+# Player profile — session-level context, separate from per-frame pose data.
+#
+# HEIGHT IS OPTIONAL. Leave height_cm blank and Swichy still works: every joint
+# angle, trunk lean and phase rule is height-independent. Only metrics that are
+# genuinely proportional to body size (release height) are skipped without it.
+#
+# Height is USER-PROVIDED ONLY. Swichy does not estimate it from the camera.
+# A single camera cannot recover absolute scale, and MediaPipe's world
+# landmarks come from a fitted statistical body model, so a vision estimate
+# would regress toward an average build rather than measure this player.
+# See resources.md Part B.
+#
+# Units: CENTIMETRES. 180 means 1.80 m. Values outside 120-230 cm are rejected
+# with a warning (this catches inches and misplaced decimal points).
+
+height_cm: 175       # player height in centimetres
+shooting_hand: auto   # auto | left | right
+label: ""             # optional name shown in reports

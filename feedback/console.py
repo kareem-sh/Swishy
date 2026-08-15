@@ -6,13 +6,32 @@ from pathlib import Path
 
 from config.settings import PROJECT_ROOT
 from feedback.models import ShotSummary
+from feedback.payload import shot_to_dict
 
 
 def print_shot_summary(summary: ShotSummary):
+    score_text = f"{summary.score}/100" if summary.score is not None else "NOT SCORED"
     print("\n" + "=" * 50)
-    print(f"  SHOT #{summary.shot_number}  —  {summary.grade.upper()}  ({summary.score}/100)")
+    print(f"  SHOT #{summary.shot_number}  —  {summary.grade.upper()}  ({score_text})")
     print("=" * 50)
     print(f"  Rules: {summary.passed_count}/{summary.total_count} passed")
+
+    if summary.outcome is not None:
+        result = summary.outcome.result.upper()
+        confidence = summary.outcome.confidence
+        print(f"  Basket: {result} ({confidence:.0%} confidence)")
+
+    if (
+        summary.pose_release_timestamp_ms is not None
+        or summary.ball_release_timestamp_ms is not None
+    ):
+        print(
+            "  Release timing: "
+            f"pose={summary.pose_release_timestamp_ms} ms, "
+            f"ball={summary.ball_release_timestamp_ms} ms, "
+            f"difference={summary.release_disagreement_ms} ms, "
+            f"alignment confidence={summary.release_alignment_confidence}"
+        )
 
     if summary.capture_note:
         print(f"\n  Capture: {summary.capture_note}")
@@ -50,70 +69,26 @@ def print_shot_summary(summary: ShotSummary):
 
 def shot_summary_to_dict(
     summary: ShotSummary,
-    shot_start_time_ms: int = 1000,
-    shot_end_time_ms: int = 2500,
-    shot_type: str = "jump_shot",
-    court_location: str = "right_wing_three_point_line",
-    is_placeholder: bool = True,
+    start_timestamp_ms: int | None = None,
+    end_timestamp_ms: int | None = None,
 ) -> dict:
-    """Convert one shot summary into a JSON-compatible dictionary."""
-    saved_at = datetime.now()
-    return {
-        "shot_number": summary.shot_number,
-        "grade": summary.grade,
-        "score": summary.score,
-        "rules": {
-            "passed_count": summary.passed_count,
-            "total_count": summary.total_count,
-        },
-        "capture_note": summary.capture_note,
-        "next_rep_focus": list(summary.next_rep_focus),
-        "passed_rules": [
-            {
-                "rule_id": rule.rule_id,
-                "name": rule.name,
-                "message": rule.message,
-            }
-            for rule in summary.passed_rules
-        ],
-        "violations": [
-            {
-                "rule_id": rule.rule_id,
-                "name": rule.name,
-                "severity": rule.severity,
-                "message": rule.message,
-            }
-            for rule in summary.violations
-        ],
-        "practice_drills": list(summary.practice_drills),
-        "coaching_tips": list(summary.coaching_tips),
-        "shot_metadata": {
-            "start_time_ms": shot_start_time_ms,
-            "end_time_ms": shot_end_time_ms,
-            "shot_type": shot_type,
-            "court_location": court_location,
-            "is_placeholder": is_placeholder,
-        },
-        "saved_at": saved_at.isoformat(timespec="milliseconds"),
-    }
+    """Convert one shot summary into a JSON-compatible dictionary.
+
+    Delegates to `feedback.payload`, which reports only what was measured.
+    This wrapper used to accept `shot_type="jump_shot"` and
+    `court_location="right_wing_three_point_line"` as defaults and emit them
+    verbatim, so every shot was described as a jump shot from the right wing
+    no matter what the classifier had actually decided.
+    """
+    return shot_to_dict(summary, start_timestamp_ms, end_timestamp_ms)
 
 
 def save_shot_summary_json(
     summary: ShotSummary,
     output_dir: str | Path | None = None,
-    shot_start_time_ms: int = 1000,
-    shot_end_time_ms: int = 2500,
-    shot_type: str = "jump_shot",
-    court_location: str = "right_wing_three_point_line",
 ) -> dict:
     """Save one shot as JSON and return the same JSON-compatible dictionary."""
-    payload = shot_summary_to_dict(
-        summary=summary,
-        shot_start_time_ms=shot_start_time_ms,
-        shot_end_time_ms=shot_end_time_ms,
-        shot_type=shot_type,
-        court_location=court_location,
-    )
+    payload = shot_summary_to_dict(summary)
     destination = (
         Path(output_dir)
         if output_dir is not None
@@ -133,20 +108,16 @@ def save_shot_summary_json(
     return payload
 
 
-def detailed_shot_to_dict(
-    detailed_shot,
-    *,
-    shot_type: str = "jump_shot",
-    court_location: str = "right_wing_three_point_line",
-) -> dict:
-    """Convert a DetailedShotReport into a JSON-compatible shot dictionary."""
-    return shot_summary_to_dict(
-        summary=detailed_shot.summary,
-        shot_start_time_ms=detailed_shot.start_timestamp_ms,
-        shot_end_time_ms=detailed_shot.end_timestamp_ms,
-        shot_type=shot_type,
-        court_location=court_location,
-        is_placeholder=False,
+def detailed_shot_to_dict(detailed_shot) -> dict:
+    """Convert a DetailedShotReport into a JSON-compatible shot dictionary.
+
+    A DetailedShotReport knows when the attempt began and ended, so these are
+    real timestamps rather than the 1000/2500 ms placeholders they replaced.
+    """
+    return shot_to_dict(
+        detailed_shot.summary,
+        detailed_shot.start_timestamp_ms,
+        detailed_shot.end_timestamp_ms,
     )
 
 

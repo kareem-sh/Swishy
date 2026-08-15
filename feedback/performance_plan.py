@@ -56,7 +56,12 @@ RULE_DRILLS: Dict[str, str] = {
     ),
 }
 
-ACTIVE_SHOT_PHASES = frozenset(PHASE_ORDER) - {"ready_stance"}
+# REMOVED: ACTIVE_SHOT_PHASES.
+# It told the tracker which phases meant "a shot is underway". The tracker now
+# asks that question of the DETECTOR's four states (phase_detection.phases
+# .CORE_ACTIVE), not of the coaching vocabulary, because deciding whether a
+# shot is happening and deciding what to call the part of it you are in are
+# different jobs. Nothing else referenced it.
 
 
 def phases_before(phase: str) -> List[str]:
@@ -128,6 +133,25 @@ def build_capture_note(
     return " ".join(parts)
 
 
+def _lifted_off_on_a_set_shot(summary: ShotSummary) -> bool:
+    """Was this a set shot whose feet still left the floor?
+
+    Read from the classifier's own notes rather than re-deriving the
+    elevation. The classifier already measured it, already applied both
+    thresholds, and already declined to call it a jump shot -- recomputing here
+    would mean two places that could disagree about the same attempt.
+    """
+    classification = getattr(summary, "classification", None)
+    if classification is None:
+        return False
+    if getattr(summary.shot_type, "name", "") != "SET_SHOT":
+        return False
+    # The classifier calls this field `evidence`: the tuple of measured
+    # statements behind its verdict.
+    return any("still left the floor" in note
+               for note in (getattr(classification, "evidence", ()) or ()))
+
+
 def build_shot_performance_plan(summary: ShotSummary) -> ShotSummary:
     """Attach drills, focus items, and capture notes to a scored shot."""
     missing_start, missing_end = compute_missing_phases(
@@ -145,9 +169,16 @@ def build_shot_performance_plan(summary: ShotSummary) -> ShotSummary:
         missing_end,
     )
 
+    if summary.score is None:
+        # Unsupported/rejected attempts deliberately have no biomechanics
+        # score. Do not compare that missing score with numeric thresholds or
+        # generate jump/set-shot coaching for an unsupported shot type.
+        summary.next_rep_focus = []
+        summary.practice_drills = []
+        return summary
+
     drills: List[str] = []
     focus: List[str] = []
-    actions: List[str] = []
 
     sorted_violations = sorted(
         summary.violations,
@@ -155,35 +186,46 @@ def build_shot_performance_plan(summary: ShotSummary) -> ShotSummary:
         reverse=True,
     )
 
+    # A set shot the player did not stay down for.
+    #
+    # This is not a rule violation in `biomechanics.yaml`, because it is not a
+    # property of any frame or phase -- it is a property of the WHOLE attempt,
+    # decided by the classifier from the elevation it measured. The rule engine
+    # has no way to express "the shot as a whole was between two categories".
+    #
+    # It goes first because it is more actionable than any joint angle: the
+    # player is doing something they can change by deciding to, and the
+    # half-committed version is the least repeatable of the three options.
+    if _lifted_off_on_a_set_shot(summary):
+        focus.append(
+            "Your feet left the floor, but not enough to be a jump shot. "
+            "Pick one and repeat it: stay planted through the release, or "
+            "commit to the jump. Half of each is the hardest to repeat. On a "
+            "free throw, staying planted is also the safer choice — leaving "
+            "the floor is legal, but landing over the line before the ball "
+            "reaches the ring is a violation."
+        )
+
+    seen = set()
     for violation in sorted_violations[:3]:
+        if violation.message in seen:
+            continue
+        seen.add(violation.message)
         focus.append(violation.message)
         drill = RULE_DRILLS.get(violation.rule_id)
         if drill and drill not in drills:
             drills.append(drill)
-        actions.append(
-            f"Fix {violation.name}: {violation.message}"
-        )
-
-    if summary.started_mid_phase:
-        actions.insert(
-            0,
-            "Next session: start recording before you begin the load so knee bend and ball lift can be scored.",
-        )
-
-    if summary.ended_early:
-        actions.append(
-            "Let the rep finish through landing before stopping the camera — landing balance is part of your score.",
-        )
 
     if not focus and summary.score >= 75:
-        focus.append("Maintain current mechanics — add game-speed reps and track consistency.")
+        focus.append(
+            "Nothing to change. Keep these reps and start shooting them at game speed."
+        )
         drills.append(
-            "Game-speed drill: 5 makes from 5 spots at game pace, one form check between each spot."
+            "Game speed: 5 makes from 5 spots, one form check between each spot."
         )
     elif not focus:
-        focus.append("Break the shot into phases: load → lift → release → hold finish.")
+        focus.append("Take it one piece at a time: load, lift, release, hold the finish.")
 
     summary.next_rep_focus = focus[:2]
     summary.practice_drills = drills[:3]
-    summary.performance_actions = actions[:4]
     return summary

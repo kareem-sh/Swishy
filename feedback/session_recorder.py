@@ -59,10 +59,15 @@ class SessionRecorder:
     ):
         self.total_frames = frame_index + 1
 
+        # A previous attempt can finish on the same frame that a new loading
+        # motion begins. Close its report before opening/capturing the new one.
+        if frame_result.shot_summary:
+            self._finish_shot(frame_result.shot_summary)
+
         if frame_result.shot_in_progress and self._capture is None:
             self._start_shot(frame_result)
 
-        if self._capture and frame_result.shot_in_progress:
+        if self._capture and frame_result.body_capture_active:
             if frame_result.phase != self._prev_phase:
                 self._phase_moments.append({
                     "phase": frame_result.phase,
@@ -77,9 +82,6 @@ class SessionRecorder:
             if self._store_all_shot_frames:
                 self._all_frame_images[frame_index] = annotated_bgr.copy()
             self._capture.consider(frame_index, annotated_bgr, frame_result)
-
-        if frame_result.shot_summary:
-            self._finish_shot(frame_result.shot_summary)
 
     def on_single_image(self, frame_result: FrameResult, annotated_bgr: np.ndarray):
         """Build a minimal single-frame report for image mode."""
@@ -187,6 +189,11 @@ class SessionRecorder:
 
         key_frame_pairs = self._capture.finalize()
         end_ms = self._shot_frames[-1].timestamp_ms if self._shot_frames else self._shot_start_ms
+        if (
+            summary.outcome is not None
+            and summary.outcome.outcome_timestamp_ms is not None
+        ):
+            end_ms = summary.outcome.outcome_timestamp_ms
         visibility_gaps = self._visibility_tracker.finalize()
 
         detailed = build_detailed_shot_report(

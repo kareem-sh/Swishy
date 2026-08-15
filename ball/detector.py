@@ -67,8 +67,8 @@ class BallDetector:
         self.model_path = str(det.get("model_path") or DEFAULT_LOCAL.as_posix())
         self.hf_repo = str(det.get("hf_repo", DEFAULT_HF_REPO))
         self.hf_file = str(det.get("hf_file", DEFAULT_HF_FILE))
-        self.use_half = (
-            bool(det.get("half", True))
+        self.use_quantize = (
+            bool(det.get("quantize", 16))
             and self.model_path.lower().endswith(".pt")
             and self.device != "cpu"
         )
@@ -140,7 +140,7 @@ class BallDetector:
                 ball=self._detect_color(bgr_image, frame_index, timestamp_ms)
             )
 
-        if result.rim is not None:
+        if self.sticky_rim and result.rim is not None:
             if (
                 self._sticky_rim_det is None
                 or result.rim.confidence >= self._sticky_rim_det.confidence
@@ -167,6 +167,7 @@ class BallDetector:
             confidence=det.confidence * 0.9,
             frame_index=frame_index,
             timestamp_ms=timestamp_ms,
+            measurement_source="reused",
         )
 
     @staticmethod
@@ -240,7 +241,11 @@ class BallDetector:
 
     def _reject_rim_jump(self, result: CourtDetections) -> CourtDetections:
         """Keep a locked static rim from jumping to a distant false detection."""
-        if self._sticky_rim_det is None or result.rim is None:
+        if (
+            not getattr(self, "sticky_rim", True)
+            or self._sticky_rim_det is None
+            or result.rim is None
+        ):
             return result
 
         locked = self._sticky_rim_det
@@ -281,8 +286,8 @@ class BallDetector:
             classes=requested_classes,
             verbose=False,
         )
-        if self.use_half:
-            predict_args["half"] = True
+        if self.use_quantize:
+            predict_args["quantize"] = 16
         results = self._model.predict(**predict_args)
         if not results or results[0].boxes is None or len(results[0].boxes) == 0:
             return CourtDetections()
@@ -322,6 +327,7 @@ class BallDetector:
                 confidence=conf,
                 frame_index=frame_index,
                 timestamp_ms=timestamp_ms,
+                measurement_source="yolo",
             )
 
         rim = None
@@ -381,5 +387,6 @@ class BallDetector:
                     confidence=float(conf),
                     frame_index=frame_index,
                     timestamp_ms=timestamp_ms,
+                    measurement_source="color",
                 )
         return best

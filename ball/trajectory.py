@@ -29,8 +29,7 @@ class TrajectoryAnalyzer:
         if len(snapshots) < self.min_snapshots_for_fit:
             return None
 
-        # Extract x, y coordinates
-        x_data = [s.x for s in snapshots]
+        # Extract y coordinates
         y_data = [s.y for s in snapshots]
         timestamps = [s.timestamp_ms for s in snapshots]
 

@@ -1,9 +1,10 @@
 """Detailed report data models for session and shot analysis."""
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, TYPE_CHECKING
 
-from analysis.models import RuleResult
+if TYPE_CHECKING:
+    import numpy as np
 from feedback.models import ShotSummary
 
 
