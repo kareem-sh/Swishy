@@ -34,6 +34,14 @@ detector:
   rim_lock_max_shift_ratio: 0.75
   rim_refresh_frames: 1
 
+shooter_tracking:
+  confirm_frames: 4
+  switch_confirm_frames: 3
+  lose_frames: 8
+  candidate_threshold: 0.45
+  confirm_threshold: 0.60
+  switch_margin: 0.12
+
 tracking:
   max_missing_frames: 6
   position_alpha: 0.65

@@ -113,6 +113,9 @@ class SessionReport:
     practice_plan: List[str] = field(default_factory=list)
     session_notes: List[str] = field(default_factory=list)
     output_path: Optional[str] = None
+    tracking: Optional[dict] = None
+    tracking_path: Optional[str] = None
+    releases_csv_path: Optional[str] = None
 
     @property
     def shot_count(self) -> int:

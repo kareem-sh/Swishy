@@ -5,4 +5,4 @@ device: auto # auto | cpu | gpu
 
 # Number of concurrent pose candidates to request from MediaPipe.
 # The shooter association layer will pick the ball-related candidate.
-num_poses: 3
+num_poses: 8

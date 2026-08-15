@@ -1,6 +1,6 @@
-# Isolated KaliCalib court-calibration subsystem. It is not run by the main
-# Swishy pipeline; use `python -m court.detector <image>` explicitly.
-enabled: false
+# KaliCalib court calibration. When enabled, the video pipeline calibrates once
+# at startup and reuses the cached CourtFrame for every frame.
+enabled: true
 model_path: models/court/model_challenge.pth
 device: auto  # auto | cuda | cpu
 input_width: 960
@@ -24,3 +24,10 @@ sanity:
 # Optional floor pixels for `--print-court-coordinates`; each entry is [u, v].
 # Keep this empty until points have been selected on the relevant camera view.
 diagnostic_points_px: []
+
+# Video pipeline startup calibration lifecycle.
+video_calibration:
+  startup_max_attempts: 10
+  startup_frame_window: 120
+  attempt_interval_frames: 3
+  freeze_after_valid: true

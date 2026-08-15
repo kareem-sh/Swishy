@@ -68,6 +68,30 @@ class BallHolder:
 
 
 @dataclass
+class ShooterCourtPosition:
+    """Floor position of the locked shooter at ball release."""
+
+    shooter_id: int
+    release_frame: int
+    release_timestamp_ms: int
+    confidence: float
+
+    image_x_px: Optional[float] = None
+    image_y_px: Optional[float] = None
+
+    court_x_m: Optional[float] = None
+    court_y_m: Optional[float] = None
+    court_z_m: float = 0.0
+
+    distance_to_hoop_m: Optional[float] = None
+    status: str = "UNKNOWN"
+
+    court_calibration_valid: bool = False
+    court_reprojection_error_px: Optional[float] = None
+    court_inliers: Optional[int] = None
+
+
+@dataclass
 class BallDetection:
     """Per-frame ball detection in image space."""
 

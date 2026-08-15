@@ -158,5 +158,9 @@ def run_video_mode(video_path: str) -> dict | None:
     if report.output_path:
         print(f"\nDetailed report saved: {report.output_path}")
         print(f"  Key frames: {Path(report.output_path).parent / 'frames'}")
+    if getattr(report, "tracking_path", None):
+        print(f"  Tracking JSON: {report.tracking_path}")
+    if getattr(report, "releases_csv_path", None):
+        print(f"  Release CSV: {report.releases_csv_path}")
 
     return session_report_to_dict(report)

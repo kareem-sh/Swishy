@@ -28,6 +28,10 @@ window_height: 540
 # Phase 6 — draw ball/rim boxes from custom basketball YOLO
 show_ball_overlay: true
 
+# Ball-holder / court overlay for the selected shooter
+show_shooter_overlay: true
+show_court_overlay: true
+
 # Shot-scoped measured ball trail. Predicted/interpolated points are excluded.
 trajectory_overlay:
   show_observed: true

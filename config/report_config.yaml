@@ -16,3 +16,9 @@ auto_save_report: true
 
 # Primary output is REPORT.pdf; set true to also save REPORT.md
 save_markdown_copy: false
+
+# Per-frame ball-holder + court tracking for frontend consumption
+tracking:
+  enabled: true
+  frame_interval: 1
+  save_releases_csv: true

@@ -128,6 +128,13 @@ def session_report_to_dict(report) -> dict:
         "session_notes": list(report.session_notes),
         "shots": shots,
     }
+    if getattr(report, "tracking", None) is not None:
+        payload["tracking"] = report.tracking
+    if getattr(report, "tracking_path", None):
+        payload["tracking_path"] = report.tracking_path
+    if getattr(report, "releases_csv_path", None):
+        payload["releases_csv_path"] = report.releases_csv_path
+    return payload
 
 
 def save_session_report_json(report, output_path: str | Path) -> Path:

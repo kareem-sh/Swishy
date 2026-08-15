@@ -12,7 +12,7 @@ from analysis.engine import BiomechanicsEngine
 from analysis.models import AnalysisResult
 from angles.calculator import AngleCalculator, AngleResult
 from ball.detector import BallDetector
-from ball.models import BallDetection, BallHolder, BallSnapshot, RimDetection, ShotOutcome
+from ball.models import BallDetection, BallHolder, BallSnapshot, RimDetection, ShotOutcome, ShooterCourtPosition
 from ball.nano_tracker import NanoBallTracker, NanoRimTracker
 from ball.rim_tracker import RimMotionSmoother, is_plausible_rim_correction
 from ball.shot_state_machine import BallShotStateMachine, BallStateUpdate
@@ -93,6 +93,9 @@ class FrameResult:
     )
     ball_holder: Optional[BallHolder] = None
     shooter: Optional[BallHolder] = None
+    selected_pose_index: int = 0
+    pose_candidate_count: int = 0
+    shooter_release: Optional[ShooterCourtPosition] = None
     court_calibration_valid: bool = False
     court_calibration_state: str = "UNINITIALIZED"
     court_calibration_confidence: Optional[float] = None
@@ -233,6 +236,8 @@ class ShotAnalysisPipeline:
         self._court_calibration_attempts = 0
         self._court_trace: deque[Tuple[float, float]] = deque(maxlen=120)
         self._selected_pose_index = 0
+        self._release_records: List[ShooterCourtPosition] = []
+        self._shot_release_counter = 0
         video_cfg = court_cfg.get("video_calibration", {})
         self._court_enabled = bool(court_cfg.get("enabled", False))
         self._court_startup_max_attempts = int(video_cfg.get("startup_max_attempts", 10))
@@ -574,6 +579,7 @@ class ShotAnalysisPipeline:
             width,
             height,
         )
+        pose_candidate_count = len(pose_candidates)
         chosen_candidate = best_candidate_for_ball(
             pose_candidates,
             hold_ball_xy,
@@ -624,6 +630,10 @@ class ShotAnalysisPipeline:
                 released=bool(ball_state_update.released_this_frame),
             )
             self._update_shooter_trace(ball_holder)
+            shooter_release = self._maybe_capture_release_position(
+                ball_state_update,
+                ball_holder,
+            )
             return FrameResult(
                 timestamp_ms=timestamp_ms,
                 has_pose=False,
@@ -642,6 +652,9 @@ class ShotAnalysisPipeline:
                 ball_snapshot=ball_snapshot,
                 ball_holder=ball_holder,
                 shooter=ball_holder,
+                selected_pose_index=self._selected_pose_index,
+                pose_candidate_count=pose_candidate_count,
+                shooter_release=shooter_release,
                 **self._court_frame_fields(),
                 shooter_trace_court_xy=list(self._court_trace),
                 **self._ball_state_frame_fields(ball_state_update),
@@ -720,6 +733,10 @@ class ShotAnalysisPipeline:
             released=bool(ball_state_update.released_this_frame),
         )
         self._update_shooter_trace(ball_holder)
+        shooter_release = self._maybe_capture_release_position(
+            ball_state_update,
+            ball_holder,
+        )
 
         snapshot = FrameSnapshot(
             timestamp_ms=timestamp_ms,
@@ -784,6 +801,9 @@ class ShotAnalysisPipeline:
             ball_snapshot=ball_snapshot,
             ball_holder=ball_holder,
             shooter=ball_holder,
+            selected_pose_index=self._selected_pose_index,
+            pose_candidate_count=pose_candidate_count,
+            shooter_release=shooter_release,
             **self._court_frame_fields(),
             shooter_trace_court_xy=list(self._court_trace),
             **self._ball_state_frame_fields(ball_state_update),
@@ -937,6 +957,56 @@ class ShotAnalysisPipeline:
         else:
             self._court_calibration_state = "UNINITIALIZED"
 
+    def _maybe_capture_release_position(
+        self,
+        update: BallStateUpdate,
+        ball_holder: Optional[BallHolder],
+    ) -> Optional[ShooterCourtPosition]:
+        if not update.released_this_frame or ball_holder is None:
+            return None
+
+        self._shot_release_counter += 1
+        calibration = self._court_native_calibration
+        court_x_m = court_y_m = distance_m = None
+        if ball_holder.court_position is not None:
+            court_x_m, court_y_m, _ = ball_holder.court_position
+            distance_m = ball_holder.distance_to_hoop_m
+
+        image_x = image_y = None
+        if ball_holder.image_position is not None:
+            image_x, image_y = ball_holder.image_position
+
+        status = "VALID"
+        if self._court_calibration_state != "VALID":
+            status = "COURT_UNCALIBRATED"
+        elif court_x_m is None or court_y_m is None:
+            status = "COURT_POSITION_UNAVAILABLE"
+        elif ball_holder.tracking_status != "CONFIDENT":
+            status = "SHOOTER_TENTATIVE"
+
+        release = ShooterCourtPosition(
+            shooter_id=ball_holder.player_id,
+            release_frame=self._frame_index,
+            release_timestamp_ms=update.outcome.release_timestamp_ms
+            if update.outcome is not None and update.outcome.release_timestamp_ms is not None
+            else (self._prev_timestamp_ms or 0),
+            confidence=ball_holder.confidence,
+            image_x_px=image_x,
+            image_y_px=image_y,
+            court_x_m=court_x_m,
+            court_y_m=court_y_m,
+            court_z_m=0.0,
+            distance_to_hoop_m=distance_m,
+            status=status,
+            court_calibration_valid=self._court_calibration_state == "VALID",
+            court_reprojection_error_px=(
+                None if calibration is None else calibration.reprojection_error_px
+            ),
+            court_inliers=None if calibration is None else calibration.inlier_count,
+        )
+        self._release_records.append(release)
+        return release
+
     def _update_shooter_trace(self, ball_holder: Optional[BallHolder]) -> None:
         if ball_holder is None or ball_holder.court_position is None:
             return
@@ -989,6 +1059,8 @@ class ShotAnalysisPipeline:
         self._last_yolo_frame = -1
         self._court_trace.clear()
         self._selected_pose_index = 0
+        self._release_records.clear()
+        self._shot_release_counter = 0
         self._court_service = None
         self._court_native_calibration = None
         self._court_last_failure = None
@@ -1033,8 +1105,16 @@ class ShotAnalysisPipeline:
         return self._court_service
 
     @property
+    def court_native_calibration(self):
+        return self._court_native_calibration
+
+    @property
     def court_calibration_state(self) -> str:
         return self._court_calibration_state
+
+    @property
+    def release_records(self) -> List[ShooterCourtPosition]:
+        return list(self._release_records)
 
     @property
     def shooter_switches(self) -> int:

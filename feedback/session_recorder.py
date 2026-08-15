@@ -16,6 +16,7 @@ from feedback.report_builder import build_detailed_shot_report, build_session_re
 from feedback.report_models import DetailedShotReport, SessionReport
 from feedback.report_writer import write_session_report
 from feedback.visibility_gaps import VisibilityGapTracker
+from feedback.tracking_payload import frame_tracking_to_dict, session_tracking_to_dict, write_releases_csv
 from pipeline import FrameResult
 from utils.config_loader import load_yaml
 
@@ -50,6 +51,11 @@ class SessionRecorder:
         self._shot_frames: List[FrameResult] = []
         self._shots: List[DetailedShotReport] = []
         self._visibility_tracker = VisibilityGapTracker()
+        tracking_cfg = load_yaml("report_config.yaml").get("tracking", {})
+        self._tracking_enabled = bool(tracking_cfg.get("enabled", True))
+        self._tracking_frame_interval = max(1, int(tracking_cfg.get("frame_interval", 1)))
+        self._save_releases_csv = bool(tracking_cfg.get("save_releases_csv", True))
+        self._tracking_frames: List[dict] = []
 
     def on_frame(
         self,
@@ -82,6 +88,9 @@ class SessionRecorder:
             if self._store_all_shot_frames:
                 self._all_frame_images[frame_index] = annotated_bgr.copy()
             self._capture.consider(frame_index, annotated_bgr, frame_result)
+
+        if self._tracking_enabled and frame_index % self._tracking_frame_interval == 0:
+            self._tracking_frames.append(frame_tracking_to_dict(frame_index, frame_result))
 
     def on_single_image(self, frame_result: FrameResult, annotated_bgr: np.ndarray):
         """Build a minimal single-frame report for image mode."""
@@ -156,10 +165,29 @@ class SessionRecorder:
             from config.settings import REPORT_OUTPUT_DIR
             save_dir = Path(REPORT_OUTPUT_DIR)
 
+        tracking = None
+        if pipeline is not None and self._tracking_enabled:
+            tracking = session_tracking_to_dict(pipeline, self._tracking_frames)
+            report.tracking = tracking
+
         if save_dir is not None:
             frame_images = self._collect_frame_images()
             path = write_session_report(report, frame_images, save_dir)
             report.output_path = str(path)
+            if tracking is not None:
+                tracking_json = save_dir / report.session_id / "tracking.json"
+                tracking_json.parent.mkdir(parents=True, exist_ok=True)
+                import json
+
+                tracking_json.write_text(
+                    json.dumps(tracking, indent=2, ensure_ascii=False),
+                    encoding="utf-8",
+                )
+                report.tracking_path = str(tracking_json)
+                if self._save_releases_csv and pipeline.release_records:
+                    csv_path = save_dir / report.session_id / "releases.csv"
+                    write_releases_csv(pipeline.release_records, csv_path)
+                    report.releases_csv_path = str(csv_path)
 
         return report
 

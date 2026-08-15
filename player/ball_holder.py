@@ -195,6 +195,23 @@ class BallHolderTracker:
         if ball_xy is None or not pose_candidates:
             return self._handle_missing_ball_or_pose(released=released)
 
+        if released and self.current is not None:
+            locked_candidate = next(
+                (candidate for candidate in pose_candidates if candidate.player_id == self.current.player_id),
+                None,
+            )
+            if locked_candidate is not None:
+                selected_holder = _convert_candidate_to_holder(
+                    locked_candidate,
+                    ball_xy,
+                    base_score=self.current.confidence,
+                    court_service=court_service,
+                )
+                selected_holder.tracking_status = self.current.tracking_status
+                selected_holder.shooter_state = ShooterSelectionState.RELEASED.value
+                self.current = selected_holder
+                return self.current
+
         self._lost_frames = 0
         scored = sorted(
             (

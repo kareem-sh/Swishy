@@ -34,6 +34,14 @@ _RIM_GEOMETRY_COLOR = (70, 150, 255)
 _FITTED_TRAJECTORY_COLOR = (40, 255, 170)
 _DISPLAY_CONFIG = load_yaml("display.yaml")
 _SHOW_BALL_OVERLAY = bool(_DISPLAY_CONFIG.get("show_ball_overlay", True))
+_SHOW_SHOOTER_OVERLAY = bool(_DISPLAY_CONFIG.get("show_shooter_overlay", True))
+_SHOW_COURT_OVERLAY = bool(_DISPLAY_CONFIG.get("show_court_overlay", True))
+_SHOOTER_COLOR = (255, 80, 220)
+_SHOOTER_FEET_COLOR = (255, 255, 80)
+_COURT_OUTLINE_COLOR = (80, 200, 255)
+_COURT_AXIS_COLOR = (120, 220, 255)
+_OTHER_POSE_COLOR = (90, 90, 90)
+_OTHER_JOINT_COLOR = (120, 120, 120)
 _TRAJECTORY_CONFIG = _DISPLAY_CONFIG.get("trajectory_overlay", {})
 _SHOW_OBSERVED_TRAJECTORY = bool(
     _TRAJECTORY_CONFIG.get("show_observed", True)
@@ -217,32 +225,146 @@ def _draw_ball_rim(annotated: np.ndarray, frame_result: FrameResult) -> None:
     )
 
 
+def _draw_court_overlay(annotated: np.ndarray, frame_result: FrameResult) -> None:
+    if not _SHOW_COURT_OVERLAY:
+        return
+
+    h, w, _ = annotated.shape
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    lines = [
+        f"COURT: {frame_result.court_calibration_state}",
+    ]
+    if frame_result.court_inlier_count is not None:
+        lines.append(f"INLIERS: {frame_result.court_inlier_count}")
+    if frame_result.court_reprojection_error_px is not None:
+        lines.append(f"REPROJ: {frame_result.court_reprojection_error_px:.1f} px")
+
+    x = w - 220
+    y = 24
+    for line in lines:
+        cv2.putText(annotated, line, (x, y), font, 0.48, (220, 220, 230), 1, cv2.LINE_AA)
+        y += 18
+
+    if not frame_result.court_outline_px:
+        return
+
+    outline = np.asarray(frame_result.court_outline_px, dtype=np.int32).reshape((-1, 1, 2))
+    cv2.polylines(annotated, [outline], True, _COURT_OUTLINE_COLOR, 2, cv2.LINE_AA)
+
+    if frame_result.court_origin_px is not None:
+        origin = tuple(map(int, frame_result.court_origin_px))
+        cv2.circle(annotated, origin, 5, _COURT_AXIS_COLOR, -1, cv2.LINE_AA)
+    if frame_result.court_x_axis_px is not None and frame_result.court_origin_px is not None:
+        cv2.arrowedLine(
+            annotated,
+            tuple(map(int, frame_result.court_origin_px)),
+            tuple(map(int, frame_result.court_x_axis_px)),
+            _COURT_AXIS_COLOR,
+            2,
+            tipLength=0.2,
+        )
+    if frame_result.court_y_axis_px is not None and frame_result.court_origin_px is not None:
+        cv2.arrowedLine(
+            annotated,
+            tuple(map(int, frame_result.court_origin_px)),
+            tuple(map(int, frame_result.court_y_axis_px)),
+            (180, 255, 180),
+            2,
+            tipLength=0.2,
+        )
+
+
+def _draw_shooter_overlay(annotated: np.ndarray, frame_result: FrameResult) -> None:
+    if not _SHOW_SHOOTER_OVERLAY:
+        return
+
+    holder = frame_result.shooter or frame_result.ball_holder
+    if holder is None:
+        return
+
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    if holder.feet_midpoint_xy is not None:
+        feet = tuple(map(int, holder.feet_midpoint_xy))
+        cv2.circle(annotated, feet, 8, _SHOOTER_FEET_COLOR, 2, cv2.LINE_AA)
+        cv2.circle(annotated, feet, 3, _SHOOTER_FEET_COLOR, -1, cv2.LINE_AA)
+
+    if holder.bbox_xyxy is not None:
+        x1, y1, x2, y2 = map(int, holder.bbox_xyxy)
+        cv2.rectangle(annotated, (x1, y1), (x2, y2), _SHOOTER_COLOR, 2, cv2.LINE_AA)
+
+    lines = [
+        f"SHOOTER ID: {holder.player_id}",
+        f"CONF: {holder.confidence:.2f}",
+        f"STATE: {holder.shooter_state}",
+    ]
+    if holder.court_position is not None:
+        x_m, y_m, z_m = holder.court_position
+        lines.extend(
+            [
+                "COURT:",
+                f"X = {x_m:+.2f} m",
+                f"Y = {y_m:.2f} m",
+                f"Z = {z_m:.2f} m",
+            ]
+        )
+        if holder.distance_to_hoop_m is not None:
+            lines.append(f"DIST = {holder.distance_to_hoop_m:.2f} m")
+
+    x, y = 10, 120
+    for line in lines:
+        cv2.putText(annotated, line, (x, y), font, 0.50, (245, 245, 250), 1, cv2.LINE_AA)
+        y += 18
+
+    if frame_result.shooter_release is not None:
+        release = frame_result.shooter_release
+        cv2.putText(
+            annotated,
+            "SHOT RELEASED",
+            (x, y + 4),
+            font,
+            0.58,
+            (80, 255, 120),
+            2,
+            cv2.LINE_AA,
+        )
+
+
 def render_frame(rgb_image: np.ndarray, detection_result, frame_result: FrameResult) -> np.ndarray:
     """Draw ball/rim, skeleton, compact joint markers, and organized HUD."""
     annotated = np.copy(rgb_image)
     _draw_observed_ball_trajectory(annotated, frame_result)
     _draw_ball_rim(annotated, frame_result)
+    _draw_court_overlay(annotated, frame_result)
 
     if not detection_result or not getattr(detection_result, "pose_landmarks", None):
+        _draw_shooter_overlay(annotated, frame_result)
         return annotated
 
     height, width, _ = annotated.shape
+    selected_index = frame_result.selected_pose_index
 
-    for pose_landmarks in detection_result.pose_landmarks:
+    for pose_index, pose_landmarks in enumerate(detection_result.pose_landmarks):
+        is_selected = pose_index == selected_index
+        line_color = _SHOOTER_COLOR if is_selected else _OTHER_POSE_COLOR
+        joint_color = (255, 120, 60) if is_selected else _OTHER_JOINT_COLOR
+        line_thickness = 3 if is_selected else 1
         for start_idx, end_idx in POSE_CONNECTIONS:
             start_lm = pose_landmarks[start_idx]
             end_lm = pose_landmarks[end_idx]
             start_pt = (int(start_lm.x * width), int(start_lm.y * height))
             end_pt = (int(end_lm.x * width), int(end_lm.y * height))
-            cv2.line(annotated, start_pt, end_pt, (0, 220, 100), 2, cv2.LINE_AA)
+            cv2.line(annotated, start_pt, end_pt, line_color, line_thickness, cv2.LINE_AA)
 
         for landmark in pose_landmarks:
             px, py = int(landmark.x * width), int(landmark.y * height)
-            cv2.circle(annotated, (px, py), 4, (255, 120, 60), -1, cv2.LINE_AA)
+            radius = 5 if is_selected else 3
+            cv2.circle(annotated, (px, py), radius, joint_color, -1, cv2.LINE_AA)
 
-        if frame_result.has_pose and frame_result.image_landmarks:
+        if frame_result.has_pose and is_selected and frame_result.image_landmarks:
             side = frame_result.shooting_side
             _draw_shooting_chain_highlight(annotated, frame_result, side, frame_result.image_landmarks)
+
+    _draw_shooter_overlay(annotated, frame_result)
 
     if frame_result.has_pose:
         draw_hud(annotated, frame_result, frame_result.hud_display)
