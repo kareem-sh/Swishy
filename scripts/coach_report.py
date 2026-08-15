@@ -127,7 +127,7 @@ class AnalysisRun:
         return payload
 
 
-def _decode_and_analyse(video_path, fps, pipe, progress):
+def _decode_and_analyse(video_path, fps, pipe, progress, inference_device=None):
     """Feed every frame through the pipeline.
 
     Every frame is read with a blocking read and none are skipped, and each
@@ -141,7 +141,7 @@ def _decode_and_analyse(video_path, fps, pipe, progress):
 
     with quiet_native_stderr():
         cap = cv2.VideoCapture(str(video_path))
-        detector = PoseDetector(vision.RunningMode.VIDEO)
+        detector = PoseDetector(vision.RunningMode.VIDEO, device=inference_device)
         while True:
             ok, frame = cap.read()
             if not ok:
@@ -187,6 +187,7 @@ def analyze_video(
     keep_landmarks: bool = False,
     rim_height_m: Optional[float] = None,
     shot_xy_m: Optional[Tuple[float, float]] = None,
+    inference_device: Optional[str] = None,
 ) -> AnalysisRun:
     """Run one video through the real pipeline and return what was found.
 
@@ -196,6 +197,11 @@ def analyze_video(
     `height_cm`, `rim_height_m`, and `shot_xy_m` are request-scoped physical
     inputs. They are passed into the pipeline and never written to YAML, so
     simultaneous backend requests cannot overwrite one another.
+
+    `inference_device` is request-scoped and never written to YAML.
+
+        None   -> pose / YOLO / NanoTrack follow their YAML (`auto` may use GPU)
+        "cpu"  -> force CPU for all three (VPS / headless)
 
     `enable_ball` decides whether the ball/rim detector runs.
 
@@ -233,13 +239,16 @@ def analyze_video(
         player=profile,
         rim_height_m=rim_height_m,
         shot_xy_m=shot_xy_m,
+        inference_device=inference_device,
     )
     pipe.set_fps(fps)
     # Uploading a file is an offline task, so it is analysed as one.
     pipe.enable_offline_segmentation(keep_landmarks=keep_landmarks)
 
     progress = progress_factory(meta) if progress_factory is not None else None
-    shots, pose_frames, index = _decode_and_analyse(video_path, fps, pipe, progress)
+    shots, pose_frames, index = _decode_and_analyse(
+        video_path, fps, pipe, progress, inference_device=inference_device
+    )
     if progress is not None:
         progress.finish(f"Analysed {index} frames in {progress.elapsed_s:.0f}s.")
 

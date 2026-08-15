@@ -25,9 +25,10 @@ log = logging.getLogger(__name__)
 class PoseDetector:
     """MediaPipe Pose Landmarker wrapper for image, video, and live stream."""
 
-    def __init__(self, running_mode, result_callback=None):
+    def __init__(self, running_mode, result_callback=None, device=None):
         pose_cfg = load_yaml("pose.yaml")
-        requested_device = str(pose_cfg.get("device", "auto")).strip().lower()
+        requested = device if device is not None else pose_cfg.get("device", "auto")
+        requested_device = str(requested).strip().lower()
         if requested_device not in {"auto", "cpu", "gpu"}:
             log.warning(
                 "unknown MediaPipe pose device %r; using auto", requested_device

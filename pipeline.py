@@ -138,10 +138,14 @@ class ShotAnalysisPipeline:
         player: Optional[PlayerProfile] = None,
         rim_height_m: Optional[float] = None,
         shot_xy_m: Optional[Tuple[float, float]] = None,
+        inference_device: Optional[str] = None,
     ):
         # Player context is session-level and optional. A profile without a
         # height is a first-class state: height-independent analysis still runs.
         self._player = player if player is not None else load_player_profile()
+        # Request-scoped only. None keeps YAML (`auto` / GPU). `"cpu"` is
+        # what the VPS headless path uses so a CUDA box still stays on CPU.
+        self._inference_device = inference_device
 
         filter_cfg = load_yaml("filter_config.yaml")
         phase_cfg = load_yaml("phases.yaml")
@@ -453,8 +457,13 @@ class ShotAnalysisPipeline:
                     initial_box_scale=float(
                         visual_tracking_cfg.get("initial_box_scale", 1.35)
                     ),
-                    device=str(visual_tracking_cfg.get("device", "auto")),
-                    cuda_fp16=bool(visual_tracking_cfg.get("cuda_fp16", False)),
+                    device=str(
+                        self._inference_device
+                        if self._inference_device is not None
+                        else visual_tracking_cfg.get("device", "auto")
+                    ),
+                    cuda_fp16=bool(visual_tracking_cfg.get("cuda_fp16", False))
+                    and self._inference_device != "cpu",
                 )
             except Exception as exc:
                 print(f"Warning: NanoTrack disabled ({exc})")
@@ -540,8 +549,13 @@ class ShotAnalysisPipeline:
                         rim_tracking_cfg.get("maximum_aspect_ratio", 8.0)
                     ),
                     center_y_fraction=rim_center_y_fraction,
-                    device=str(rim_tracking_cfg.get("device", "auto")),
-                    cuda_fp16=bool(rim_tracking_cfg.get("cuda_fp16", False)),
+                    device=str(
+                        self._inference_device
+                        if self._inference_device is not None
+                        else rim_tracking_cfg.get("device", "auto")
+                    ),
+                    cuda_fp16=bool(rim_tracking_cfg.get("cuda_fp16", False))
+                    and self._inference_device != "cpu",
                 )
             except Exception as exc:
                 # Keep periodic YOLO rim updates active as the fallback.
@@ -549,7 +563,7 @@ class ShotAnalysisPipeline:
 
         if self._ball_enabled:
             try:
-                detector = BallDetector("ball.yaml")
+                detector = BallDetector("ball.yaml", device=self._inference_device)
                 self._ball_detector = detector if detector.ready else None
             except Exception as exc:
                 print(f"Warning: ball/rim detector disabled ({exc})")

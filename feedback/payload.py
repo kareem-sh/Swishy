@@ -100,9 +100,15 @@ def _outcome_dict(outcome) -> Optional[dict]:
         return None
     return {
         "result": outcome.result,
-        # Derived from `result`, kept so a client does not have to know the
-        # vocabulary. This is a convenience field, not a second opinion.
-        "is_basket": outcome.result == "made",
+        # Derived from `result`. None when the tracker did not resolve
+        # make/miss — false would collapse "unknown" into a miss.
+        "is_basket": (
+            True
+            if outcome.result == "made"
+            else False
+            if outcome.result in {"miss", "missed"}
+            else None
+        ),
         "confidence": outcome.confidence,
         "release_frame": outcome.release_frame,
         "release_timestamp_ms": outcome.release_timestamp_ms,

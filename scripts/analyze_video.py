@@ -72,9 +72,13 @@ def main() -> int:
         )
         print(f"Session JSON saved: {out_path}")
 
+    name = payload.get("video") or payload.get("source_name")
+    score = payload.get("average_score")
+    if score is None:
+        score = payload.get("overall_score")
     print(
-        f"Analyzed {payload['source_name']}: "
-        f"{payload['shot_count']} shot(s), overall score {payload['overall_score']}"
+        f"Analyzed {name}: "
+        f"{payload['shot_count']} shot(s), overall score {score}"
     )
     return 0
 
