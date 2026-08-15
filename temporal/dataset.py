@@ -136,12 +136,25 @@ class Clip:
 
 
 VIDEO_SUFFIXES = {".mp4", ".mov", ".avi", ".mkv", ".m4v", ".webm"}
-VIDEO_DIRS = (
-    "assets/videos",
-    "assets/videos/single_shot",
-    "assets/videos/ShootingVideosDataset",
-    "assets/videos/training",
-)
+def video_dirs() -> tuple:
+    """`assets/videos` and every folder inside it, discovered at run time.
+
+    This used to be a hard-coded tuple of four paths, which meant a folder the
+    owner added was invisible to the whole pipeline -- no error, no warning,
+    the clips simply were not in the dataset. `curry_nba_free_throw_set_Shot`
+    landed exactly that way.
+
+    Discovery does not weaken the file's argument for being explicit: what
+    must stay deliberate is which folders are EXCLUDED and why, and that is
+    still written out by hand in EXCLUDE_DIRS. Finding a folder is not the
+    same decision as trusting it.
+    """
+    root = PROJECT / "assets" / "videos"
+    if not root.is_dir():
+        return ()
+    subs = sorted(p.relative_to(PROJECT).as_posix()
+                  for p in root.iterdir() if p.is_dir())
+    return ("assets/videos",) + tuple(subs)
 
 
 # Labels the owner gave in conversation rather than in a filename.
@@ -212,7 +225,7 @@ def scan_disk() -> Dict[int, Path]:
     minutes to recover information that never changed.
     """
     found: Dict[int, Path] = {}
-    for rel in VIDEO_DIRS:
+    for rel in video_dirs():
         directory = PROJECT / rel
         if not directory.is_dir():
             continue

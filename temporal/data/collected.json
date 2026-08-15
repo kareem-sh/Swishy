@@ -1,0 +1,21 @@
+[
+  {
+    "url": "https://www.youtube.com/watch?v=olnkP06SHyY",
+    "id": "olnkP06SHyY",
+    "accepted": false,
+    "why": "elevation 8.453 exceeds the physical limit (0.4): edited footage or a camera cut, not a jump"
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=ywxvxdwEGAs",
+    "id": "ywxvxdwEGAs",
+    "accepted": true,
+    "file": "assets\\videos\\collected\\ywxvxdwEGAs_jump_shot.mp4",
+    "title": "Kevin Durant side-step, back-pedal and catch-and-shoot drills after Golden State Warriors practice",
+    "uploader": "LetsGoWarriors",
+    "license": null,
+    "duration_s": 59,
+    "elevation": 0.2445,
+    "type": "jump_shot",
+    "measurable_shots": 8
+  }
+]
