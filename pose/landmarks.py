@@ -92,12 +92,20 @@ BASKETBALL_LANDMARKS = {
 }
 
 
-def extract_image_landmarks(detection_result, width: int, height: int) -> Optional[Dict[str, dict]]:
+def extract_image_landmarks(
+    detection_result,
+    width: int,
+    height: int,
+    pose_index: int = 0,
+) -> Optional[Dict[str, dict]]:
     """Extract image-space landmarks with pixel and normalized coordinates."""
     if not detection_result.pose_landmarks:
         return None
 
-    pose = detection_result.pose_landmarks[0]
+    poses = detection_result.pose_landmarks
+    if pose_index < 0 or pose_index >= len(poses):
+        return None
+    pose = poses[pose_index]
     data = {}
 
     for name, idx in BASKETBALL_LANDMARKS.items():
@@ -115,7 +123,7 @@ def extract_image_landmarks(detection_result, width: int, height: int) -> Option
     return data
 
 
-def extract_world_landmarks(detection_result) -> Optional[Dict[str, dict]]:
+def extract_world_landmarks(detection_result, pose_index: int = 0) -> Optional[Dict[str, dict]]:
     """
     Extract world-space landmarks in meters, in Swichy canonical coordinates.
 
@@ -129,7 +137,10 @@ def extract_world_landmarks(detection_result) -> Optional[Dict[str, dict]]:
     if not detection_result.pose_world_landmarks:
         return None
 
-    pose = detection_result.pose_world_landmarks[0]
+    poses = detection_result.pose_world_landmarks
+    if pose_index < 0 or pose_index >= len(poses):
+        return None
+    pose = poses[pose_index]
     data = {}
 
     for name, idx in BASKETBALL_LANDMARKS.items():
@@ -147,10 +158,15 @@ def extract_world_landmarks(detection_result) -> Optional[Dict[str, dict]]:
     return data
 
 
-def extract_all_landmarks(detection_result, width: int, height: int) -> Optional[dict]:
+def extract_all_landmarks(
+    detection_result,
+    width: int,
+    height: int,
+    pose_index: int = 0,
+) -> Optional[dict]:
     """Return both image and world landmark dictionaries."""
-    image = extract_image_landmarks(detection_result, width, height)
-    world = extract_world_landmarks(detection_result)
+    image = extract_image_landmarks(detection_result, width, height, pose_index=pose_index)
+    world = extract_world_landmarks(detection_result, pose_index=pose_index)
 
     if image is None or world is None:
         return None

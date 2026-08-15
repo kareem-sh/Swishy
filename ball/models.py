@@ -3,7 +3,68 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Dict, List, Optional, Tuple
+
+
+class BallHolderStatus(str, Enum):
+    """Confidence status for the current ball holder."""
+
+    CONFIDENT = "CONFIDENT"
+    TENTATIVE = "TENTATIVE"
+    LOST = "LOST"
+    UNKNOWN = "UNKNOWN"
+
+
+class ShooterSelectionState(str, Enum):
+    """Temporal shooter-selection state machine output."""
+
+    NO_SHOOTER = "NO_SHOOTER"
+    CANDIDATE = "CANDIDATE"
+    CONFIRMED_SHOOTER = "CONFIRMED_SHOOTER"
+    RELEASED = "RELEASED"
+    UNKNOWN = "UNKNOWN"
+
+
+@dataclass
+class PlayerPoseCandidate:
+    """Minimal candidate used for ball-holder association."""
+
+    player_id: int
+    image_center_xy: Optional[Tuple[float, float]] = None
+    left_wrist_xy: Optional[Tuple[float, float]] = None
+    right_wrist_xy: Optional[Tuple[float, float]] = None
+    feet_midpoint_xy: Optional[Tuple[float, float]] = None
+    left_ankle_xy: Optional[Tuple[float, float]] = None
+    right_ankle_xy: Optional[Tuple[float, float]] = None
+    left_heel_xy: Optional[Tuple[float, float]] = None
+    right_heel_xy: Optional[Tuple[float, float]] = None
+    body_center_xy: Optional[Tuple[float, float]] = None
+    bbox_xyxy: Optional[Tuple[float, float, float, float]] = None
+    confidence: float = 0.0
+    tracking_status: str = "UNKNOWN"
+
+
+@dataclass
+class BallHolder:
+    """Player who is currently considered to be holding the ball."""
+
+    player_id: int
+    confidence: float
+    image_position: Optional[Tuple[float, float]] = None
+    left_wrist_xy: Optional[Tuple[float, float]] = None
+    right_wrist_xy: Optional[Tuple[float, float]] = None
+    feet_midpoint_xy: Optional[Tuple[float, float]] = None
+    left_foot_xy: Optional[Tuple[float, float]] = None
+    right_foot_xy: Optional[Tuple[float, float]] = None
+    nearest_wrist_xy: Optional[Tuple[float, float]] = None
+    bbox_xyxy: Optional[Tuple[float, float, float, float]] = None
+    court_position: Optional[Tuple[float, float, float]] = None
+    tracking_status: str = BallHolderStatus.UNKNOWN.value
+    shooter_state: str = ShooterSelectionState.UNKNOWN.value
+    distance_to_hoop_m: Optional[float] = None
+    signed_x_offset_m: Optional[float] = None
+    signed_y_distance_m: Optional[float] = None
 
 
 @dataclass

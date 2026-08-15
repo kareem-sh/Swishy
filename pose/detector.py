@@ -27,6 +27,7 @@ class PoseDetector:
 
     def __init__(self, running_mode, result_callback=None):
         pose_cfg = load_yaml("pose.yaml")
+        self.num_poses = max(1, int(pose_cfg.get("num_poses", 3)))
         requested_device = str(pose_cfg.get("device", "auto")).strip().lower()
         if requested_device not in {"auto", "cpu", "gpu"}:
             log.warning(
@@ -63,6 +64,8 @@ class PoseDetector:
 
     @staticmethod
     def _create_landmarker(running_mode, result_callback, delegate):
+        pose_cfg = load_yaml("pose.yaml")
+        num_poses = max(1, int(pose_cfg.get("num_poses", 3)))
         base_options = python.BaseOptions(
             model_asset_path=MODEL_PATH,
             delegate=delegate,
@@ -74,7 +77,7 @@ class PoseDetector:
             min_pose_detection_confidence=MIN_POSE_DETECTION_CONFIDENCE,
             min_tracking_confidence=MIN_TRACKING_CONFIDENCE,
             min_pose_presence_confidence=MIN_PRESENCE_CONFIDENCE,
-            num_poses=1,
+            num_poses=num_poses,
             output_segmentation_masks=False,
         )
 

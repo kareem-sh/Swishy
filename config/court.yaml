@@ -1,0 +1,26 @@
+# Isolated KaliCalib court-calibration subsystem. It is not run by the main
+# Swishy pipeline; use `python -m court.detector <image>` explicitly.
+enabled: false
+model_path: models/court/model_challenge.pth
+device: auto  # auto | cuda | cpu
+input_width: 960
+input_height: 540
+visualization: true
+
+# Swichy CourtFrame adapter. `near` is KaliCalib's basket at the low native
+# court-length end; choose `far` when analysing from the opposite hoop.
+reference_hoop: near  # near | far
+fiba:
+  length_m: 28.0
+  width_m: 15.0
+  hoop_height_m: 3.05
+sanity:
+  minimum_inliers: 4
+  maximum_reprojection_error_px: 40.0
+  length_tolerance_m: 1.0
+  width_tolerance_m: 0.75
+  round_trip_tolerance_px: 1.0
+
+# Optional floor pixels for `--print-court-coordinates`; each entry is [u, v].
+# Keep this empty until points have been selected on the relevant camera view.
+diagnostic_points_px: []

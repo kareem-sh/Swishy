@@ -68,3 +68,5 @@ models/*.engine
 *.egg-info/
 build/
 dist/
+
+todo.txt

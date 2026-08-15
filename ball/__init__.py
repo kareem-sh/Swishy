@@ -4,10 +4,14 @@ from ball.detector import BallDetector
 from ball.fusion import OutcomeFusion
 from ball.models import (
     BallDetection,
+    BallHolder,
+    BallHolderStatus,
     BallSnapshot,
     BallTrajectory,
     CourtDetections,
+    PlayerPoseCandidate,
     RimDetection,
+    ShooterSelectionState,
     ShotOutcome,
 )
 from ball.outcome import OutcomeClassifier
@@ -26,6 +30,8 @@ from ball.yolo_model import load_basketball_yolo, resolve_device, resolve_model_
 __all__ = [
     "BallDetection",
     "BallDetector",
+    "BallHolder",
+    "BallHolderStatus",
     "BallSnapshot",
     "BallShotState",
     "BallShotStateMachine",
@@ -36,9 +42,11 @@ __all__ = [
     "BallTrajectory",
     "CourtDetections",
     "OutcomeClassifier",
+    "PlayerPoseCandidate",
     "OutcomeFusion",
     "ReleaseSync",
     "RimDetection",
+    "ShooterSelectionState",
     "ShotOutcome",
     "TrajectoryAnalyzer",
     "load_basketball_yolo",

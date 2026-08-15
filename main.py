@@ -30,7 +30,7 @@ elif MODE == "image":
 
 elif MODE == "video":
 
-    result = run_video_mode("assets/videos/one_score_one_miss.mp4")
+    result = run_video_mode("assets/videos/free/curry.mp4")
     # print(result)
 else:
 
