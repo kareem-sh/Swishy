@@ -28,7 +28,12 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from feedback.localization import localized_coaching, rule_feedback_ar
+from feedback.localization import (
+    localized_coaching,
+    phase_label_ar,
+    rule_feedback_ar,
+    rule_name_ar,
+)
 from feedback.models import PhaseScore, ShotSummary
 from shots.types import describe
 
@@ -47,6 +52,10 @@ def _rule_dict(rule) -> dict:
     return {
         "rule_id": rule.rule_id,
         "name": rule.name,
+        "name_localized": {
+            "en": rule.name,
+            "ar": rule_name_ar(rule.rule_id, rule.name),
+        },
         "phase": rule.phase,
         "score": rule_score,
         "passed": rule.passed,
@@ -73,6 +82,10 @@ def _phase_dict(phase: PhaseScore) -> dict:
     return {
         "phase": phase.phase,
         "label": phase.label,
+        "label_localized": {
+            "en": phase.label,
+            "ar": phase_label_ar(phase.phase, phase.label),
+        },
         "score": phase.score,
         "grade": phase.grade,
         "on_target": list(phase.strengths),

@@ -8,6 +8,57 @@ older clients.
 
 from __future__ import annotations
 
+
+# Display-name translations are keyed by stable IDs rather than by the
+# English text, so renaming an English label cannot select the wrong Arabic
+# name. Unknown IDs intentionally fall back to the supplied English name.
+_AR_RULE_NAMES = {
+    "knee_flexion_loading": "تحميل الساقين",
+    "hip_hinge_loading": "دفع الوركين",
+    "elbow_slot_ball_lift": "موضع تجهيز الكرة",
+    "guide_hand_support_lift": "إسناد اليد المساعدة",
+    "shoulder_alignment_lift": "ارتفاع الكتف",
+    "jump_elevation": "ارتفاع القفزة",
+    "trunk_posture": "وضعية الجزء العلوي من الجسم",
+    "elbow_extension_release": "امتداد الذراع عند الإطلاق",
+    "release_height": "ارتفاع نقطة الإطلاق",
+    "follow_through_hold": "تثبيت وضعية النهاية",
+    "landing_balance": "الهبوط",
+    "wrist_cock_loading": "تهيئة الرسغ",
+    "wrist_release": "نقرة الرسغ",
+    "knee_excursion_loading": "دفع الساقين",
+    "trajectory_release_angle": "زاوية إطلاق الكرة",
+    "trajectory_release_speed": "سرعة إطلاق الكرة",
+    "trajectory_apex_height": "ارتفاع القوس",
+    "trajectory_apex_progress": "موضع قمة القوس",
+    "trajectory_apex_distance": "مسافة قمة القوس",
+    # Diagnostic and legacy rule IDs can still appear in saved reports.
+    "jump_release_timing": "توقيت الإطلاق أثناء القفز",
+    "guide_wrist_release_proxy": "إطلاق اليد المساعدة (مؤشر الدفع)",
+    "head_stability": "ثبات العينين والرأس",
+    "index_alignment_release": "اتجاه الأصابع",
+    "release_height_ratio": "ارتفاع نقطة الإطلاق نسبةً إلى طول اللاعب",
+    "follow_through_elbow": "المتابعة",
+    "follow_through_index": "وضعية النهاية",
+    "wrist_snap_release": "نقرة الرسغ",
+}
+
+
+_AR_PHASE_NAMES = {
+    "ready": "الاستعداد",
+    "loading": "التحميل",
+    "rise": "الصعود",
+    "ball_lift": "رفع الكرة",
+    "jump": "القفز",
+    "release": "الإطلاق",
+    "follow_through": "المتابعة",
+    "landing": "الهبوط",
+    "recovery": "الاستعادة",
+    "trajectory": "مسار الكرة",
+    "whole_shot": "طوال التسديدة",
+}
+
+
 # Variants mirror the same direction used by BiomechanicsEngine._message:
 # excellent, good_low, good_high, needs_work_low, and needs_work_high.
 _AR_RULE_FEEDBACK = {
@@ -310,6 +361,19 @@ def rule_feedback_ar(rule) -> str:
         or translations.get(getattr(rule.outcome, "value", str(rule.outcome)))
         or translations.get("measured" if not rule.scored else "default")
         or _AR_FALLBACK[variant]
+    )
+
+
+def rule_name_ar(rule_id: str, english_name: str) -> str:
+    """Return the Arabic display name for a stable rule ID."""
+    return _AR_RULE_NAMES.get(rule_id, english_name)
+
+
+def phase_label_ar(phase_id: str, english_label: str) -> str:
+    """Return the Arabic display label for a stable phase ID."""
+    return _AR_PHASE_NAMES.get(
+        phase_id,
+        _AR_PHASE_LABELS.get(english_label, english_label),
     )
 
 
