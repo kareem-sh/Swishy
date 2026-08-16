@@ -46,7 +46,7 @@ from scripts.coach_report import (  # noqa: E402
 # WHAT TO ANALYSE
 # ==================================
 
-VIDEO = "assets/videos/video_01_free_throw.mp4"
+VIDEO = "assets/videos/MikeDunnThirdMade.mov"
 
 # Your height in centimetres, or None. Never estimated from the camera: a
 # single lens cannot separate a tall player from a near one. Without it, the

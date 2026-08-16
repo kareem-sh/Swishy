@@ -60,6 +60,7 @@ assets/videos/**/*.mov
 assets/videos/**/*.avi
 assets/videos/**/*.mkv
 assets/videos/**/*.webm
+!assets/videos/MikeDunnThirdMade.mov
 
 # Generated TensorRT models
 models/*.engine
