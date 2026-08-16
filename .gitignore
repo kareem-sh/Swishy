@@ -44,7 +44,7 @@ temporal/tensorboard/**
 temporal/data/*.npz
 temporal/data/*.npy
 !temporal/**/.gitkeep
-
+ml/datasets/videos
 mlRingBall/datasets
 mlRingBall/datasets/runs/basketball_rim_training/basketball_and_rim/weights
 
