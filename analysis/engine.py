@@ -32,8 +32,48 @@ from phase_detection.features import KinematicFeatures
 # reporting 0 for the jump phase. A player scored 0 for the camera panning is
 # the failure this whole class of fix exists to prevent.
 MAX_SHOOTING_ELEVATION = 0.40
+from config.settings import POSE_MODEL
 from player.profile import PlayerProfile
 from utils.config_loader import load_yaml
+
+
+BAND_KEYS = ("min", "max", "ideal_min", "ideal_max")
+
+
+def apply_calibration(rules: dict, model: str) -> dict:
+    """Swap in the band set derived against `model`, where one exists.
+
+    A rule's bands are only meaningful for the pose model they were measured
+    against. Swapping `lite` for `full` moved scores by up to 17 points on
+    identical footage (config/settings.py records the table), so a single set
+    of numbers cannot serve every model -- it would silently mean something
+    different depending on which .task file happened to be loaded.
+
+    A rule may therefore carry:
+
+        calibration:
+          lite: {min: 87, max: 137, ideal_min: 98, ideal_max: 115}
+          full: {min: 92, max: 141, ideal_min: 104, ideal_max: 121}
+
+    The block for the active model wins. A rule with no block for it keeps its
+    top-level numbers, which is the honest fallback: those describe whichever
+    model they were derived against and are at least a stated quantity, rather
+    than an interpolation between two calibrations that nobody measured.
+
+    Only the four band keys are overridden. Severity, aggregation, phases and
+    messages describe the MECHANIC and do not change with the instrument
+    reading it.
+    """
+    out = {}
+    for rid, rule in (rules or {}).items():
+        merged = dict(rule)
+        bands = (rule.get("calibration") or {}).get(model)
+        if bands:
+            for key in BAND_KEYS:
+                if key in bands:
+                    merged[key] = bands[key]
+        out[rid] = merged
+    return out
 
 
 class BiomechanicsEngine:
@@ -41,7 +81,7 @@ class BiomechanicsEngine:
 
     def __init__(self, player: Optional[PlayerProfile] = None):
         cfg = load_yaml("biomechanics.yaml")
-        self._rules = cfg.get("rules", {})
+        self._rules = apply_calibration(cfg.get("rules", {}), POSE_MODEL)
         # Height is optional. Without it, height-dependent metrics return None
         # and their rules are skipped rather than scored against a guess.
         self._player = player or PlayerProfile()
@@ -205,6 +245,28 @@ class BiomechanicsEngine:
             return rule.get("refine_low", rule.get("message_excellent", f"{name} is good."))
         return rule.get("refine_high", rule.get("message_excellent", f"{name} is good."))
 
+    def measure(
+        self,
+        metric: str,
+        angles: dict,
+        features: KinematicFeatures,
+        shooting_side: str,
+    ) -> Optional[float]:
+        """Read one metric, for callers that want the number without a verdict.
+
+        The overlay uses this. It exists so that what is DRAWN and what is
+        SCORED come from one function rather than two: every metric below is
+        wrapped in guards that took measurement to find -- the
+        `wrist_world_valid` check that stops a rejected wrist reading as "hand
+        at hip height", the `body_rise_ratio` term that `release_height_ratio`
+        is structurally blind without -- and a display path that recomputed the
+        formulas would drift from the scoring path silently, one guard at a
+        time, while agreeing on the easy frames.
+
+        None means NOT MEASURED and must stay None all the way to the screen.
+        """
+        return self._measure(metric, angles, features, shooting_side)
+
     def _measure(
         self,
         metric: str,
@@ -346,12 +408,28 @@ class BiomechanicsEngine:
         if metric == "wrist_height":
             return features.wrist_y
 
-        if metric == "ankle_rise":
-            return features.ankle_y_avg - features.ankle_baseline_y
-
-        if metric == "vertical_displacement":
-            # Reported in centimetres to match the literature. Used to tell a
-            # set shot (~15 cm) from a jump shot (~27-31 cm).
-            return (features.ankle_y_avg - features.ankle_baseline_y) * 100.0
+        # DEPRECATED AND DELIBERATELY UNMEASURABLE -- `ankle_rise` and
+        # `vertical_displacement`.
+        #
+        # Both asked "how far did the body leave the floor" of HIP-CENTRED
+        # world landmarks, where the hip IS the origin. They cannot see
+        # whole-body vertical motion at all; what they actually tracked was the
+        # hip-to-ankle distance changing, i.e. the legs folding. `landing_
+        # balance` was measured reading a leg fold as a balance fault, which is
+        # what forced the replacement.
+        #
+        # No rule in biomechanics.yaml uses either, and no test exercises them
+        # (`ankle_rise` appears in tests only as a helper's parameter name that
+        # feeds `body_rise_ratio`). They stayed reachable, though: any config
+        # naming them would have received a confident, wrong number.
+        #
+        # Returning None rather than deleting the branches means such a config
+        # gets NOT MEASURED -- the rule is skipped, nobody is scored against a
+        # broken metric, and the name still resolves so an old config fails
+        # visibly instead of raising. `takeoff_elevation` and `landing_settle`
+        # are the working replacements; both measure in IMAGE space, where
+        # whole-body translation is visible.
+        if metric in ("ankle_rise", "vertical_displacement"):
+            return None
 
         return None
