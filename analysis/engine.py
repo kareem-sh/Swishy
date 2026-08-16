@@ -375,6 +375,12 @@ class BiomechanicsEngine:
         if metric == "head_velocity":
             return abs(features.nose_velocity_y)
 
+        if metric == "guide_hand_ball_distance_ratio":
+            return features.guide_hand_ball_distance_ratio
+
+        if metric == "guide_wrist_align":
+            return features.guide_wrist_align_angle
+
         # Both release metrics are built from `wrist_y`, which is fabricated as
         # 0.0 when the visibility gate rejects the wrist -- and in hip-centred
         # world coordinates 0.0 reads as "the wrist is exactly at hip height",

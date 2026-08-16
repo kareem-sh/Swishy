@@ -19,6 +19,10 @@ RULE_DRILLS: Dict[str, str] = {
         "One-hand form shooting from chest: 20 reps keeping elbow under the ball and pointing "
         "at the rim through the lift."
     ),
+    "guide_hand_support_lift": (
+        "Guide-hand form shooting: take 15 close-range reps with the guide hand supporting "
+        "the side during the lift, then coming cleanly off the ball at release."
+    ),
     "shoulder_alignment_lift": (
         "Wall touch drill: lift the ball while keeping shooting shoulder elevated — 15 slow reps "
         "without dropping the elbow."
@@ -38,6 +42,10 @@ RULE_DRILLS: Dict[str, str] = {
     "elbow_extension_release": (
         "Extension pause: at the top of each shot, freeze with full elbow extension for 1 second "
         "before follow-through — 15 reps."
+    ),
+    "jump_release_timing": (
+        "Peak-release drill: take 10 controlled jump shots and let the ball leave on the rise "
+        "or at the top, before your body starts coming down."
     ),
     "release_height": (
         "High-release drill: shoot from chin level only after the ball passes your forehead — "

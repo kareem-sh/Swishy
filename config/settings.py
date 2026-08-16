@@ -4,7 +4,7 @@ from pathlib import Path
 
 # Paths
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-MODEL_PATH = str(PROJECT_ROOT / "models" / "pose_landmarker_lite.task")
+MODEL_PATH = str(PROJECT_ROOT / "models" / "pose_landmarker_heavy.task")
 
 WINDOW_NAME = "Swichy — AI Basketball Coach"
 

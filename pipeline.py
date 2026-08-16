@@ -861,6 +861,12 @@ class ShotAnalysisPipeline:
             image_landmarks=raw["image"],
             ankle_image_baseline=self._ankle_image_baseline,
             prev_image_landmarks=self._prev_image,
+            ball_center_xy=(
+                ball.center_xy
+                if ball is not None and ball.is_visual_observation
+                else None
+            ),
+            image_height_px=height,
         )
         self._prev_image = raw["image"]
 
@@ -1028,7 +1034,11 @@ class ShotAnalysisPipeline:
             rim_center_xy=update.rim_center_xy,
             rim_radius=update.rim_inner_radius,
             wrist_xy=wrist_xy,
-            release_distance_px=self._ball_shot_fsm.release_distance_px,
+            release_distance_px=(
+                self._ball_shot_fsm.release_distance_threshold_px(
+                    player_height_px
+                )
+            ),
         )
         if update.released_this_frame:
             self._release_comparison_debug_printed = False
@@ -1201,7 +1211,9 @@ class ShotAnalysisPipeline:
             self._ideal_trajectory.minimum_wrist_vertical_difference_m
         )
         maximum_wrist_distance_px = (
-            self._ball_shot_fsm.release_distance_px
+            self._ball_shot_fsm.release_distance_threshold_px(
+                player_height_px
+            )
             * self._release_anchor_max_wrist_distance_scale
         )
         ball_was_near_historical_wrist = (
@@ -1325,7 +1337,9 @@ class ShotAnalysisPipeline:
             "horizontal_px": horizontal_pixels,
             "release_wrist_distance_px": historical_wrist_distance_px,
             "maximum_release_wrist_distance_px": (
-                self._ball_shot_fsm.release_distance_px
+                self._ball_shot_fsm.release_distance_threshold_px(
+                    player_height_px
+                )
                 * self._release_anchor_max_wrist_distance_scale
             ),
             "meters_per_pixel": (

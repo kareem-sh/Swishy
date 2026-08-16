@@ -4,6 +4,8 @@ import dataclasses
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from analysis.engine import BiomechanicsEngine
@@ -90,6 +92,71 @@ def test_biomechanics_knee_rule():
     assert result.total_count >= 2
     knee_rule = next(r for r in result.active_rules if r.rule_id == "knee_flexion_loading")
     assert knee_rule.passed
+
+
+def test_guide_hand_rules_use_ball_distance_and_non_shooting_wrist():
+    engine = BiomechanicsEngine()
+    features = _make_features(
+        guide_hand_ball_distance_ratio=0.10,
+        guide_wrist_align_angle=150.0,
+    )
+
+    lift = engine.evaluate("ball_lift", {}, features, "right")
+    support = next(
+        r for r in lift.active_rules if r.rule_id == "guide_hand_support_lift"
+    )
+    assert support.passed
+    assert support.scored
+    assert support.measured_value == pytest.approx(0.10)
+
+    release = engine.evaluate("release", {}, features, "right")
+    proxy = next(
+        r for r in release.active_rules if r.rule_id == "guide_wrist_release_proxy"
+    )
+    assert proxy.passed
+    assert not proxy.scored
+    assert proxy.measured_value == pytest.approx(150.0)
+
+
+def test_guide_hand_distance_is_normalized_by_visible_player_height():
+    def image_lm(x, y, visibility=1.0):
+        return {
+            "x": x,
+            "y": y,
+            "x_norm": x / 1000.0,
+            "y_norm": y / 1000.0,
+            "visibility": visibility,
+            "presence": visibility,
+        }
+
+    image = {
+        "nose": image_lm(500, 100),
+        "left_ankle": image_lm(450, 900),
+        "right_ankle": image_lm(550, 900),
+        "left_hip": image_lm(450, 550),
+        "right_hip": image_lm(550, 550),
+        # A right-handed shooter uses the left wrist as the guide hand.
+        "left_elbow": image_lm(200, 480),
+        "left_wrist": image_lm(300, 480),
+        "left_index": image_lm(400, 480),
+    }
+    features = extract_features(
+        {},
+        {},
+        "right",
+        image_landmarks=image,
+        ball_center_xy=(300.0, 400.0),
+        image_height_px=1000.0,
+    )
+
+    # 80 px wrist-to-ball / 800 px nose-to-ankle.
+    assert features.guide_hand_ball_distance_ratio == pytest.approx(0.10)
+    assert features.guide_wrist_align_angle == pytest.approx(180.0)
+
+    without_ball = extract_features(
+        {}, {}, "right", image_landmarks=image, image_height_px=1000.0
+    )
+    assert without_ball.guide_hand_ball_distance_ratio is None
 
 
 def test_detector_stays_small():

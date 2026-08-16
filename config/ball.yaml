@@ -10,7 +10,7 @@ detector:
   hf_file: BODD_yolov8n_0001.pt
 
   # Recall-oriented thresholds; temporal tracking filters short false hits.
-  min_confidence: 0.20
+  min_confidence: 0.30
   min_confidence_rim: 0.08
   min_radius_px: 3
   max_radius_px: 80
@@ -50,7 +50,7 @@ visual_tracking:
   cuda_fp16: false
   backbone_path: models/nanotrack/nanotrack_backbone_sim.onnx
   neckhead_path: models/nanotrack/nanotrack_head_sim.onnx
-  yolo_correction_interval_s: 0.16
+  yolo_correction_interval_s: 0.10
   yolo_reinitialize_confidence: 0.20
   yolo_override_confidence: 0.35
   yolo_max_correction_distance_px: 100
@@ -97,11 +97,18 @@ ball_state_machine:
   # final-decision evidence used for MADE/MISSED/UNKNOWN.
   debug_outcome: true
 
+  # Release separation is measured in fractions of the player's visible
+  # anatomical height. This keeps the same gate at close and distant framing.
+  release_distance_ratio: 0.20
+  release_far_distance_ratio: 0.30
+  release_distance_growth_ratio_s: 2.0
+  release_min_upward_speed_ratio_s: 0.35
+
+  # Pixel fallbacks are used only when MediaPipe cannot supply a trustworthy
+  # player-height scale. The growth value is per second, not per frame.
   release_distance_px: 33
-  # Wrist separation rate, not per-frame displacement. The old 12 px/frame at
-  # 30 FPS is 360 px/s.
   release_distance_growth_px_s: 360
-  release_min_speed_px_s: 60
+  release_min_upward_speed_px_s: 60
 
   # Ball height above the ankles as a fraction of visible nose-to-ankle
   # height. Unlike a pixel threshold, this survives resolution, zoom, and
@@ -110,6 +117,11 @@ ball_state_machine:
   ankle_release_height_ratio: 0.45
   ankle_release_fallback_px: 300
   minimum_player_height_px: 50
+  # Release cannot be confirmed while the ball center is below the wrist.
+  # This normalized clearance is resolution/camera-distance independent.
+  release_ball_above_wrist_ratio: 0.01
+  # Used only when the pose scale is unavailable.
+  release_ball_above_wrist_fallback_px: 4
 
   ascending_velocity_px_s: 30
   descending_velocity_px_s: 30

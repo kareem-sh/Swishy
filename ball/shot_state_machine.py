@@ -95,11 +95,32 @@ class BallShotStateMachine:
         self.release_distance_px = float(
             state_cfg.get("release_distance_px", 60)
         )
+        self.release_distance_ratio = max(
+            0.0,
+            float(state_cfg.get("release_distance_ratio", 0.20)),
+        )
+        self.release_far_distance_ratio = max(
+            self.release_distance_ratio,
+            float(state_cfg.get("release_far_distance_ratio", 0.30)),
+        )
         self.release_distance_growth_px_s = float(
             state_cfg.get("release_distance_growth_px_s", 360.0)
         )
-        self.release_min_speed_px_s = float(
-            state_cfg.get("release_min_speed_px_s", 120)
+        self.release_distance_growth_ratio_s = max(
+            0.0,
+            float(state_cfg.get("release_distance_growth_ratio_s", 2.0)),
+        )
+        # Kept as a pixel fallback for frames where pose scale is unavailable.
+        # The production path normally uses the body-height-normalized value.
+        self.release_min_upward_speed_px_s = float(
+            state_cfg.get(
+                "release_min_upward_speed_px_s",
+                state_cfg.get("release_min_speed_px_s", 120),
+            )
+        )
+        self.release_min_upward_speed_ratio_s = max(
+            0.0,
+            float(state_cfg.get("release_min_upward_speed_ratio_s", 0.35)),
         )
         self.ankle_release_height_ratio = float(
             state_cfg.get("ankle_release_height_ratio", 0.45)
@@ -109,6 +130,18 @@ class BallShotStateMachine:
         )
         self.minimum_player_height_px = float(
             state_cfg.get("minimum_player_height_px", 50.0)
+        )
+        self.release_ball_above_wrist_ratio = max(
+            0.0,
+            float(state_cfg.get("release_ball_above_wrist_ratio", 0.01)),
+        )
+        self.release_ball_above_wrist_fallback_px = max(
+            0.0,
+            float(
+                state_cfg.get(
+                    "release_ball_above_wrist_fallback_px", 4.0
+                )
+            ),
         )
         self.ascending_velocity_px_s = float(
             state_cfg.get("ascending_velocity_px_s", 30)
@@ -185,6 +218,7 @@ class BallShotStateMachine:
         self.previous_observed_rim_center: Optional[Tuple[float, float]] = None
         self.previous_wrist_distance: Optional[float] = None
         self.previous_wrist_timestamp_ms: Optional[int] = None
+        self.in_hand_timestamp_ms: Optional[int] = None
         self.last_observed_timestamp_ms: Optional[int] = None
         self.last_ball_radius: Optional[float] = None
         self.saw_ball_above_rim = False
@@ -255,8 +289,7 @@ class BallShotStateMachine:
             )
 
         wrist_distance = self._ball_wrist_distance(ball_snapshot, wrist_xy)
-        vx, vy = ball_snapshot.velocity_xy
-        speed = math.hypot(vx, vy)
+        _, vy = ball_snapshot.velocity_xy
         # print(
         #     ball_snapshot.frame_index,
         #     ball_snapshot.x,
@@ -268,18 +301,30 @@ class BallShotStateMachine:
         relative_vy = self._relative_vertical_velocity(ball_snapshot, vy)
 
         if self.state == BallShotState.WAITING and wrist_distance is not None:
-            in_hand_limit = self.release_distance_px
-            if pose_phase in {"rise"}:
-                in_hand_limit *= 1.5
+            in_hand_limit = self.release_distance_threshold_px(player_height_px)
+            if pose_phase == "rise":
+                in_hand_limit = self.release_far_distance_threshold_px(
+                    player_height_px
+                )
             if wrist_distance <= in_hand_limit:
                 self.state = BallShotState.IN_HAND
+                self.in_hand_timestamp_ms = timestamp_ms
 
-        if self.state in {BallShotState.WAITING, BallShotState.IN_HAND}:
+        # A release is a transition FROM possession. A detector point that was
+        # never observed near the hand must not jump directly from WAITING to
+        # RELEASED, even if pose and velocity happen to resemble a shot.
+        had_prior_in_hand_observation = (
+            self.state == BallShotState.IN_HAND
+            and self.in_hand_timestamp_ms is not None
+            and timestamp_ms > self.in_hand_timestamp_ms
+        )
+        if had_prior_in_hand_observation:
             if self._release_confirmed(
                 pose_phase=pose_phase,
                 ball_snapshot=ball_snapshot,
                 wrist_distance=wrist_distance,
-                speed=speed,
+                wrist_xy=wrist_xy,
+                relative_vertical_velocity=relative_vy,
                 ankle_y=ankle_y,
                 player_height_px=player_height_px,
                 timestamp_ms=timestamp_ms,
@@ -392,7 +437,8 @@ class BallShotStateMachine:
         pose_phase: Optional[str],
         ball_snapshot: Optional[BallSnapshot],
         wrist_distance: Optional[float],
-        speed: float,
+        wrist_xy: Optional[Tuple[float, float]],
+        relative_vertical_velocity: float,
         ankle_y: Optional[float],
         player_height_px: Optional[float],
         timestamp_ms: int,
@@ -423,10 +469,36 @@ class BallShotStateMachine:
             ankle_release = (
                 difference_from_ankle >= self.ankle_release_fallback_px
             )
-        ball_fast = speed >= self.release_min_speed_px_s
+
+        # In image coordinates y grows downward.  At release the ball center
+        # must be just above the wrist, so a positive wrist_y - ball_y is
+        # required.  Normalize the small clearance by player height when a
+        # reliable image scale is available; otherwise use a pixel fallback.
+        ball_above_wrist = False
+        if ball_snapshot is not None and wrist_xy is not None:
+            wrist_x, wrist_y = map(float, wrist_xy)
+            if math.isfinite(wrist_x) and math.isfinite(wrist_y):
+                vertical_gap_px = wrist_y - ball_snapshot.y
+                if valid_player_height:
+                    ball_above_wrist = (
+                        vertical_gap_px / player_height_px
+                        >= self.release_ball_above_wrist_ratio
+                    )
+                else:
+                    ball_above_wrist = (
+                        vertical_gap_px
+                        >= self.release_ball_above_wrist_fallback_px
+                    )
+
+        release_distance_px = self.release_distance_threshold_px(
+            player_height_px
+        )
+        far_distance_px = self.release_far_distance_threshold_px(
+            player_height_px
+        )
         far_from_wrist = (
             wrist_distance is not None
-            and wrist_distance >= self.release_distance_px * 1.5
+            and wrist_distance >= far_distance_px
         )
         separating = False
         if (
@@ -440,14 +512,56 @@ class BallShotStateMachine:
                 if dt_s > 1e-6
                 else 0.0
             )
+            if valid_player_height:
+                distance_growth = distance_growth_px_s / player_height_px
+                required_growth = self.release_distance_growth_ratio_s
+            else:
+                distance_growth = distance_growth_px_s
+                required_growth = self.release_distance_growth_px_s
             separating = (
-                wrist_distance >= self.release_distance_px
-                and distance_growth_px_s >= self.release_distance_growth_px_s
+                wrist_distance >= release_distance_px
+                and distance_growth >= required_growth
             )
-        # print(separating , ball_fast , ankle_release)
-        return ankle_release and(
-            (pose_release and separating and ball_fast and far_from_wrist)
+        # Image y grows downward. Negative velocity is upward. Use motion
+        # relative to the rim so camera motion cannot turn a stationary ball
+        # into a release, and normalize it when pose scale is trustworthy.
+        if valid_player_height:
+            upward_speed = -relative_vertical_velocity / player_height_px
+            required_upward_speed = self.release_min_upward_speed_ratio_s
+        else:
+            upward_speed = -relative_vertical_velocity
+            required_upward_speed = self.release_min_upward_speed_px_s
+        ball_moving_upward = upward_speed >= required_upward_speed
+
+        return ankle_release and ball_above_wrist and (
+            pose_release
+            and separating
+            and ball_moving_upward
+            and far_from_wrist
         )
+
+    def _valid_player_height(self, player_height_px: Optional[float]) -> bool:
+        return (
+            player_height_px is not None
+            and math.isfinite(player_height_px)
+            and player_height_px >= self.minimum_player_height_px
+        )
+
+    def release_distance_threshold_px(
+        self, player_height_px: Optional[float]
+    ) -> float:
+        """Near-hand separation threshold in pixels for the current scale."""
+        if self._valid_player_height(player_height_px):
+            return self.release_distance_ratio * float(player_height_px)
+        return self.release_distance_px
+
+    def release_far_distance_threshold_px(
+        self, player_height_px: Optional[float]
+    ) -> float:
+        """Final release separation threshold in pixels for the current scale."""
+        if self._valid_player_height(player_height_px):
+            return self.release_far_distance_ratio * float(player_height_px)
+        return self.release_distance_px * 1.5
 
     @staticmethod
     def _ball_wrist_distance(

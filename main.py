@@ -29,6 +29,7 @@ standing, which needs to have seen them standing. A clip cut at the moment of
 release removes both at once, and the report will say so rather than guess.
 """
 
+import json
 import sys
 from pathlib import Path
 
@@ -45,7 +46,7 @@ from scripts.coach_report import (  # noqa: E402
 # WHAT TO ANALYSE
 # ==================================
 
-VIDEO = "assets/videos/salahRandomshotTest.mov"
+VIDEO = "assets/videos/MikeDunnThirdMade.mov"
 
 # Your height in centimetres, or None. Never estimated from the camera: a
 # single lens cannot separate a tall player from a near one. Without it, the
@@ -63,6 +64,30 @@ ENABLE_BALL = True
 # happen once the whole file has been read.
 SHOW_VIDEO = True
 
+# Stable machine-readable result from the most recent run. It is intentionally
+# overwritten instead of timestamped so an app or script always has one path
+# to read.
+LATEST_JSON = Path(__file__).resolve().parent / "outputs" / "latest_analysis.json"
+
+
+def save_latest_analysis(run, output_path: Path = LATEST_JSON) -> Path:
+    """Atomically replace the latest-analysis JSON with this run's payload."""
+    path = Path(output_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.tmp")
+    try:
+        temporary.write_text(
+            json.dumps(run.to_payload(), indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        temporary.replace(path)
+    finally:
+        # Normally `replace` has moved the temporary file. Clean up only if a
+        # failed write left it behind; the previous valid JSON remains intact.
+        if temporary.exists():
+            temporary.unlink()
+    return path
+
 
 def main() -> int:
     video = sys.argv[1] if len(sys.argv) > 1 else VIDEO
@@ -79,6 +104,8 @@ def main() -> int:
         enable_ball=ENABLE_BALL,
         keep_landmarks=SHOW_VIDEO,
     )
+    latest_json = save_latest_analysis(run)
+    print(f"\nLatest JSON: {latest_json}")
 
     if run.is_rejected:
         print_rejection(run.rejection, run.rejection_detail)

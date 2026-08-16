@@ -21,6 +21,7 @@ from shots.classifier import (  # noqa: E402
 )
 from shots.elevation import (  # noqa: E402
     MIN_BASELINE_SAMPLES,
+    jump_release_apex_offset_s,
     shooting_event_ms,
     takeoff_elevation,
 )
@@ -114,6 +115,39 @@ def test_shooting_event_is_the_wrist_peak():
 
 def test_shooting_event_ignores_unseen_wrists():
     assert shooting_event_ms([0, 33, 66], [None, None, None]) is None
+
+
+def _jump_timing_curve():
+    timestamps = list(range(0, 1000, 100))
+    # Image y decreases while rising, stays nearly level at the top, then
+    # increases as the player descends.
+    hips = [0.62, 0.58, 0.53, 0.48, 0.44, 0.420, 0.422, 0.45, 0.50, 0.56]
+    heights = [0.50] * len(timestamps)
+    return timestamps, hips, heights
+
+
+def test_jump_release_at_apex_has_zero_delay():
+    assert jump_release_apex_offset_s(*_jump_timing_curve(), 500) == 0.0
+
+
+def test_jump_release_while_rising_is_negative():
+    offset = jump_release_apex_offset_s(*_jump_timing_curve(), 300)
+    assert offset is not None and offset < 0.0
+
+
+def test_jump_release_after_descent_is_positive():
+    offset = jump_release_apex_offset_s(*_jump_timing_curve(), 800)
+    assert offset is not None and offset > 0.12
+
+
+def test_jump_release_timing_requires_coverage_after_release():
+    timestamps, hips, heights = _jump_timing_curve()
+    assert (
+        jump_release_apex_offset_s(
+            timestamps[:6], hips[:6], heights[:6], release_ms=500
+        )
+        is None
+    )
 
 
 # --- measured values, pinned -------------------------------------------------

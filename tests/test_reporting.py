@@ -2,6 +2,7 @@
 
 import sys
 import tempfile
+import json
 from pathlib import Path
 
 import numpy as np
@@ -13,6 +14,7 @@ from feedback.models import ShotSummary
 from feedback.report_builder import build_detailed_shot_report, build_session_report
 from feedback.report_models import KeyFrame
 from feedback.report_writer import write_session_report
+from main import save_latest_analysis
 
 
 def _summary(passed=True):
@@ -143,8 +145,29 @@ def test_write_session_report_creates_pdf_and_frames():
         assert any(frames_dir.glob("*.jpg"))
 
 
+def test_latest_analysis_json_is_replaced_not_accumulated():
+    class FakeRun:
+        def __init__(self, marker):
+            self.marker = marker
+
+        def to_payload(self):
+            return {"marker": self.marker}
+
+    with tempfile.TemporaryDirectory() as tmp:
+        output = Path(tmp) / "latest_analysis.json"
+        save_latest_analysis(FakeRun("first"), output)
+        save_latest_analysis(FakeRun("second"), output)
+
+        assert json.loads(output.read_text(encoding="utf-8")) == {
+            "marker": "second"
+        }
+        assert list(output.parent.glob("*.json")) == [output]
+        assert not (output.parent / ".latest_analysis.json.tmp").exists()
+
+
 if __name__ == "__main__":
     test_build_detailed_shot_report_links_violation_frame()
     test_build_session_report_aggregates_improvements()
     test_write_session_report_creates_pdf_and_frames()
+    test_latest_analysis_json_is_replaced_not_accumulated()
     print("All reporting tests passed.")

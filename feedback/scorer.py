@@ -304,6 +304,54 @@ def _hold_rule(hold_s) -> RuleResult | None:
     )
 
 
+def _jump_release_timing_rule(
+    offset_s: float | None,
+    shot_type,
+    confidence: float,
+) -> RuleResult | None:
+    """Build the jump-only release-vs-apex timing rule.
+
+    This is shot-level for the same reason as the finish hold: one frame cannot
+    know where the apex of the complete jump occurred. Positive values mean a
+    late release after the apex plateau; negative values mean release while
+    still rising.
+    """
+    type_name = getattr(shot_type, "value", shot_type)
+    if offset_s is None or type_name != "jump_shot":
+        return None
+
+    cfg = ((load_yaml("biomechanics.yaml") or {}).get("rules", {}) or {})
+    rule = cfg.get("jump_release_timing")
+    if not rule:
+        return None
+
+    min_v, max_v = rule.get("min"), rule.get("max")
+    ideal_min, ideal_max = rule.get("ideal_min"), rule.get("ideal_max")
+    outcome = BiomechanicsEngine._classify(
+        offset_s, min_v, max_v, ideal_min, ideal_max
+    )
+    phases = rule.get("phases") or ["release"]
+    return RuleResult(
+        rule_id="jump_release_timing",
+        name=rule.get("name", "Jump Release Timing"),
+        passed=outcome is not RuleOutcome.NEEDS_WORK,
+        severity=rule.get("severity", "warning"),
+        message=BiomechanicsEngine._message(
+            rule, outcome, offset_s, ideal_min, ideal_max
+        ),
+        phase=str(phases[0]),
+        measured_value=offset_s,
+        min_value=min_v,
+        max_value=max_v,
+        ideal_min=ideal_min,
+        ideal_max=ideal_max,
+        unit=rule.get("unit", "s"),
+        scored=bool(rule.get("scored", True)),
+        outcome=outcome,
+        confidence=max(0.0, min(1.0, float(confidence))),
+    )
+
+
 def _expected_rules(phase: str, shot_type) -> List[str]:
     """Scored rules that SHOULD have produced a value for this phase.
 
@@ -415,6 +463,8 @@ def score_shot(
     entry_phase: str | None = None,
     shot_type=None,
     hold_s: float | None = None,
+    jump_release_apex_offset_s: float | None = None,
+    jump_release_timing_confidence: float = 0.75,
     shot_level_rules: List[RuleResult] | None = None,
 ) -> ShotSummary:
     """Compute per-phase scores and an overall 0-100 score for one shot."""
@@ -429,6 +479,14 @@ def score_shot(
     hold_rule = _hold_rule(hold_s)
     if hold_rule is not None:
         rule_list.append(hold_rule)
+
+    jump_timing_rule = _jump_release_timing_rule(
+        jump_release_apex_offset_s,
+        shot_type,
+        jump_release_timing_confidence,
+    )
+    if jump_timing_rule is not None:
+        rule_list.append(jump_timing_rule)
 
     # Complete-flight measurements (for example ball trajectory comparison)
     # are evaluated once per shot rather than once per pose frame. They join

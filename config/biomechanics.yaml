@@ -292,6 +292,79 @@ rules:
       10-34 in one laboratory — which is low statistical power, NOT
       demonstrated invariance. Treated as a tunable prior. SOURCES.md D2.
 
+  guide_hand_support_lift:
+    name: "Guide-Hand Support"
+    metric: guide_hand_ball_distance_ratio
+    phases: [ball_lift]
+    # The closest observed point answers whether the guide hand joined the
+    # ball during the lift. The distance is divided by visible player height,
+    # so this does not change when the player moves closer to the camera.
+    aggregate: min
+    min: 0.00
+    max: 0.24
+    ideal_max: 0.16
+    unit: "body heights"
+    severity: info
+    scored: true
+    message_excellent: "Your guide hand supports the side of the ball as it rises."
+    refine_high: "Your guide hand reaches the ball. Bring it a little closer to the side so the lift stays centred."
+    message_high: "Your guide hand stays too far from the ball during the lift. Support the side of the ball until the shooting arm begins the release."
+    evidence: >
+      COACHING HEURISTIC; THE METRIC AND THRESHOLDS ARE AN ENGINEERING
+      DECISION. No non-retracted source in SOURCES.md validates guide-hand use
+      as a proficiency discriminator, publishes a diagnostic wrist-to-ball
+      distance, or provides an individual pass/fail cutoff. The mechanically
+      narrow assumption is that a hand cannot support the ball without coming
+      close to it; this rule does not claim that proximity alone improves
+      accuracy.
+
+      This rule therefore measures the narrow claim the camera can observe:
+      did the non-shooting wrist come close to the ball during ball_lift? It
+      uses the visually detected ball and the opposite wrist, with distance
+      divided by the player's visible nose-to-ankle height. If the ball, guide
+      wrist, or body scale is missing, the rule is skipped rather than reading
+      missing evidence as zero distance.
+
+      0.16 and 0.24 body heights are initial engineering bands, not published
+      biomechanics. They deliberately allow the wrist-to-ball-centre distance
+      to include the ball's radius. Re-measure these bands on labelled clips
+      before treating the EXCELLENT-versus-GOOD split as a validated norm.
+
+  guide_wrist_release_proxy:
+    name: "Guide-Hand Release (push proxy)"
+    metric: guide_wrist_align
+    phases: [release]
+    aggregate: max
+    min: 120
+    max: 180
+    ideal_min: 145
+    ideal_max: 180
+    severity: info
+    scored: false
+    message_excellent: "Guide-wrist alignment, for reference - this push proxy isn't scored."
+    refine_low: "Guide-wrist alignment, for reference - this push proxy isn't scored."
+    message_low: "Guide-wrist alignment, for reference - this push proxy isn't scored."
+    evidence: >
+      NOT SUPPORTED FOR SCORING. This is the 2D elbow-wrist-index angle of the
+      NON-shooting hand at release. A markedly bent guide wrist can be
+      consistent with a thumb flick or guide-hand push, but a single monocular
+      pose cannot measure hand force and this angle cannot prove that force was
+      or was not applied. It is explicitly a proxy, never a force reading.
+
+      The measurement is also too uncertain to penalise. The 3D sibling of the
+      same elbow-wrist-index construction on the shooting side has 39.2 deg
+      mean disagreement between MediaPipe's full and heavy models on identical
+      frames, with more than 10 deg disagreement on 92.4% of frames. Projecting
+      the guide chain into 2D makes it available more often; it does not remove
+      hand-landmark error or out-of-plane ambiguity. The guide hand is also
+      often partly hidden by the ball. 120-180 and 145-180 are display bands
+      only.
+
+      Kept because it exposes the wrist-angle signal requested for guide-hand
+      review. A future scored rule needs labelled thumb-flick/push footage and
+      either a validated hand model or direct ball/hand contact dynamics.
+      scripts/measure_angle_uncertainty.py; docs/LIMITS.md.
+
   shoulder_alignment_lift:
     name: "Shoulder Elevation"
     metric: shoulder
@@ -587,6 +660,47 @@ rules:
       Displayed because a stable gaze is genuine coaching practice.
 
   # ---------------------------------------------------------------- release
+  jump_release_timing:
+    name: "Jump Release Timing"
+    metric: jump_release_apex_offset_s  # SHOT-LEVEL: see scorer
+    phases: [release]
+    shot_types: [jump_shot]
+    # Negative = released while rising; zero = inside the apex plateau;
+    # positive = released after the player began descending.
+    max: 0.12
+    ideal_max: 0.04
+    unit: "s"
+    severity: warning
+    scored: true
+    message_excellent: "The ball leaves on the rise or at the top of your jump, so your lift flows into the shot."
+    refine_high: "Your release is just after the top of the jump. Let the ball go a little sooner so the lift still carries it."
+    message_high: "You wait until you are dropping before releasing the ball. Let it go on the rise or at the top so the jump can power the shot."
+    evidence: >
+      DIRECTION SUPPORTED WITH LIMITATIONS; METRIC AND THRESHOLDS ARE AN
+      ENGINEERING DECISION. Struzik et al. describe the jump shot's goal as a
+      high release point reached in the shortest time and identify jump height
+      and coordination as contributors. That supports avoiding a deliberately
+      delayed, descending release. It does NOT provide a release-to-apex time
+      cutoff. Penner (2021) explicitly identifies release-time measurement as
+      work still needed. SOURCES.md A11-A12.
+
+      The measured value is signed time from the player's apex plateau to ball
+      release: negative before the plateau starts, zero inside it, and positive
+      after it ends. The plateau contains hip positions within 0.015 visible
+      body heights of the maximum jump height. The ball detector supplies
+      release time when available; the pose shooting event is the
+      lower-confidence fallback.
+
+      0.04 s ideal and 0.12 s outer tolerance are project choices, not
+      published norms. They are time-based rather than frame-based so 12, 24,
+      30 and 60 fps footage is treated consistently. This runs only for a
+      classified jump_shot; set shots are never evaluated against a jump apex.
+
+      LIMITATION: hip height is measured in image space. Camera tilt, pan or
+      zoom during the jump can imitate vertical player motion. Missing hip
+      coverage before or after release skips the rule instead of manufacturing
+      an apex.
+
   elbow_extension_release:
     name: "Reach at Release"
     metric: elbow

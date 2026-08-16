@@ -48,7 +48,11 @@ from feedback.release_timing import release_timing_fields
 from feedback.scorer import score_shot
 from phase_detection.phases import CORE_ACTIVE, CORE_ANCHOR, CORE_REST, PHASE_LABELS
 from shots.classifier import AttemptEvidence, classify
-from shots.elevation import shooting_event_ms, takeoff_elevation
+from shots.elevation import (
+    jump_release_apex_offset_s,
+    shooting_event_ms,
+    takeoff_elevation,
+)
 from shots.types import RejectionReason, ShotType
 from utils.config_loader import load_yaml
 from utils.frame_buffer import FrameSnapshot
@@ -890,6 +894,36 @@ class ShotTracker:
         # actually was rather than against a guess made while it was happening.
         frames = self._refined_frames(c, classification.shot_type)
 
+        jump_release_offset = None
+        jump_release_confidence = 0.75
+        if getattr(classification.shot_type, "value", None) == "jump_shot":
+            # Ball release is the authority when it exists; pose release is a
+            # usable fallback when ball tracking is disabled or incomplete.
+            # The lower confidence follows that difference into the report
+            # without changing the pass/fail band.
+            timing_release_ms = c.ball_release_ms
+            if timing_release_ms is not None:
+                jump_release_confidence = 0.9
+            else:
+                timing_release_ms = c.pose_release_timestamp_ms()
+            if timing_release_ms is not None:
+                jump_release_offset = jump_release_apex_offset_s(
+                    [frame.timestamp_ms for frame in frames],
+                    [
+                        frame.features.hip_image_y
+                        if frame.features is not None
+                        else None
+                        for frame in frames
+                    ],
+                    [
+                        frame.features.body_pixel_height
+                        if frame.features is not None
+                        else 0.0
+                        for frame in frames
+                    ],
+                    timing_release_ms,
+                )
+
         trajectory_rules = []
         if self._analyzer is not None and self._ball_outcome is not None:
             trajectory_comparison = self._ball_outcome.timeseries_summary.get(
@@ -928,6 +962,8 @@ class ShotTracker:
                 self.shot_count,
                 shot_type=getattr(classification.shot_type, "value", None),
                 hold_s=hold_duration_s(frames, c.event_index),
+                jump_release_apex_offset_s=jump_release_offset,
+                jump_release_timing_confidence=jump_release_confidence,
                 shot_level_rules=trajectory_rules,
                 started_mid_phase=c.mid_start,
                 ended_early=not c.body_finished,
