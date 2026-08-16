@@ -61,3 +61,11 @@ models/*.engine
 *.egg-info/
 build/
 dist/
+
+# Partial downloads. `yt-dlp` leaves a .part behind whenever a fetch is
+# interrupted: not data, not playable, and useless to anyone else -- but eight
+# of them reached the history and account for ~13 MB of what a clone pulls.
+# Git keeps them forever, so untracking cannot shrink that; this only stops it
+# growing.
+*.part
+temporal/data/staging/
