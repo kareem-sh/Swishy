@@ -90,15 +90,15 @@ Swichy/
 
 ## Documentation — Start Here
 
-| Doc | Purpose |
-|-----|---------|
-| **[docs/README.md](docs/README.md)** | **Ordered beginner learning path** |
-| [docs/PIPELINE.md](docs/PIPELINE.md) | Current pose + ball/rim data flow |
-| [docs/LANDMARKS.md](docs/LANDMARKS.md) | Index finger, feet, shoes, and reliability |
-| [docs/PHASE_DETECTION.md](docs/PHASE_DETECTION.md) | Features, FSM, hysteresis, tuning |
-| [docs/GPU_YOLO_SETUP.md](docs/GPU_YOLO_SETUP.md) | CUDA and YOLO setup |
-| [docs/PRODUCT_ROADMAP.md](docs/PRODUCT_ROADMAP.md) | Mobile app, datasets, team tasks |
-| [assets/README.md](assets/README.md) | Test videos by camera angle |
+| Doc                                                | Purpose                                    |
+| -------------------------------------------------- | ------------------------------------------ |
+| **[docs/README.md](docs/README.md)**               | **Ordered beginner learning path**         |
+| [docs/PIPELINE.md](docs/PIPELINE.md)               | Current pose + ball/rim data flow          |
+| [docs/LANDMARKS.md](docs/LANDMARKS.md)             | Index finger, feet, shoes, and reliability |
+| [docs/PHASE_DETECTION.md](docs/PHASE_DETECTION.md) | Features, FSM, hysteresis, tuning          |
+| [docs/GPU_YOLO_SETUP.md](docs/GPU_YOLO_SETUP.md)   | CUDA and YOLO setup                        |
+| [docs/PRODUCT_ROADMAP.md](docs/PRODUCT_ROADMAP.md) | Mobile app, datasets, team tasks           |
+| [assets/README.md](assets/README.md)               | Test videos by camera angle                |
 
 The full index keeps filenames stable and gives the exact recommended order.
 
@@ -131,3 +131,9 @@ python scripts/check_docs.py
 - NumPy, PyYAML
 - fpdf2 (PDF reports)
 - yt-dlp (optional — re-download YouTube test clip)
+
+COURT DETECTION: Detect court and player position in 3D using KaliCalip hugging face model
+
+python -m court.detector assets/images/court/side.png \
+ --device cpu --output assets/images/keypoints/side_check.png \
+ --print-court-coordinates --point 500,600
