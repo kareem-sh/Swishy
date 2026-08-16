@@ -383,21 +383,65 @@ def _known_hashes() -> List[Tuple[str, str, List[int]]]:
     return out
 
 
+def clip_distance(a: List[int], b: List[int]) -> Tuple[int, float]:
+    """(closest single frame, median per-frame best) between two clips.
+
+    WHY THE MEDIAN AND NOT THE MINIMUM
+    ----------------------------------
+    This used to score a pair as the minimum over all 24x24 frame pairs, so ONE
+    near-identical frame anywhere made two clips duplicates. On footage from one
+    gym, one camera and one session that is not safe: an empty-court frame, or
+    the moment before the lift, looks the same in every attempt.
+
+    It produced answers that cannot all be true. `30.mp4` and `40.mp4` scored
+    0 bits from each other while matching DIFFERENT existing clips at 0 bits --
+    three copies of one video cannot disagree about which video they are.
+
+    The median asks whether the WHOLE clip matches, not whether some frame does.
+    A real duplicate is low on both numbers; a coincidental shared frame is low
+    on the minimum and high on the median. Measured on the nine clips in
+    `assets/videos/new`, the two separate cleanly: seven confirmed duplicates
+    score a median of 1.0-9.0, while the two originals score 14.0 and 18.0
+    against their nearest neighbour -- both of which the minimum had called
+    duplicates.
+    """
+    m = [min(_hamming(x, y) for y in b) for x in a]
+    return min(m), float(sorted(m)[len(m) // 2])
+
+
 def _match_duplicate(m: Measured, known: List[Tuple[str, str, List[int]]]) -> str:
     """Pin a near-duplicate to the group its twin already belongs to.
 
     Compared against the WHOLE inventory, not just this batch. A re-download of
     a clip already present is the most likely duplicate there is, and pinning
     it is what keeps both copies on one side of the split.
+
+    A CLIP IS NOT ITS OWN DUPLICATE. `_known_hashes` walks every video on disk,
+    which includes the candidate being measured, so a new clip matched ITSELF at
+    distance 0 and was reported as a duplicate of its own directory. Every clip
+    ingested this way came back a duplicate, whatever it actually was, and the
+    output could not be told apart from a real match: `assets/videos/new/j.mp4`
+    is original and was reported a duplicate on its own hashes.
+
+    The CLOSEST match wins, not the first one found. Iteration order is
+    alphabetical over directories, so "the first clip within threshold" reported
+    whichever folder sorted earliest rather than the twin -- `p.mp4` was
+    attributed to `assets/videos` when its actual twin is in `collected/`.
     """
     mine = [int(x, 16) for x in m.phash8.split("|") if x]
     if not mine:
         return ""
+    best: Optional[Tuple[float, str, str]] = None
     for name, group, hs in known:
-        best = min(_hamming(a, b) for a in mine for b in hs)
-        if best <= PHASH_HAMMING_MAX:
-            return group or f"D_dup_{Path(name).stem[:16]}"
-    return ""
+        if name == m.filename and group == m.directory:
+            continue                      # itself
+        _, median = clip_distance(mine, hs)
+        if median <= PHASH_HAMMING_MAX and (best is None or median < best[0]):
+            best = (median, group, name)
+    if best is None:
+        return ""
+    _, group, name = best
+    return group or f"D_dup_{Path(name).stem[:16]}"
 
 
 def _append(path: Path, rows: List[dict]) -> None:

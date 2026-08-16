@@ -92,6 +92,65 @@ EXCLUDE_FILES = {
     ),
 }
 
+# Exact `directory/filename`, for clips whose NAME carries no information.
+#
+# EXCLUDE_FILES matches a substring of the stem, which works while the owner
+# names files after their content. A batch dropped in as `10.mp4`, `a.mp4`,
+# `p.mp4` cannot be excluded that way without also excluding every other file
+# whose name happens to contain "10" or "a" -- so identity has to be the full
+# path.
+#
+# Every entry below was measured, not assumed. The figure is the MEDIAN
+# per-frame best-match Hamming distance to the named twin, which asks whether
+# the whole clip matches rather than whether some frame does
+# (`temporal/ingest.py:clip_distance`). For scale, the two clips in this same
+# batch that are NOT duplicates score 14.0 and 18.0 against their nearest
+# neighbour, and both are kept.
+EXCLUDE_PATHS = {
+    "assets/videos/collected/-1.mp4": (
+        "0 bits from video8.mov and from single_shot/video8_shot01_set.mp4. "
+        "video8's ten cuts are in TRAIN, and this copy forms its OWN group "
+        "because its dup_group names a directory rather than the video8 group "
+        "-- so the leakage check passes only because both happen to land on "
+        "the same side. That is the 'passed by luck' failure this file's "
+        "build_groups docstring records; excluding the copy removes the luck."
+    ),
+    "assets/videos/collected/c.mp4": (
+        "1 bit from video8.mov and from single_shot/video8_shot10_jump.mp4. "
+        "Same reasoning as -1.mp4 above."
+    ),
+    "assets/videos/new/10.mp4": (
+        "median 9.0 bits from ShootingVideosDataset/"
+        "Kevindurantrightcournor3ptshooting2_jump_shot.mp4, which is already "
+        "in the corpus. Re-adding it duplicates that attempt."
+    ),
+    "assets/videos/new/20.mp4": (
+        "median 2.0 bits from ShootingVideosDataset/"
+        "Kevindurantrightcournor3ptshooting1_jump_shoot.mp4 -- near-exact copy."
+    ),
+    "assets/videos/new/30.mp4": (
+        "median 4.5 bits from ShootingVideosDataset/"
+        "Kevindurantrightwing3ptshooting2miss_jump_shot.mp4."
+    ),
+    "assets/videos/new/40.mp4": (
+        "median 4.0 bits from ShootingVideosDataset/"
+        "Kevindurantrightcournor3ptshooting2_jump_shot.mp4, and 10.5 from "
+        "new/60.mp4 -- the same attempt arriving three times."
+    ),
+    "assets/videos/new/60.mp4": (
+        "median 6.0 bits from new/20.mp4 and 9.0 from ShootingVideosDataset/"
+        "Kevindurantrightcournor3ptshooting1_jump_shoot.mp4."
+    ),
+    "assets/videos/new/a.mp4": (
+        "median 3.0 bits from ShootingVideosDataset/"
+        "Mikedunn3ptshooting3_set_shot.mp4."
+    ),
+    "assets/videos/new/p.mp4": (
+        "median 1.0 bits from collected/c.mp4, which is itself a confirmed "
+        "copy of video8 -- so this is a third copy of shots already in TRAIN."
+    ),
+}
+
 # Clips where a SECOND PLAYER of comparable size sits inside the shooter's crop
 # for most of the clip, so no crop can isolate one shooter. Measured, not
 # assumed: the fraction of frames with an intruder in the crop and the
@@ -312,6 +371,10 @@ def apply_exclusions(clips: List[Clip]) -> None:
     for c in clips:
         if c.directory in EXCLUDE_DIRS:
             c.status, c.reason = "exclude", EXCLUDE_DIRS[c.directory]
+            continue
+        exact = EXCLUDE_PATHS.get(f"{c.directory}/{c.filename}")
+        if exact:
+            c.status, c.reason = "exclude", exact
             continue
         hit = next(
             (k for k in EXCLUDE_FILES if k.lower() in c.filename.lower()), None
