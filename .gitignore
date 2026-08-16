@@ -34,23 +34,16 @@ yolo11*.pt
 # Jupyter
 .ipynb_checkpoints/
 
-# Swichy ML local artifacts (Salah trains these on his machine)
-ml/datasets/data/*.npz
-ml/datasets/data/*.npy
-ml/datasets/data/*.csv
-
-# Local ML video datasets (keep labels, README files, and code tracked)
-ml/datasets/videos/**/*.mp4
-ml/datasets/videos/**/*.mov
-ml/datasets/videos/**/*.avi
-ml/datasets/videos/**/*.mkv
-ml/datasets/videos/**/*.m4v
-ml/datasets/videos/**/*.webm
-
-ml/tensorboard/**
-!ml/tensorboard/.gitkeep
-!ml/datasets/data/.gitkeep
-!ml/checkpoints/.gitkeep
+# Temporal model local artifacts. Weights, logs and feature arrays are
+# rebuilt from the videos and the pipeline, so they are never committed --
+# a checkpoint in git goes stale the moment a band or a phase cut changes,
+# and nothing warns you that it has.
+temporal/artifacts/**
+temporal/checkpoints/**
+temporal/tensorboard/**
+temporal/data/*.npz
+temporal/data/*.npy
+!temporal/**/.gitkeep
 
 mlRingBall/datasets
 mlRingBall/datasets/runs/basketball_rim_training/basketball_and_rim/weights
@@ -68,3 +61,11 @@ models/*.engine
 *.egg-info/
 build/
 dist/
+
+# Partial downloads. `yt-dlp` leaves a .part behind whenever a fetch is
+# interrupted: not data, not playable, and useless to anyone else -- but eight
+# of them reached the history and account for ~13 MB of what a clone pulls.
+# Git keeps them forever, so untracking cannot shrink that; this only stops it
+# growing.
+*.part
+temporal/data/staging/

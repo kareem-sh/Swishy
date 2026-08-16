@@ -141,9 +141,17 @@ class _Candidate:
         if snapshot.phase in _TRAVEL_STATES:
             self.hip_x_min = min(self.hip_x_min, f.hip_x_ratio)
             self.hip_x_max = max(self.hip_x_max, f.hip_x_ratio)
-        if snapshot.phase in _ELEVATION_STATES:
+        if snapshot.phase in _ELEVATION_STATES and f.body_rise_ratio is not None:
             # body_rise_ratio comes from IMAGE space because world landmarks
             # are hip-centred and therefore blind to whole-body translation.
+            #
+            # None means the elevation was not measured on this frame, and a
+            # frame that measured nothing must not contribute to a running
+            # maximum. It would contribute 0.0, which cannot win a max -- so
+            # this guard changes no number today. It is here because the
+            # alternative is code that happens to be correct rather than code
+            # that says what it means, and the next reader of this attribute
+            # may not aggregate with `max`.
             self.vertical_displacement_max = max(
                 self.vertical_displacement_max, f.body_rise_ratio
             )

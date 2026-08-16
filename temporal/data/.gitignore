@@ -1,0 +1,17 @@
+# Rendered clips are DERIVED: temporal/preprocess.py reproduces every one of
+# them from assets/ and the manifest. Committing ~60 MB of re-encoded video
+# would also make the repo the second copy of footage it does not own.
+clips/
+
+# The raw-input extraction and its saved copy exist only to A/B the
+# preprocessing stage (temporal/compare_preprocessing.py). shots.json is the
+# dataset; these two are scratch from a comparison run.
+shots_raw.json
+shots_prepared.json
+
+# Feature caches are derived: temporal/build_features.py rebuilds both from
+# the videos. The leaky one is a control artefact and must never be mistaken
+# for the dataset.
+features.npz
+features_leaky.npz
+phash64.json

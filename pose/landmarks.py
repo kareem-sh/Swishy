@@ -93,8 +93,15 @@ BASKETBALL_LANDMARKS = {
 
 
 def extract_image_landmarks(detection_result, width: int, height: int) -> Optional[Dict[str, dict]]:
-    """Extract image-space landmarks with pixel and normalized coordinates."""
-    if not detection_result.pose_landmarks:
+    """Extract image-space landmarks with pixel and normalized coordinates.
+
+    `detection_result` may be None, meaning no inference was run on this frame
+    -- a caller that knows nobody is on screen and declined to pay MediaPipe
+    for the confirmation. That is the same absence of landmarks as a detector
+    that ran and found nothing, and it returns the same None, so the caller
+    reaches the same no-pose branch either way.
+    """
+    if detection_result is None or not detection_result.pose_landmarks:
         return None
 
     pose = detection_result.pose_landmarks[0]
@@ -126,7 +133,7 @@ def extract_world_landmarks(detection_result) -> Optional[Dict[str, dict]]:
     ``MEDIAPIPE_TO_SWICHY`` so that every downstream consumer can rely on
     "larger Y means physically higher".
     """
-    if not detection_result.pose_world_landmarks:
+    if detection_result is None or not detection_result.pose_world_landmarks:
         return None
 
     pose = detection_result.pose_world_landmarks[0]

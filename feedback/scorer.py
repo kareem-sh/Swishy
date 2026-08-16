@@ -10,6 +10,34 @@ from utils.config_loader import load_yaml
 from utils.frame_buffer import FrameSnapshot
 
 _SEVERITY_RANK = {"error": 3, "warning": 2, "info": 1}
+
+# How much each phase's rules count toward the OVERALL shot score.
+#
+# A SEPARATE AXIS FROM SEVERITY, deliberately. Severity says how loudly one
+# rule speaks when it fires -- it drives the wording and the ordering of the
+# coaching notes. Phase importance says how much that phase matters to shooting
+# form at all. Collapsing them would mean the only way to make landing count
+# for less is to make its advice quieter, which is the wrong trade: a player
+# landing off balance should still be TOLD so plainly, it just should not cost
+# them what a broken release costs.
+#
+# The final contribution of a rule is therefore
+#
+#     severity weight  x  phase importance  x  credit
+#
+# and both weights appear in the denominator too, so the score stays a true
+# 0-100 fraction and adding or removing a phase cannot inflate it.
+#
+# 0.25 for `landing` is a product judgement, not a measurement, and is recorded
+# as such: the landing is real coaching information and worth reporting, but a
+# shot is made or missed by the loading, the release and the follow-through.
+# Every other phase is 1.0 until there is a reason for it not to be.
+PHASE_IMPORTANCE: Dict[str, float] = {"landing": 0.25}
+DEFAULT_PHASE_IMPORTANCE = 1.0
+
+
+def phase_importance(phase: str) -> float:
+    return PHASE_IMPORTANCE.get(phase, DEFAULT_PHASE_IMPORTANCE)
 _OUTCOME_RANK = {
     RuleOutcome.NEEDS_WORK: 0,
     RuleOutcome.GOOD: 1,
@@ -162,6 +190,10 @@ def _aggregate_rules(frames: List[FrameSnapshot]) -> Dict[str, RuleResult]:
         if limit is not None:
             entries = _despike(entries, limit)
         policy = policies.get(rule_id, "worst")
+        if policy == "median":
+            for key, rule in _median_per_phase(rule_id, entries).items():
+                aggregated[key] = rule
+            continue
         for _, rule in entries:
             key = f"{rule.phase}:{rule_id}"
             chosen = aggregated.get(key)
@@ -169,6 +201,42 @@ def _aggregate_rules(frames: List[FrameSnapshot]) -> Dict[str, RuleResult]:
                 aggregated[key] = rule
 
     return aggregated
+
+
+def _median_per_phase(rule_id: str, entries) -> Dict[str, RuleResult]:
+    """The middle frame of each phase, for metrics too noisy to trust an extreme.
+
+    WHY A THIRD POLICY EXISTS
+    -------------------------
+    `min` and `max` answer "how deep did the knee get" and "how far did the arm
+    extend" -- real questions, where the extreme IS the mechanic. But they
+    select the single most extreme frame, and on a metric whose error has a
+    long tail that is the same frame as the worst reconstruction.
+
+    Measured on video8, MediaPipe's full and heavy models disagree about
+    `index_align` by a mean of 33.3 deg, with p90 67.5 and a maximum of 91.4 --
+    a tail far heavier than the body of the distribution. Asking `max` for the
+    wrist angle is therefore close to asking for the frame where the finger
+    landmark collapsed in depth. The median discards exactly those frames,
+    which is what makes it the right question for this metric and the wrong one
+    for the knee.
+
+    A REAL FRAME IS STILL CHOSEN, never a computed average. Everything
+    downstream -- the message, the outcome, the timestamp a coach could scrub
+    to -- refers to a moment that exists in the footage. On an even count the
+    lower of the two middle frames is taken, so the choice stays deterministic.
+    """
+    by_phase: Dict[str, list] = {}
+    for _, rule in entries:
+        if rule.measured_value is None:
+            continue
+        by_phase.setdefault(rule.phase, []).append(rule)
+
+    out: Dict[str, RuleResult] = {}
+    for phase, rules in by_phase.items():
+        ordered = sorted(rules, key=lambda r: r.measured_value)
+        out[f"{phase}:{rule_id}"] = ordered[(len(ordered) - 1) // 2]
+    return out
 
 
 def _replaces(new: RuleResult, old: RuleResult, policy: str) -> bool:
@@ -194,15 +262,35 @@ def _replaces(new: RuleResult, old: RuleResult, policy: str) -> bool:
     return False
 
 
-def _weighted_score(rules: List[RuleResult], weights: dict) -> int:
-    """0-100 from partial credit: excellent 1.0, good 0.75, needs work 0.0."""
+def _weighted_score(rules: List[RuleResult], weights: dict,
+                    apply_phase_importance: bool = False) -> int:
+    """0-100 from partial credit. See `RuleResult.credit` for the curve.
+
+    Reads `r.credit`, not `r.outcome.credit`: the tier alone cannot tell a rule
+    that missed its bound by a degree from one that missed it by forty, and on
+    a coaching scale those must not cost the same.
+
+    `apply_phase_importance` is OFF for a phase's own score and ON for the
+    overall one. A phase is graded on its own terms -- "how was your landing"
+    is a fair question with a fair answer, and scaling it would report the
+    landing as 100 while its rules failed. Importance decides how much that
+    verdict then matters to the shot, which is a question only the overall
+    score is asking.
+    """
     scored = [r for r in rules if r.scored]
-    total = sum(float(weights.get(r.severity, 1)) for r in scored)
+
+    def w(rule: RuleResult) -> float:
+        base = float(weights.get(rule.severity, 1))
+        return base * (phase_importance(rule.phase)
+                       if apply_phase_importance else 1.0)
+
+    total = sum(w(r) for r in scored)
     if total <= 0:
         return 0
-    earned = sum(
-        float(weights.get(r.severity, 1)) * r.outcome.credit for r in scored
-    )
+    # Importance scales numerator AND denominator, so the result stays a true
+    # fraction: down-weighting a phase cannot raise a score by shrinking what
+    # is being divided by.
+    earned = sum(w(r) * r.credit for r in scored)
     return int(round(100.0 * earned / total))
 
 
@@ -257,6 +345,28 @@ def _make_phase_score(phase: str, label: str, all_rules: List[RuleResult],
     )
 
 
+
+def _calibrated_rules() -> dict:
+    """Rules with the active model's band set applied.
+
+    The shot-level rules -- `follow_through_hold` and `knee_excursion_loading`
+    -- are assembled here rather than by `BiomechanicsEngine`, and they were
+    reading biomechanics.yaml RAW. That meant they silently kept the top-level
+    bands, which describe `lite`, while every frame-level rule in the same shot
+    used the calibration for the model actually running. Measured on the Klay
+    clips under `full`: `knee_excursion_loading` reported a floor of 35 when
+    its `full` block says 32.
+
+    One bypass is one rule scored against the wrong instrument. Both go through
+    the same function now.
+    """
+    from analysis.engine import apply_calibration
+    from config.settings import POSE_MODEL
+    return apply_calibration(
+        (load_yaml("biomechanics.yaml") or {}).get("rules", {}) or {}, POSE_MODEL
+    )
+
+
 def _hold_rule(hold_s) -> RuleResult | None:
     """The follow-through hold, as a RuleResult, from a shot-level measurement.
 
@@ -277,7 +387,7 @@ def _hold_rule(hold_s) -> RuleResult | None:
     """
     if hold_s is None:
         return None
-    cfg = ((load_yaml("biomechanics.yaml") or {}).get("rules", {}) or {})
+    cfg = _calibrated_rules()
     rule = cfg.get("follow_through_hold")
     if not rule:
         return None
@@ -341,14 +451,73 @@ def _jump_release_timing_rule(
         ),
         phase=str(phases[0]),
         measured_value=offset_s,
+        )
+_MIN_EXCURSION_FRAMES = 5
+
+
+def _knee_excursion_rule(frames: List[FrameSnapshot]) -> RuleResult | None:
+    """How far the knee TRAVELLED during loading, as a RuleResult.
+
+    THE SECOND SHOT-LEVEL RULE, AND THE ARGUMENT FOR AN ABSTRACTION
+    ---------------------------------------------------------------
+    `BiomechanicsEngine` sees one frame at a time, so it can report where the
+    knee IS and never how far it MOVED. A range needs the whole phase at once,
+    the way `follow_through_hold` needs the whole shot -- and that is now two
+    metrics attached here by hand rather than declared like the other twelve.
+
+    Two is the point at which this stops being an exception and becomes a
+    missing concept: the engine has no shot-level or phase-level metric kind.
+    Neither of these is a hack in itself -- both take every band, message,
+    severity and `scored` flag from biomechanics.yaml exactly like an ordinary
+    rule, and neither hardcodes a threshold -- but a third should not be added
+    before that abstraction exists. Recorded here rather than in a comment
+    nobody reads, because the next person to need one will start in this file.
+
+    WHY THE RULE IS NEEDED. `knee_flexion_loading` aggregates with `min`, so it
+    answers "how deep" and cannot answer "did the legs move at all". A player
+    who starts already bent reaches the same minimum as one who dips into it.
+    Measured on salah_video, the rep identified by eye as having no load
+    travelled 31 deg against 65-78 for the others, and the depth rule passed
+    all five.
+
+    Returns None when loading was too short to state a range. Fewer than five
+    frames is not a small excursion, it is an unobserved one, and the two must
+    not produce the same number.
+    """
+    knee = [
+        f.features.knee_angle
+        for f in frames
+        if f.phase == "loading" and f.features is not None
+        and f.features.knee_angle is not None
+    ]
+    if len(knee) < _MIN_EXCURSION_FRAMES:
+        return None
+
+    cfg = _calibrated_rules()
+    rule = cfg.get("knee_excursion_loading")
+    if not rule:
+        return None
+
+    value = max(knee) - min(knee)
+    min_v, max_v = rule.get("min"), rule.get("max")
+    ideal_min, ideal_max = rule.get("ideal_min"), rule.get("ideal_max")
+    outcome = BiomechanicsEngine._classify(value, min_v, max_v, ideal_min, ideal_max)
+    return RuleResult(
+        rule_id="knee_excursion_loading",
+        name=rule.get("name", "Leg Drive"),
+        passed=outcome is not RuleOutcome.NEEDS_WORK,
+        severity=rule.get("severity", "warning"),
+        message=BiomechanicsEngine._message(rule, outcome, value, ideal_min, ideal_max),
+        phase="loading",
+        measured_value=value,
         min_value=min_v,
         max_value=max_v,
         ideal_min=ideal_min,
         ideal_max=ideal_max,
-        unit=rule.get("unit", "s"),
+        unit=rule.get("unit", "°"),
         scored=bool(rule.get("scored", True)),
         outcome=outcome,
-        confidence=max(0.0, min(1.0, float(confidence))),
+        confidence=0.9,
     )
 
 
@@ -455,6 +624,55 @@ def _build_phase_scores(
     return phase_scores
 
 
+_LANDING_RULE_ID = "landing_balance"
+
+
+def _withdraw_truncated_landing(
+    rules: List[RuleResult],
+    frames: List[FrameSnapshot],
+    ended_early: bool,
+) -> List[RuleResult]:
+    """Drop the landing rule when the recording stopped before the landing did.
+
+    ONE POLICY FOR PARTIAL OBSERVATIONS, applied consistently. The project
+    already takes this position elsewhere: `hold_duration_s` returns None when
+    the hand has not come back down before the clip ends, so a recording that
+    stopped early is read as neither a perfect follow-through nor a dropped
+    one. The landing rule did the opposite on the same root cause -- a clip
+    that ended mid-descent scored a FAILURE -- and one cause must not produce
+    two contradictory verdicts.
+
+    Measured case: video8_shot10_jump ends with the body still 0.048-0.064
+    above baseline. That is not a player who failed to land. It is a player
+    nobody watched land.
+
+    The test is deliberately narrow, so a real fault is still caught:
+
+      - the shot must run to the end of what was captured (`ended_early`), AND
+      - the landing must still be ABOVE the band when it stopped.
+
+    A landing that came down and settled badly is fully observed and stays
+    scored. A landing measured BELOW the floor -- a genuine collapse -- is also
+    fully observed and stays scored. Only "still in the air when the tape ran
+    out" is withdrawn, because only that one is a question the footage never
+    answered.
+    """
+    if not ended_early:
+        return rules
+    out = []
+    for r in rules:
+        cut_off = (
+            r.rule_id == _LANDING_RULE_ID
+            and r.measured_value is not None
+            and r.max_value is not None
+            and r.measured_value > r.max_value
+        )
+        if cut_off:
+            continue
+        out.append(r)
+    return out
+
+
 def score_shot(
     frames: List[FrameSnapshot],
     shot_number: int,
@@ -476,9 +694,14 @@ def score_shot(
 
     # The follow-through hold is measured once per shot, not per frame, so it
     # joins the rule list here rather than coming out of the engine.
-    hold_rule = _hold_rule(hold_s)
-    if hold_rule is not None:
-        rule_list.append(hold_rule)
+    # Shot-level and phase-level rules, which the frame-level engine cannot
+    # express. See `_knee_excursion_rule` for why there are two and why a third
+    # needs an abstraction first.
+    for extra in (_hold_rule(hold_s), _knee_excursion_rule(frames)):
+        if extra is not None:
+            rule_list.append(extra)
+
+    rule_list = _withdraw_truncated_landing(rule_list, frames, ended_early)
 
     jump_timing_rule = _jump_release_timing_rule(
         jump_release_apex_offset_s,
@@ -515,7 +738,10 @@ def score_shot(
     # Overall score is computed across every scored rule, not as a mean of
     # phase scores: averaging phase means would let a phase carrying one rule
     # outweigh a phase carrying five.
-    score = _weighted_score(rule_list, weights)
+    #
+    # This is the ONE place phase importance applies. A phase's own score is
+    # left alone so it can still be reported honestly.
+    score = _weighted_score(rule_list, weights, apply_phase_importance=True)
 
     scored_rules = [r for r in rule_list if r.scored]
     passed = [r for r in scored_rules if r.passed]

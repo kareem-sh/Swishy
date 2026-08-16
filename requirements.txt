@@ -5,10 +5,17 @@ PyYAML>=6.0
 fpdf2>=2.7.0
 ultralytics>=8.3.0
 huggingface_hub>=0.23.0
-# Install this matching CUDA pair separately on the RTX training machine:
-#   pip install torch==2.6.0 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cu124
-# Torch and torchvision contain compiled operators and must stay version-matched.
+# Install separately on the CUDA machine:
+#   pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cu124
+#
+# torch is used by ball/yolo_model.py (device selection) and
+# scripts/check_environment.py. torchvision and tensorboard were dropped with
+# ml/: nothing imported them, and a pose-feature temporal model needs neither
+# image transforms nor a pretrained CNN. If the training loop in temporal/
+# wants tensorboard logging, add it back with the code that imports it --
+# a dependency nothing imports is a dependency nobody maintains.
+#
+# If torchvision is ever needed it must stay version-matched with torch:
+# both ship compiled operators built against the same ABI.
 torch==2.6.0
-torchvision==0.21.0
-tensorboard>=2.14.0
 

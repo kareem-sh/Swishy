@@ -1779,6 +1779,7 @@ class ShotAnalysisPipeline:
                     "phase": label,
                     "score": summary.score,
                     "angles": angles,
+                    "metrics": self._overlay_metrics(snap),
                 }
         return summaries
 
@@ -1810,6 +1811,38 @@ class ShotAnalysisPipeline:
         _, index, outcome = min(candidates, key=lambda item: item[0])
         used_outcomes.add(index)
         return outcome
+    # Metrics drawn beside the joint angles. Angles are self-describing on
+    # screen -- everyone reads 152 next to "Elbow" as degrees -- so these carry
+    # their unit with them and are kept separate rather than folded in.
+    #
+    # `release_height_ratio` was displayed here briefly and has been removed
+    # with its rule: shown on real footage it read 0.997 at its peak against a
+    # band starting at 1.02, which is the same 15-of-15 failure that had
+    # already cost it its score. A number no observed player has ever passed is
+    # not worth the space it takes on screen.
+    OVERLAY_METRICS = (("release_height", "m"),)
+
+    def _overlay_metrics(self, snapshot) -> Dict[str, float]:
+        """Per-frame metric readouts for the replay overlay.
+
+        Absent keys mean NOT MEASURED, and the overlay must render them as
+        absent rather than as zero. `release_height_ratio` in particular is
+        None whenever no player height was entered -- height is a user input
+        and is never estimated -- and a 0.00 on screen would read as a
+        measurement of a player who released at floor level.
+        """
+        features = getattr(snapshot, "features", None)
+        if features is None:
+            return {}
+        angles = snapshot.angles or {}
+        out: Dict[str, float] = {}
+        for metric, _unit in self.OVERLAY_METRICS:
+            value = self._biomechanics.measure(
+                metric, angles, features, self._resolved_side
+            )
+            if value is not None:
+                out[metric] = round(float(value), 3)
+        return out
 
     def finalize_session(self) -> Optional[ShotSummary]:
         """Close any shot still in progress (e.g. video ended mid-rep)."""

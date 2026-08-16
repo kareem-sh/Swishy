@@ -90,10 +90,17 @@ guarantees it picks the shooter.
 
 ## Scope
 
-Jump shots and set shots / free throws. A driving action is reported as a layup
-with low confidence and **never scored** — pose alone cannot separate a layup
-from a hook shot from a dunk, and every member of that family is unimplemented,
-so the outcome is the same whichever it was.
+Jump shots and set shots / free throws. Nothing else.
+
+A driving action is reported as **unrecognised** and **never scored**. Not as a
+layup: the horizontal test measures that the attempt is not stationary
+shooting, and says nothing about what it is instead — pose alone cannot
+separate a layup from a hook shot from a dunk. Naming the most common member
+of a family we cannot resolve would be a guess wearing a label.
+
+That refusal is a **guard, not a feature**. Removing it would not narrow the
+product to jump and set; it would send drives into the jump-shot rules and
+produce confident, wrong coaching.
 
 ---
 

@@ -53,12 +53,19 @@ MODELS = {
 # Raw MediaPipe indices, deliberately not the project's named landmarks: this
 # script must stay independent of the code it is auditing.
 IDX = {"right_shoulder": 12, "right_elbow": 14, "right_wrist": 16,
-       "right_hip": 24, "right_knee": 26, "right_ankle": 28}
+       "right_hip": 24, "right_knee": 26, "right_ankle": 28,
+       "right_index": 20}
 CHAINS = {
     "elbow": ("right_shoulder", "right_elbow", "right_wrist"),
     "knee": ("right_hip", "right_knee", "right_ankle"),
     "hip": ("right_shoulder", "right_hip", "right_knee"),
     "shoulder": ("right_hip", "right_shoulder", "right_elbow"),
+    # Added 16 Aug 2026. `index_align` is the WRIST angle -- elbow, wrist,
+    # index -- and two scored rules now depend on it, but it had never been
+    # put through this audit: the 39.2 deg figure quoted in biomechanics.yaml
+    # came from elsewhere and was never reproduced here. A band was being
+    # derived from a number this tool had not produced.
+    "index_align": ("right_elbow", "right_wrist", "right_index"),
 }
 BONES = {"upper arm": ("right_shoulder", "right_elbow"),
          "forearm": ("right_elbow", "right_wrist"),

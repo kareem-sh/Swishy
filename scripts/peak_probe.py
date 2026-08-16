@@ -169,7 +169,9 @@ def extract(video_path: Path) -> dict:
                     0.0 if features is None else round(float(features.total_velocity), 4)
                 ),
                 "rise_adaptive": (
-                    None if features is None else round(float(features.body_rise_ratio), 5)
+                    None
+                    if features is None or features.body_rise_ratio is None
+                    else round(float(features.body_rise_ratio), 5)
                 ),
                 "phase": result.phase,
                 "has_pose": bool(result.has_pose),
