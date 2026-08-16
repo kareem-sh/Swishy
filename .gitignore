@@ -22,14 +22,17 @@ Thumbs.db
 .env
 .env.*
 
-# Large ML weights (auto-downloaded on first use)
+# Large or generated ML weights. Keep the deployed runtime models below.
 models/*.pt
 models/*.onnx
-!models/*.task
 yolov8*.pt
 yolo11*.pt
 *.pt
+
+!models/best.pt
 !models/*.task
+!models/nanotrack/
+!models/nanotrack/**
 
 # Jupyter
 .ipynb_checkpoints/
