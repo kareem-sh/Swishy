@@ -1,12 +1,26 @@
 """Tests for the observed ball trajectory overlay recorder."""
 
+<<<<<<< HEAD
 import sys
 from pathlib import Path
 
+=======
+import math
+import sys
+from pathlib import Path
+
+import numpy as np
+
+>>>>>>> balltraking-fixedpose
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from ball.models import BallSnapshot
 from ball.trajectory_overlay import ObservedTrajectoryRecorder
+<<<<<<< HEAD
+=======
+from pipeline import FrameResult
+from visualization.renderer import draw_ball_overlays
+>>>>>>> balltraking-fixedpose
 
 
 def _ball(
@@ -117,6 +131,79 @@ def test_interpolated_snapshot_is_not_recorded() -> None:
     assert recorder.screen_segments((200, 100), 20) == [[(100.0, 100.0)]]
 
 
+<<<<<<< HEAD
+=======
+def test_reused_detection_is_not_recorded_as_observed() -> None:
+    recorder = ObservedTrajectoryRecorder()
+    reused = _ball(120, 80, frame=1)
+    reused.measurement_source = "reused"
+    recorder.update(
+        _ball(100, 100),
+        released_this_frame=True,
+        shot_finished=False,
+        rim_center_xy=(200, 100),
+        rim_radius=20,
+    )
+    recorder.update(
+        reused,
+        released_this_frame=False,
+        shot_finished=False,
+        rim_center_xy=(200, 100),
+        rim_radius=20,
+    )
+
+    assert recorder.screen_segments((200, 100), 20) == [[(100.0, 100.0)]]
+
+
+def test_release_confirmation_backtracks_to_last_near_wrist_point() -> None:
+    recorder = ObservedTrajectoryRecorder(
+        release_preroll_s=0.2,
+        release_near_wrist_scale=0.5,
+    )
+    recorder.update(
+        _ball(100, 200, frame=0),
+        released_this_frame=False,
+        shot_finished=False,
+        rim_center_xy=(300, 100),
+        rim_radius=20,
+        wrist_xy=(100, 200),
+        release_distance_px=60,
+    )
+    recorder.update(
+        _ball(110, 190, frame=1),
+        released_this_frame=False,
+        shot_finished=False,
+        rim_center_xy=(300, 100),
+        rim_radius=20,
+        wrist_xy=(100, 200),
+        release_distance_px=60,
+    )
+    recorder.update(
+        _ball(160, 140, frame=2),
+        released_this_frame=True,
+        shot_finished=False,
+        rim_center_xy=(300, 100),
+        rim_radius=20,
+        wrist_xy=(100, 200),
+        release_distance_px=60,
+    )
+
+    # Confirmation occurred at frame 2, but the reconstructed release begins
+    # at frame 1: the last point still within half the release-distance gate.
+    assert recorder.screen_segments((300, 100), 20) == [
+        [(110.0, 190.0), (160.0, 140.0)]
+    ]
+    assert recorder.relative_points()[0][2] == 33
+    wrist_relative, wrist_distance = recorder.release_wrist_context()
+    assert wrist_relative == (-10.0, 5.0)
+    assert wrist_distance is not None
+    assert math.isclose(wrist_distance, math.sqrt(200.0), rel_tol=1e-9)
+    # Drawing keeps the near-hand point, but launch velocity starts only once
+    # the ball is at least one release-distance away from the wrist.
+    assert recorder.release_kinematics_start_timestamp_ms() == 66
+
+
+>>>>>>> balltraking-fixedpose
 def test_robust_fit_ignores_one_jitter_outlier() -> None:
     recorder = ObservedTrajectoryRecorder(
         maximum_jump_rim_radii=100,
@@ -146,10 +233,40 @@ def test_robust_fit_ignores_one_jitter_outlier() -> None:
     assert middle_y < 280.0
 
 
+<<<<<<< HEAD
+=======
+def test_shared_ball_renderer_can_be_reused_by_offline_replay() -> None:
+    canvas = np.zeros((240, 320, 3), dtype=np.uint8)
+    frame_result = FrameResult(
+        ball_state="ascending",
+        ball_tracking_status="tracked",
+        ball_measurement_source="nanotrack",
+        stabilized_rim_center_xy=(250.0, 80.0),
+        stabilized_rim_inner_radius=20.0,
+        observed_ball_path_segments=[[(80.0, 180.0), (130.0, 120.0)]],
+        fitted_observed_ball_path=[(80.0, 180.0), (160.0, 90.0)],
+        ideal_ball_path=[(80.0, 180.0), (250.0, 80.0)],
+        ideal_rim_target_xy=(250.0, 80.0),
+    )
+
+    returned = draw_ball_overlays(canvas, frame_result)
+
+    assert returned is canvas
+    assert np.count_nonzero(canvas) > 0
+
+
+>>>>>>> balltraking-fixedpose
 if __name__ == "__main__":
     test_path_follows_current_rim_after_camera_motion()
     test_missing_detection_starts_a_new_segment()
     test_finished_shot_stops_recording_until_next_release()
     test_interpolated_snapshot_is_not_recorded()
+<<<<<<< HEAD
     test_robust_fit_ignores_one_jitter_outlier()
+=======
+    test_reused_detection_is_not_recorded_as_observed()
+    test_release_confirmation_backtracks_to_last_near_wrist_point()
+    test_robust_fit_ignores_one_jitter_outlier()
+    test_shared_ball_renderer_can_be_reused_by_offline_replay()
+>>>>>>> balltraking-fixedpose
     print("All observed trajectory overlay tests passed.")

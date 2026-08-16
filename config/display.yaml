@@ -34,6 +34,48 @@ trajectory_overlay:
   # Orange dots are filtered observed centers. The green line is the robust fit.
   show_observed_polyline: false
   show_fitted: true
+  # Blue reference arc starts at the measured ball release and reaches the
+  # top of the rim detection at the configured launch angle. This target is
+  # separate from the center geometry used by made/miss classification.
+  show_ideal: true
+  # Select the launch angle from calibrated horizontal shot distance.
+  # The fixed value is used only when physical distance calibration is absent.
+  ideal_angle_mode: distance_adaptive
+  ideal_release_angle_deg: 58.0
+  # <=3.0 m: 65 degrees; a 4.225 m FIBA free throw is about 54.35
+  # degrees; >=5.30 m remains 45 degrees.
+  # The 5.30 m anchor matches the current player-scale estimate for the tested
+  # three-point clip. Replace it with the regulation distance after court
+  # homography calibration. Values between anchors are linearly interpolated.
+  ideal_close_distance_m: 1.5
+  ideal_close_angle_deg: 65.0
+  ideal_midrange_distance_m: 3.0
+  ideal_midrange_angle_deg: 65.0
+  ideal_three_point_distance_m: 6.75
+  ideal_three_point_angle_deg: 45.0
+  # Vertical target within YOLO's rim box: 0.0 = top/min Y, 0.5 = box center.
+  ideal_rim_y_fraction: 0.0
+  ideal_samples: 80
+  ideal_thickness: 2
+  # Regulation inside rim diameter; used to express distance and speed in SI.
+  # These remain camera-scale estimates until full perspective calibration.
+  rim_diameter_m: 0.457
+  # Launch kinematics use real ball detections after hand separation only.
+  # Fit the same 0.2-second launch interval at every source frame rate.
+  velocity_fit_window_s: 0.20
+  velocity_fit_min_points: 3
+  # NanoTrack may fill the interval, but at least two independently detected
+  # YOLO/color points must anchor a reported launch velocity.
+  velocity_fit_min_direct_points: 2
+  velocity_fit_outlier_threshold_rim_radii: 0.75
+  velocity_min_toward_rim_m_s: 0.25
+  velocity_min_upward_m_s: 0.25
+  velocity_max_speed_m_s: 20.0
+  comparison_min_points: 3
+  # Release is confirmed a few frames late. Keep a short measured history and
+  # begin both paths at the last near-wrist point before sustained separation.
+  release_preroll_s: 0.40
+  release_near_wrist_scale: 0.5
   observed_max_points: 120
   maximum_jump_rim_radii: 5.0
   observed_thickness: 3

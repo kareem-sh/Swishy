@@ -173,9 +173,34 @@ def _draw_shot_summary_card(image, summary: ShotSummary, w: int, h: int):
     y1 = h - card_h - 24
     _blend_panel(image, x1, y1, x1 + card_w, y1 + card_h, alpha=0.9)
 
-    score_color = (80, 220, 120) if summary.score >= 75 else (0, 165, 255) if summary.score >= 60 else (80, 80, 255)
+    if summary.score is None:
+        # Unsupported/rejected attempts intentionally have no numeric score.
+        # They are not zero-score shots, so avoid numeric comparisons here.
+        score_text = "NOT SCORED"
+        score_color = (160, 160, 160)
+    else:
+        score_text = f"{summary.score}/100"
+        score_color = (
+            (80, 220, 120)
+            if summary.score >= 75
+            else (0, 165, 255)
+            if summary.score >= 60
+            else (80, 80, 255)
+        )
+
     _put_line(image, f"SHOT #{summary.shot_number}  |  {summary.grade.upper()}", x1 + 16, y1 + 28, 0.58, (255, 255, 255), 1)
-    _put_line(image, f"{summary.score}/100", x1 + card_w - 72, y1 + 28, 0.62, score_color, 2)
+    score_width = cv2.getTextSize(
+        score_text, cv2.FONT_HERSHEY_SIMPLEX, 0.62, 2
+    )[0][0]
+    _put_line(
+        image,
+        score_text,
+        x1 + card_w - score_width - 16,
+        y1 + 28,
+        0.62,
+        score_color,
+        2,
+    )
     _put_line(
         image,
         f"Rules passed: {summary.passed_count}/{summary.total_count}",

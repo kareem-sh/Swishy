@@ -16,11 +16,11 @@ class BallTracker:
 
     def __init__(
         self,
-        max_gap_frames: int = 4,
+        max_gap_ms: int = 200,
         position_alpha: float = 0.80,
         velocity_alpha: float = 0.50,
     ):
-        self.max_gap_frames = max(0, int(max_gap_frames))
+        self.max_gap_ms = max(0, int(max_gap_ms))
         self.position_alpha = min(1.0, max(0.0, float(position_alpha)))
         self.velocity_alpha = min(1.0, max(0.0, float(velocity_alpha)))
 
@@ -29,6 +29,7 @@ class BallTracker:
         self.current_position: Optional[Tuple[float, float]] = None
         self.current_velocity: Tuple[float, float] = (0.0, 0.0)
         self.last_detection_frame = -1
+        self.last_detection_timestamp_ms: Optional[int] = None
         self.last_timestamp_ms: Optional[int] = None
 
     def update(
@@ -38,7 +39,7 @@ class BallTracker:
         timestamp_ms: int,
     ) -> Optional[BallSnapshot]:
         """Update state with a detection or a short constant-velocity prediction."""
-        if detection is not None:
+        if detection is not None and detection.is_visual_observation:
             snapshot = self._update_from_detection(
                 detection,
                 frame_index,
@@ -88,6 +89,7 @@ class BallTracker:
         self.current_position = smoothed
         self.current_velocity = velocity
         self.last_detection_frame = frame_index
+        self.last_detection_timestamp_ms = timestamp_ms
         self.last_timestamp_ms = timestamp_ms
 
         return BallSnapshot(
@@ -98,6 +100,7 @@ class BallTracker:
             velocity_xy=velocity,
             state="unknown",
             track_id=self.track_id,
+            measurement_source=detection.measurement_source,
         )
 
     def _predict_missing(
@@ -105,10 +108,15 @@ class BallTracker:
         frame_index: int,
         timestamp_ms: int,
     ) -> Optional[BallSnapshot]:
-        gap = frame_index - self.last_detection_frame
+        gap_ms = (
+            timestamp_ms - self.last_detection_timestamp_ms
+            if self.last_detection_timestamp_ms is not None
+            else None
+        )
         if (
-            gap <= 0
-            or gap > self.max_gap_frames
+            gap_ms is None
+            or gap_ms <= 0
+            or gap_ms > self.max_gap_ms
             or self.current_position is None
             or self.last_timestamp_ms is None
             or not self.track_history
@@ -132,6 +140,7 @@ class BallTracker:
             state="unknown",
             track_id=self.track_id,
             is_interpolated=True,
+            measurement_source="predicted",
         )
 
     def reset(self) -> None:
@@ -141,6 +150,7 @@ class BallTracker:
         self.current_position = None
         self.current_velocity = (0.0, 0.0)
         self.last_detection_frame = -1
+        self.last_detection_timestamp_ms = None
         self.last_timestamp_ms = None
 
     def get_track(self) -> List[BallSnapshot]:

@@ -35,6 +35,7 @@ class BallTrackingStatus(str, Enum):
     """Whether the current ball point is measured, predicted, or absent."""
 
     OBSERVED = "observed"
+    TRACKED = "tracked"
     PREDICTED = "predicted"
     LOST = "lost"
 
@@ -44,8 +45,8 @@ _TERMINAL_STATES = {
     BallShotState.MISSED,
     BallShotState.UNKNOWN,
 }
-_SHOT_START_PHASES = {"loading", "ball_lift"}
-_RELEASE_PHASES = {"release", "follow_through"}
+_SHOT_START_PHASES = {"rise"}
+_RELEASE_PHASES = {"release", "recovery"}
 _FLIGHT_STATES = {
     BallShotState.RELEASED,
     BallShotState.ASCENDING,
@@ -65,12 +66,14 @@ class BallStateUpdate:
 
     state: BallShotState
     tracking_status: BallTrackingStatus
+    measurement_source: str = "none"
     outcome: Optional[ShotOutcome] = None
     released_this_frame: bool = False
     crossed_rim_this_frame: bool = False
     rim_center_xy: Optional[Tuple[float, float]] = None
     rim_inner_radius: Optional[float] = None
     crossing_xy: Optional[Tuple[float, float]] = None
+    crossing_timestamp_ms: Optional[int] = None
 
 
 class BallShotStateMachine:
@@ -88,14 +91,60 @@ class BallShotStateMachine:
 
         self.enabled = bool(state_cfg.get("enabled", True))
         self.dynamic_rim = bool(state_cfg.get("dynamic_rim", False))
+<<<<<<< HEAD
+=======
+        self.debug_outcome = bool(state_cfg.get("debug_outcome", False))
+>>>>>>> balltraking-fixedpose
         self.release_distance_px = float(
             state_cfg.get("release_distance_px", 60)
         )
-        self.release_distance_growth_px = float(
-            state_cfg.get("release_distance_growth_px", 12)
+        self.release_distance_ratio = max(
+            0.0,
+            float(state_cfg.get("release_distance_ratio", 0.20)),
         )
-        self.release_min_speed_px_s = float(
-            state_cfg.get("release_min_speed_px_s", 120)
+        self.release_far_distance_ratio = max(
+            self.release_distance_ratio,
+            float(state_cfg.get("release_far_distance_ratio", 0.30)),
+        )
+        self.release_distance_growth_px_s = float(
+            state_cfg.get("release_distance_growth_px_s", 360.0)
+        )
+        self.release_distance_growth_ratio_s = max(
+            0.0,
+            float(state_cfg.get("release_distance_growth_ratio_s", 2.0)),
+        )
+        # Kept as a pixel fallback for frames where pose scale is unavailable.
+        # The production path normally uses the body-height-normalized value.
+        self.release_min_upward_speed_px_s = float(
+            state_cfg.get(
+                "release_min_upward_speed_px_s",
+                state_cfg.get("release_min_speed_px_s", 120),
+            )
+        )
+        self.release_min_upward_speed_ratio_s = max(
+            0.0,
+            float(state_cfg.get("release_min_upward_speed_ratio_s", 0.35)),
+        )
+        self.ankle_release_height_ratio = float(
+            state_cfg.get("ankle_release_height_ratio", 0.45)
+        )
+        self.ankle_release_fallback_px = float(
+            state_cfg.get("ankle_release_fallback_px", 350.0)
+        )
+        self.minimum_player_height_px = float(
+            state_cfg.get("minimum_player_height_px", 50.0)
+        )
+        self.release_ball_above_wrist_ratio = max(
+            0.0,
+            float(state_cfg.get("release_ball_above_wrist_ratio", 0.01)),
+        )
+        self.release_ball_above_wrist_fallback_px = max(
+            0.0,
+            float(
+                state_cfg.get(
+                    "release_ball_above_wrist_fallback_px", 4.0
+                )
+            ),
         )
         self.ascending_velocity_px_s = float(
             state_cfg.get("ascending_velocity_px_s", 30)
@@ -117,6 +166,7 @@ class BallShotStateMachine:
         )
         self.rim_contact_channel_scale = float(
             state_cfg.get("rim_contact_channel_scale", 1.15)
+<<<<<<< HEAD
         )
         self.rim_depth_scale = float(
             state_cfg.get("rim_depth_scale", 0.20)
@@ -126,9 +176,24 @@ class BallShotStateMachine:
         )
         self.below_confirmation_frames = max(
             1, int(state_cfg.get("below_confirmation_frames", 2))
+=======
+>>>>>>> balltraking-fixedpose
         )
-        self.miss_confirmation_frames = max(
-            1, int(state_cfg.get("miss_confirmation_frames", 2))
+        self.rim_depth_scale = float(
+            state_cfg.get("rim_depth_scale", 0.20)
+        )
+        self.rim_exit_channel_scale = float(
+            state_cfg.get("rim_exit_channel_scale", 1.5)
+        )
+        self.entry_containment_tolerance_scale = max(
+            0.0,
+            float(state_cfg.get("entry_containment_tolerance_scale", 0.05)),
+        )
+        self.made_confirmation_s = max(
+            0.0, float(state_cfg.get("made_confirmation_s", 0.0))
+        )
+        self.miss_confirmation_s = max(
+            0.0, float(state_cfg.get("miss_confirmation_s", 0.05))
         )
         self.outcome_timeout_ms = max(
             1, int(state_cfg.get("outcome_timeout_ms", 3000))
@@ -161,17 +226,23 @@ class BallShotStateMachine:
         self.release_timestamp_ms: Optional[int] = None
         self.release_frame: Optional[int] = None
         self.entry_frame: Optional[int] = None
+        self.entry_timestamp_ms: Optional[int] = None
         self.previous_snapshot: Optional[BallSnapshot] = None
         self.previous_observed_snapshot: Optional[BallSnapshot] = None
         self.previous_rim_center: Optional[Tuple[float, float]] = None
         self.previous_observed_rim_center: Optional[Tuple[float, float]] = None
         self.previous_wrist_distance: Optional[float] = None
+        self.previous_wrist_timestamp_ms: Optional[int] = None
+        self.in_hand_timestamp_ms: Optional[int] = None
         self.last_observed_timestamp_ms: Optional[int] = None
         self.last_ball_radius: Optional[float] = None
         self.saw_ball_above_rim = False
         self.saw_inside_crossing = False
+        self.saw_contact_center_inside_opening = False
         self.below_confirmation_count = 0
         self.miss_confirmation_count = 0
+        self.below_confirmation_started_ms: Optional[int] = None
+        self.miss_confirmation_started_ms: Optional[int] = None
         self.evidence: list[str] = []
         self.crossing_xy: Optional[Tuple[float, float]] = None
         self._rim_locked = False
@@ -184,9 +255,14 @@ class BallShotStateMachine:
         ball_snapshot: Optional[BallSnapshot],
         rim_detection: Optional[RimDetection],
         wrist_xy: Optional[Tuple[float, float]],
+<<<<<<< HEAD
         ankle_y: float,
+=======
+        ankle_y: Optional[float],
+>>>>>>> balltraking-fixedpose
         pose_phase: Optional[str],
         timestamp_ms: int,
+        player_height_px: Optional[float] = None,
     ) -> BallStateUpdate:
         """Process one frame and return the current physical shot state."""
         released_this_frame = False
@@ -196,7 +272,7 @@ class BallShotStateMachine:
         if (
             self.terminal
             and pose_phase in _SHOT_START_PHASES
-            and self._previous_pose_phase in (None, "ready_stance")
+            and self._previous_pose_phase in (None, "ready")
         ):
             self.begin_attempt()
 
@@ -204,7 +280,15 @@ class BallShotStateMachine:
             self._update_rim(rim_detection)
 
         tracking_status = self._tracking_status(ball_detection, ball_snapshot)
-        observed = tracking_status == BallTrackingStatus.OBSERVED
+        observed = tracking_status in {
+            BallTrackingStatus.OBSERVED,
+            BallTrackingStatus.TRACKED,
+        }
+        measurement_source = (
+            ball_snapshot.measurement_source
+            if ball_snapshot is not None
+            else "none"
+        )
 
         if observed and ball_detection is not None:
             self.last_ball_radius = float(ball_detection.radius)
@@ -212,33 +296,69 @@ class BallShotStateMachine:
 
         if not self.enabled or self.terminal:
             self._remember_pose_phase(pose_phase)
-            return self._result(tracking_status)
+            return self._result(
+                tracking_status, measurement_source=measurement_source
+            )
 
         if ball_snapshot is None:
             self._check_timeouts(timestamp_ms, tracking_status)
             self._remember_pose_phase(pose_phase)
-            return self._result(tracking_status)
+            return self._result(
+                tracking_status, measurement_source=measurement_source
+            )
 
         wrist_distance = self._ball_wrist_distance(ball_snapshot, wrist_xy)
+<<<<<<< HEAD
         vx, vy = ball_snapshot.velocity_xy
         speed = math.hypot(vx, vy)
+=======
+        _, vy = ball_snapshot.velocity_xy
+        # print(
+        #     ball_snapshot.frame_index,
+        #     ball_snapshot.x,
+        #     ball_snapshot.y,
+        #     ball_snapshot.velocity_xy,
+        #     ball_snapshot.is_interpolated,
+        #     speed,
+        # )
+>>>>>>> balltraking-fixedpose
         relative_vy = self._relative_vertical_velocity(ball_snapshot, vy)
 
         if self.state == BallShotState.WAITING and wrist_distance is not None:
-            in_hand_limit = self.release_distance_px
-            if pose_phase in {"loading", "knee_flexion", "ball_lift"}:
-                in_hand_limit *= 1.5
+            in_hand_limit = self.release_distance_threshold_px(player_height_px)
+            if pose_phase == "rise":
+                in_hand_limit = self.release_far_distance_threshold_px(
+                    player_height_px
+                )
             if wrist_distance <= in_hand_limit:
                 self.state = BallShotState.IN_HAND
+                self.in_hand_timestamp_ms = timestamp_ms
 
-        if self.state in {BallShotState.WAITING, BallShotState.IN_HAND}:
+        # A release is a transition FROM possession. A detector point that was
+        # never observed near the hand must not jump directly from WAITING to
+        # RELEASED, even if pose and velocity happen to resemble a shot.
+        had_prior_in_hand_observation = (
+            self.state == BallShotState.IN_HAND
+            and self.in_hand_timestamp_ms is not None
+            and timestamp_ms > self.in_hand_timestamp_ms
+        )
+        if had_prior_in_hand_observation:
             if self._release_confirmed(
                 pose_phase=pose_phase,
                 ball_snapshot=ball_snapshot,
                 wrist_distance=wrist_distance,
+<<<<<<< HEAD
                 speed=speed,
                 ankle_y=ankle_y,
+=======
+                wrist_xy=wrist_xy,
+                relative_vertical_velocity=relative_vy,
+                ankle_y=ankle_y,
+                player_height_px=player_height_px,
+                timestamp_ms=timestamp_ms,
+>>>>>>> balltraking-fixedpose
             ):
+                print("ball release confirmed")
                 self.state = BallShotState.RELEASED
                 self.release_timestamp_ms = timestamp_ms
                 self.release_frame = ball_snapshot.frame_index
@@ -277,10 +397,12 @@ class BallShotStateMachine:
             self.previous_observed_rim_center = self.rim_center
         if wrist_distance is not None:
             self.previous_wrist_distance = wrist_distance
+            self.previous_wrist_timestamp_ms = timestamp_ms
         self._remember_pose_phase(pose_phase)
 
         return self._result(
             tracking_status,
+            measurement_source=measurement_source,
             released_this_frame=released_this_frame,
             crossed_rim_this_frame=crossed_this_frame,
         )
@@ -291,6 +413,10 @@ class BallShotStateMachine:
         snapshot: Optional[BallSnapshot],
     ) -> BallTrackingStatus:
         if detection is not None and snapshot is not None:
+            if detection.measurement_source == "nanotrack":
+                return BallTrackingStatus.TRACKED
+            if not detection.is_visual_observation:
+                return BallTrackingStatus.PREDICTED
             return BallTrackingStatus.OBSERVED
         if snapshot is not None and snapshot.is_interpolated:
             return BallTrackingStatus.PREDICTED
@@ -340,14 +466,23 @@ class BallShotStateMachine:
         pose_phase: Optional[str],
         ball_snapshot: Optional[BallSnapshot],
         wrist_distance: Optional[float],
+<<<<<<< HEAD
         speed: float,
         ankle_y: float,
+=======
+        wrist_xy: Optional[Tuple[float, float]],
+        relative_vertical_velocity: float,
+        ankle_y: Optional[float],
+        player_height_px: Optional[float],
+        timestamp_ms: int,
+>>>>>>> balltraking-fixedpose
     ) -> bool:
         pose_release = pose_phase in _RELEASE_PHASES
         difference_from_ankle = (
             ankle_y - ball_snapshot.y
             if ankle_y is not None and ball_snapshot is not None
             else None
+<<<<<<< HEAD
         )
         print(difference_from_ankle)
         ankle_threshold = 350.0  # pixels, adjust as needed
@@ -367,12 +502,128 @@ class BallShotStateMachine:
                 and wrist_distance - self.previous_wrist_distance
                 >= self.release_distance_growth_px
                 
+=======
+        )
+        valid_player_height = (
+            player_height_px is not None
+            and math.isfinite(player_height_px)
+            and player_height_px >= self.minimum_player_height_px
+        )
+        if difference_from_ankle is None:
+            ankle_release = False
+        elif valid_player_height:
+            # Body-height units make the same gate work across resolutions,
+            # zoom levels, and different distances from the camera.
+            ankle_release = (
+                difference_from_ankle / player_height_px
+                >= self.ankle_release_height_ratio
+            )
+        else:
+            # Preserve usable behavior on frames where MediaPipe cannot provide
+            # a trustworthy nose-to-ankle scale.
+            ankle_release = (
+                difference_from_ankle >= self.ankle_release_fallback_px
+>>>>>>> balltraking-fixedpose
             )
 
+        # In image coordinates y grows downward.  At release the ball center
+        # must be just above the wrist, so a positive wrist_y - ball_y is
+        # required.  Normalize the small clearance by player height when a
+        # reliable image scale is available; otherwise use a pixel fallback.
+        ball_above_wrist = False
+        if ball_snapshot is not None and wrist_xy is not None:
+            wrist_x, wrist_y = map(float, wrist_xy)
+            if math.isfinite(wrist_x) and math.isfinite(wrist_y):
+                vertical_gap_px = wrist_y - ball_snapshot.y
+                if valid_player_height:
+                    ball_above_wrist = (
+                        vertical_gap_px / player_height_px
+                        >= self.release_ball_above_wrist_ratio
+                    )
+                else:
+                    ball_above_wrist = (
+                        vertical_gap_px
+                        >= self.release_ball_above_wrist_fallback_px
+                    )
+
+        release_distance_px = self.release_distance_threshold_px(
+            player_height_px
+        )
+        far_distance_px = self.release_far_distance_threshold_px(
+            player_height_px
+        )
+        far_from_wrist = (
+            wrist_distance is not None
+            and wrist_distance >= far_distance_px
+        )
+        separating = False
+        if (
+            wrist_distance is not None
+            and self.previous_wrist_distance is not None
+            and self.previous_wrist_timestamp_ms is not None
+        ):
+            dt_s = (timestamp_ms - self.previous_wrist_timestamp_ms) / 1000.0
+            distance_growth_px_s = (
+                (wrist_distance - self.previous_wrist_distance) / dt_s
+                if dt_s > 1e-6
+                else 0.0
+            )
+            if valid_player_height:
+                distance_growth = distance_growth_px_s / player_height_px
+                required_growth = self.release_distance_growth_ratio_s
+            else:
+                distance_growth = distance_growth_px_s
+                required_growth = self.release_distance_growth_px_s
+            separating = (
+                wrist_distance >= release_distance_px
+                and distance_growth >= required_growth
+            )
+        # Image y grows downward. Negative velocity is upward. Use motion
+        # relative to the rim so camera motion cannot turn a stationary ball
+        # into a release, and normalize it when pose scale is trustworthy.
+        if valid_player_height:
+            upward_speed = -relative_vertical_velocity / player_height_px
+            required_upward_speed = self.release_min_upward_speed_ratio_s
+        else:
+            upward_speed = -relative_vertical_velocity
+            required_upward_speed = self.release_min_upward_speed_px_s
+        ball_moving_upward = upward_speed >= required_upward_speed
+
+        return ankle_release and ball_above_wrist and (
+            pose_release
+            and separating
+            and ball_moving_upward
+            and far_from_wrist
+        )
+
+    def _valid_player_height(self, player_height_px: Optional[float]) -> bool:
         return (
+<<<<<<< HEAD
             pose_release and ((separating or ball_fast or far_from_wrist) and ankle_release)
         ) 
     # or (separating and ball_fast  and ankle_release)
+=======
+            player_height_px is not None
+            and math.isfinite(player_height_px)
+            and player_height_px >= self.minimum_player_height_px
+        )
+
+    def release_distance_threshold_px(
+        self, player_height_px: Optional[float]
+    ) -> float:
+        """Near-hand separation threshold in pixels for the current scale."""
+        if self._valid_player_height(player_height_px):
+            return self.release_distance_ratio * float(player_height_px)
+        return self.release_distance_px
+
+    def release_far_distance_threshold_px(
+        self, player_height_px: Optional[float]
+    ) -> float:
+        """Final release separation threshold in pixels for the current scale."""
+        if self._valid_player_height(player_height_px):
+            return self.release_far_distance_ratio * float(player_height_px)
+        return self.release_distance_px * 1.5
+>>>>>>> balltraking-fixedpose
 
     @staticmethod
     def _ball_wrist_distance(
@@ -408,8 +659,26 @@ class BallShotStateMachine:
                 self._rim_locked = True
 
         above_margin = radius * self.above_margin_scale
+<<<<<<< HEAD
+=======
+        newly_above_rim = (
+            observed
+            and near_rim
+            and snapshot.y < rim_top - above_margin
+            and not self.saw_ball_above_rim
+        )
+>>>>>>> balltraking-fixedpose
         if observed and near_rim and snapshot.y < rim_top - above_margin:
             self.saw_ball_above_rim = True
+        if newly_above_rim:
+            self._debug_outcome_event(
+                "ABOVE_RIM",
+                frame=snapshot.frame_index,
+                ball_y=snapshot.y,
+                rim_y=rim_y,
+                rim_top=rim_top,
+                vertical_velocity=vertical_velocity,
+            )
 
         self._record_possible_rim_contact(snapshot, observed, radius)
 
@@ -436,7 +705,14 @@ class BallShotStateMachine:
             current_relative_x = snapshot.x - rim_x
             current_relative_y = snapshot.y - rim_y
             downward_crossing = previous_relative_y < 0.0 <= current_relative_y
+<<<<<<< HEAD
             crossing_supported = observed or not previous.is_interpolated
+=======
+            # Do not declare the entry from a constant-velocity prediction.
+            # Two measured endpoints may still straddle the rim plane; the
+            # crossing point is interpolated between them below.
+            crossing_supported = observed and not previous.is_interpolated
+>>>>>>> balltraking-fixedpose
             if (
                 downward_crossing
                 and crossing_supported
@@ -454,14 +730,29 @@ class BallShotStateMachine:
                     crossed = True
                     self.crossing_xy = (crossing_x, rim_y)
                     self.entry_frame = snapshot.frame_index
-                    clearance = max(
-                        self.rim_inner_radius - radius,
-                        self.rim_inner_radius * 0.20,
+                    crossing_ratio = self._interpolate_crossing_ratio(
+                        previous_relative_y,
+                        current_relative_y,
                     )
+<<<<<<< HEAD
+=======
+                    self.entry_timestamp_ms = (
+                        int(
+                            round(
+                                previous.timestamp_ms
+                                + crossing_ratio
+                                * (snapshot.timestamp_ms - previous.timestamp_ms)
+                            )
+                        )
+                        if crossing_ratio is not None
+                        else snapshot.timestamp_ms
+                    )
+>>>>>>> balltraking-fixedpose
                     crossing_offset = abs(crossing_relative_x)
                     contact_limit = (
                         self.rim_inner_radius * self.rim_contact_channel_scale
                     )
+<<<<<<< HEAD
                     if crossing_offset <= clearance:
                         self.state = BallShotState.CROSSED_INSIDE
                         self.saw_inside_crossing = True
@@ -472,11 +763,57 @@ class BallShotStateMachine:
                         # this result unresolved until post-contact evidence.
                         self.state = BallShotState.RIM_CONTACT
                         self.saw_rim_contact = True
+=======
+                    contour_fits = self._ball_contour_fits_opening(
+                        crossing_relative_x,
+                        radius,
+                    )
+                    center_inside_opening = (
+                        crossing_offset <= self.rim_inner_radius
+                    )
+                    if center_inside_opening:
+                        # The interpolated center is the stable evidence here.
+                        # In an oblique camera view, the projected ball circle
+                        # can overlap the projected rim even during a swish;
+                        # that 2D contour overlap is not physical contact.
+                        self.state = BallShotState.CROSSED_INSIDE
+                        self.saw_inside_crossing = True
+                        self.evidence.append(
+                            "Ball center crossed inside rim opening"
+                        )
+                    elif crossing_offset <= contact_limit:
+                        # A center just outside the projected opening remains
+                        # unresolved. The legacy state name is not proof of a
+                        # physical collision; actual contact needs deflection
+                        # evidence across multiple frames.
+                        self.state = BallShotState.RIM_CONTACT
+                        self.saw_rim_contact = True
+                        self.saw_contact_center_inside_opening = (
+                            crossing_offset <= self.rim_inner_radius
+                        )
+>>>>>>> balltraking-fixedpose
                         self.evidence.append("Ball crossed rim contact zone")
                     else:
                         self.state = BallShotState.CROSSED_OUTSIDE
                         self.evidence.append("Ball crossed outside rim opening")
 
+<<<<<<< HEAD
+=======
+                    self._debug_outcome_event(
+                        "RIM_CROSSING",
+                        frame=snapshot.frame_index,
+                        classification=self.state.value,
+                        crossing_x=crossing_x,
+                        crossing_offset=abs(crossing_relative_x),
+                        ball_radius=radius,
+                        rim_inner_radius=self.rim_inner_radius,
+                        center_inside_opening=center_inside_opening,
+                        contour_fits=contour_fits,
+                        saw_rim_contact=self.saw_rim_contact,
+                        vertical_velocity=vertical_velocity,
+                    )
+
+>>>>>>> balltraking-fixedpose
         below_threshold = max(
             rim_y + radius * self.below_margin_scale,
             rim_bottom + radius * 0.25,
@@ -485,6 +822,20 @@ class BallShotStateMachine:
         inside_net_channel = (
             horizontal_offset <= self.rim_inner_radius * self.net_channel_scale
         )
+<<<<<<< HEAD
+=======
+        inside_inner_opening = horizontal_offset <= self.rim_inner_radius
+        if (
+            self.state == BallShotState.RIM_CONTACT
+            and observed
+            and inside_inner_opening
+            and not below_rim
+        ):
+            # Preserve the entry evidence. A made ball can move diagonally
+            # after crossing the opening, so it need not remain within the
+            # inner radius on the later frame that confirms it is below.
+            self.saw_contact_center_inside_opening = True
+>>>>>>> balltraking-fixedpose
         previous_distance = None
         if (
             self.previous_observed_snapshot is not None
@@ -512,6 +863,7 @@ class BallShotStateMachine:
             > self.rim_inner_radius * self.rim_exit_channel_scale
             and moving_away
         )
+<<<<<<< HEAD
 
         if self.state in {
             BallShotState.CROSSED_INSIDE,
@@ -528,26 +880,120 @@ class BallShotStateMachine:
                 self.miss_confirmation_count += 1
 
             if self.below_confirmation_count >= self.below_confirmation_frames:
+=======
+
+        if self.state in {
+            BallShotState.CROSSED_INSIDE,
+            BallShotState.RIM_CONTACT,
+        }:
+            # An interpolated center crossing inside the opening establishes
+            # the entry path. This must not depend on a vertical net channel:
+            # without a net, the ball naturally continues diagonally.
+            # Rim-contact entries remain stricter because they can still
+            # deflect away after touching the rim.
+            clean_inside_exit = (
+                self.state == BallShotState.CROSSED_INSIDE
+                and self.saw_inside_crossing
+                and observed
+                and below_rim
+                and vertical_velocity >= 0.0
+            )
+            contact_inside_exit = (
+                self.state == BallShotState.RIM_CONTACT
+                and self.saw_contact_center_inside_opening
+                and observed
+                and below_rim
+                and vertical_velocity >= 0.0
+            )
+            confirmed_made_exit = clean_inside_exit or contact_inside_exit
+            unverified_contact_exit = (
+                self.state == BallShotState.RIM_CONTACT
+                and observed
+                and below_rim
+                and not self.saw_contact_center_inside_opening
+            )
+            miss_evidence = rebounding_up or (
+                self.state == BallShotState.RIM_CONTACT
+                and not self.saw_contact_center_inside_opening
+                and (outside_exit or unverified_contact_exit)
+            )
+            make_duration_s = self._update_made_confirmation(
+                confirmed_made_exit, observed, timestamp_ms
+            )
+            miss_duration_s = self._update_miss_confirmation(
+                miss_evidence, observed, timestamp_ms
+            )
+
+            self._debug_outcome_event(
+                "POST_ENTRY",
+                frame=snapshot.frame_index,
+                state=self.state.value,
+                observed=observed,
+                below_rim=below_rim,
+                inside_net_channel=inside_net_channel,
+                inside_inner_opening=inside_inner_opening,
+                saw_contact_inner_entry=(
+                    self.saw_contact_center_inside_opening
+                ),
+                confirmation_mode=(
+                    "clean_crossing"
+                    if self.state == BallShotState.CROSSED_INSIDE
+                    else "rim_contact"
+                ),
+                rebounding_up=rebounding_up,
+                outside_exit=outside_exit,
+                make_duration_s=(
+                    f"{make_duration_s:.3f}/{self.made_confirmation_s:.3f}"
+                ),
+                miss_duration_s=(
+                    f"{miss_duration_s:.3f}/{self.miss_confirmation_s:.3f}"
+                ),
+            )
+
+            if (
+                confirmed_made_exit
+                and make_duration_s >= self.made_confirmation_s
+            ):
+>>>>>>> balltraking-fixedpose
                 contact_make = self.state == BallShotState.RIM_CONTACT
                 self._finish(
                     result="made",
                     confidence=0.90 if contact_make else 0.95,
                     evidence=(
+<<<<<<< HEAD
                         "Ball observed below rim inside net channel after rim contact"
                         if contact_make
                         else "Ball observed below rim inside net channel"
+=======
+                        "Ball center crossed the inner opening and descended below the rim after rim contact"
+                        if contact_make
+                        else "Ball observed below rim after center crossed inside opening"
+>>>>>>> balltraking-fixedpose
                     ),
                     timestamp_ms=timestamp_ms,
                 )
-            elif self.miss_confirmation_count >= self.miss_confirmation_frames:
+            elif miss_evidence and miss_duration_s >= self.miss_confirmation_s:
+                if rebounding_up:
+                    miss_reason = "Ball rebounded upward after rim crossing"
+                elif outside_exit:
+                    miss_reason = "Ball exited away from the basket after rim contact"
+                else:
+                    miss_reason = (
+                        "Ball remained below the rim outside the inner opening"
+                    )
                 self._finish(
                     result="missed",
                     confidence=0.85,
+<<<<<<< HEAD
                     evidence="Ball clearly rebounded or exited after rim contact",
+=======
+                    evidence=miss_reason,
+>>>>>>> balltraking-fixedpose
                     timestamp_ms=timestamp_ms,
                 )
 
         elif self.state == BallShotState.CROSSED_OUTSIDE:
+<<<<<<< HEAD
             if (
                 observed
                 and (
@@ -558,24 +1004,68 @@ class BallShotStateMachine:
             ):
                 self.miss_confirmation_count += 1
             if self.miss_confirmation_count >= self.miss_confirmation_frames:
+=======
+            miss_evidence = (
+                observed
+                and (below_rim or rebounding_up or outside_exit)
+            )
+            self._update_made_confirmation(False, observed, timestamp_ms)
+            miss_duration_s = self._update_miss_confirmation(
+                miss_evidence, observed, timestamp_ms
+            )
+            self._debug_outcome_event(
+                "OUTSIDE_ENTRY",
+                frame=snapshot.frame_index,
+                below_rim=below_rim,
+                inside_net_channel=inside_net_channel,
+                inside_inner_opening=inside_inner_opening,
+                rebounding_up=rebounding_up,
+                outside_exit=outside_exit,
+                miss_duration_s=(
+                    f"{miss_duration_s:.3f}/{self.miss_confirmation_s:.3f}"
+                ),
+            )
+            if miss_evidence and miss_duration_s >= self.miss_confirmation_s:
+>>>>>>> balltraking-fixedpose
                 self._finish(
                     result="missed",
                     confidence=0.90,
-                    evidence="Ball passed below rim outside opening",
+                    evidence="Ball passed below rim after crossing outside opening",
                     timestamp_ms=timestamp_ms,
                 )
 
         elif self.state == BallShotState.RIM_APPROACH:
             # Handles an airball when sparse frames do not capture the exact
             # plane crossing but the ball is visibly below and well outside.
-            if (
+            miss_evidence = (
                 observed
                 and below_rim
                 and horizontal_offset
                 > self.rim_inner_radius * self.rim_exit_channel_scale
+<<<<<<< HEAD
             ):
                 self.miss_confirmation_count += 1
             if self.miss_confirmation_count >= self.miss_confirmation_frames:
+=======
+            )
+            self._update_made_confirmation(False, observed, timestamp_ms)
+            miss_duration_s = self._update_miss_confirmation(
+                miss_evidence, observed, timestamp_ms
+            )
+            if observed and below_rim:
+                self._debug_outcome_event(
+                    "AIRBALL_CHECK",
+                    frame=snapshot.frame_index,
+                    horizontal_offset=horizontal_offset,
+                    exit_limit=(
+                        self.rim_inner_radius * self.rim_exit_channel_scale
+                    ),
+                    miss_duration_s=(
+                        f"{miss_duration_s:.3f}/{self.miss_confirmation_s:.3f}"
+                    ),
+                )
+            if miss_evidence and miss_duration_s >= self.miss_confirmation_s:
+>>>>>>> balltraking-fixedpose
                 self._finish(
                     result="missed",
                     confidence=0.80,
@@ -584,6 +1074,76 @@ class BallShotStateMachine:
                 )
 
         return crossed
+
+    def _update_made_confirmation(
+        self, condition: bool, observed: bool, timestamp_ms: int
+    ) -> float:
+        if not observed or not condition:
+            self.below_confirmation_started_ms = None
+            self.below_confirmation_count = 0
+            return 0.0
+        if self.below_confirmation_started_ms is None:
+            self.below_confirmation_started_ms = timestamp_ms
+        self.below_confirmation_count += 1
+        return max(
+            0.0,
+            (timestamp_ms - self.below_confirmation_started_ms) / 1000.0,
+        )
+
+    def _update_miss_confirmation(
+        self, condition: bool, observed: bool, timestamp_ms: int
+    ) -> float:
+        if not observed or not condition:
+            self.miss_confirmation_started_ms = None
+            self.miss_confirmation_count = 0
+            return 0.0
+        if self.miss_confirmation_started_ms is None:
+            self.miss_confirmation_started_ms = timestamp_ms
+        self.miss_confirmation_count += 1
+        return max(
+            0.0,
+            (timestamp_ms - self.miss_confirmation_started_ms) / 1000.0,
+        )
+
+    def _ball_contour_fits_opening(
+        self,
+        crossing_relative_x: float,
+        ball_radius: float,
+    ) -> bool:
+        """Whether the ball's horizontal circle fits in the inner rim opening.
+
+        The detector provides boxes rather than segmentation masks, so the
+        ball contour is represented by its tracked center and effective
+        radius. At the rim-entry plane, horizontal containment is the useful
+        2D test; vertical containment would reject a ball precisely while it
+        is passing through that plane.
+        """
+        if self.rim_inner_radius is None:
+            return False
+
+        tolerance = (
+            self.rim_inner_radius * self.entry_containment_tolerance_scale
+        )
+        opening_left = -self.rim_inner_radius - tolerance
+        opening_right = self.rim_inner_radius + tolerance
+        ball_left = crossing_relative_x - ball_radius
+        ball_right = crossing_relative_x + ball_radius
+        return ball_left >= opening_left and ball_right <= opening_right
+
+    def _debug_outcome_event(self, event: str, **values) -> None:
+        """Print concise evidence explaining a made/missed state decision."""
+        if not self.debug_outcome:
+            return
+
+        parts = []
+        for key, value in values.items():
+            if isinstance(value, float):
+                rendered = f"{value:.2f}"
+            else:
+                rendered = str(value)
+            parts.append(f"{key}={rendered}")
+        details = " ".join(parts)
+        print(f"[BALL OUTCOME] {event} {details}".rstrip())
 
     def _effective_ball_radius(self) -> float:
         if self.rim_inner_radius is None:
@@ -616,7 +1176,10 @@ class BallShotStateMachine:
             snapshot.x - (rim_x + self.rim_inner_radius), snapshot.y - rim_y
         )
         if min(left_distance, right_distance) <= ball_radius + thickness:
-            self.evidence.append("Possible rim contact")
+            # A single-camera 2D overlap can also mean that the ball passed in
+            # front of or behind the rim. Record it as diagnostic evidence,
+            # but do not promote it to verified physical rim contact.
+            self.evidence.append("Possible projected rim-edge overlap")
             self._recorded_rim_contact = True
             self.saw_rim_contact = True
 
@@ -635,6 +1198,21 @@ class BallShotStateMachine:
         if not 0.0 <= ratio <= 1.0:
             return None
         return previous_x + ratio * (current_x - previous_x)
+<<<<<<< HEAD
+=======
+
+    @staticmethod
+    def _interpolate_crossing_ratio(
+        previous_y: float,
+        current_y: float,
+    ) -> Optional[float]:
+        """Return where in a frame interval the rim plane was crossed."""
+        dy = current_y - previous_y
+        if abs(dy) < 1e-6:
+            return None
+        ratio = -previous_y / dy
+        return ratio if 0.0 <= ratio <= 1.0 else None
+>>>>>>> balltraking-fixedpose
 
     def _check_timeouts(
         self,
@@ -703,6 +1281,17 @@ class BallShotStateMachine:
             return self.outcome
 
         self.evidence.append(evidence)
+        self._debug_outcome_event(
+            "FINAL",
+            result=result.upper(),
+            confidence=confidence,
+            reason=evidence,
+            saw_ball_above_rim=self.saw_ball_above_rim,
+            saw_inside_crossing=self.saw_inside_crossing,
+            saw_rim_contact=self.saw_rim_contact,
+            make_count=self.below_confirmation_count,
+            miss_count=self.miss_confirmation_count,
+        )
         self.state = {
             "made": BallShotState.MADE,
             "missed": BallShotState.MISSED,
@@ -714,13 +1303,27 @@ class BallShotStateMachine:
             release_frame=self.release_frame,
             release_timestamp_ms=self.release_timestamp_ms,
             entry_frame=self.entry_frame,
+            entry_timestamp_ms=self.entry_timestamp_ms,
             outcome_timestamp_ms=timestamp_ms,
             evidence=list(self.evidence),
             timeseries_summary={
                 "ball_state": self.state.value,
                 "saw_ball_above_rim": self.saw_ball_above_rim,
+<<<<<<< HEAD
                 "saw_rim_contact": self.saw_rim_contact,
+=======
+                "saw_inside_crossing": self.saw_inside_crossing,
+                "saw_rim_contact": self.saw_rim_contact,
+                "saw_contact_center_inside_opening": (
+                    self.saw_contact_center_inside_opening
+                ),
+>>>>>>> balltraking-fixedpose
                 "crossing_xy": self.crossing_xy,
+                "crossing_timestamp_ms": self.entry_timestamp_ms,
+                "below_confirmation_count": self.below_confirmation_count,
+                "miss_confirmation_count": self.miss_confirmation_count,
+                "made_confirmation_s": self.made_confirmation_s,
+                "miss_confirmation_s": self.miss_confirmation_s,
             },
         )
         return self.outcome
@@ -728,18 +1331,21 @@ class BallShotStateMachine:
     def _result(
         self,
         tracking_status: BallTrackingStatus,
+        measurement_source: str = "none",
         released_this_frame: bool = False,
         crossed_rim_this_frame: bool = False,
     ) -> BallStateUpdate:
         return BallStateUpdate(
             state=self.state,
             tracking_status=tracking_status,
+            measurement_source=measurement_source,
             outcome=self.outcome,
             released_this_frame=released_this_frame,
             crossed_rim_this_frame=crossed_rim_this_frame,
             rim_center_xy=self.rim_center,
             rim_inner_radius=self.rim_inner_radius,
             crossing_xy=self.crossing_xy,
+            crossing_timestamp_ms=self.entry_timestamp_ms,
         )
 
     def _remember_pose_phase(self, pose_phase: Optional[str]) -> None:

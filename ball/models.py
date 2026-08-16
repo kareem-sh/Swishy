@@ -15,6 +15,10 @@ class BallDetection:
     confidence: float
     frame_index: int = 0
     timestamp_ms: int = 0
+    # Provenance is part of the measurement, not display-only metadata.
+    # Direct detectors observe pixels independently; NanoTrack follows a prior
+    # box; reused/predicted points must never masquerade as new observations.
+    measurement_source: str = "unknown"
 
     @property
     def x(self) -> float:
@@ -28,6 +32,14 @@ class BallDetection:
     def radius(self) -> float:
         x1, y1, x2, y2 = self.bbox_xyxy
         return max(x2 - x1, y2 - y1) / 2.0
+
+    @property
+    def is_direct_observation(self) -> bool:
+        return self.measurement_source in {"unknown", "yolo", "color"}
+
+    @property
+    def is_visual_observation(self) -> bool:
+        return self.measurement_source not in {"predicted", "reused"}
 
 
 @dataclass
@@ -69,6 +81,7 @@ class BallSnapshot:
     state: str = "unknown"  # in_hand | in_flight | at_rim | unknown
     track_id: int = 0
     is_interpolated: bool = False
+    measurement_source: str = "unknown"
 
     @property
     def x(self) -> float:
@@ -77,6 +90,20 @@ class BallSnapshot:
     @property
     def y(self) -> float:
         return self.center_xy[1]
+
+    @property
+    def is_direct_observation(self) -> bool:
+        return (
+            not self.is_interpolated
+            and self.measurement_source in {"unknown", "yolo", "color"}
+        )
+
+    @property
+    def is_visual_observation(self) -> bool:
+        return (
+            not self.is_interpolated
+            and self.measurement_source not in {"predicted", "reused"}
+        )
 
 
 @dataclass
@@ -104,6 +131,7 @@ class ShotOutcome:
     release_frame: Optional[int] = None
     release_timestamp_ms: Optional[int] = None
     entry_frame: Optional[int] = None
+    entry_timestamp_ms: Optional[int] = None
     outcome_timestamp_ms: Optional[int] = None
     trajectory_apex_frame: Optional[int] = None
     evidence: List[str] = field(default_factory=list)

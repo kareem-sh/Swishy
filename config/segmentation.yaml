@@ -1,0 +1,111 @@
+# Shot segmentation — when a burst of phase transitions counts as one attempt.
+#
+# ALL VALUES ARE IN SECONDS, never frame counts. Sample material spans 12-30 fps
+# and includes slow motion; a frame count means a different duration in each.
+#
+# EMPIRICAL / PROJECT-CALIBRATED. These are engineering choices about movement
+# plausibility, not published biomechanical norms. They are derived from what a
+# human shooting motion can physically do, not fitted to any particular clip.
+
+# A candidate attempt only becomes a CONFIRMED shot if it shows a credible
+# shooting event. Every condition below must hold.
+confirmation:
+  # The ball has to actually leave the hand.
+  require_release: true
+
+  # The shooting wrist must travel this far vertically. Settling on the toes
+  # or re-gripping moves the wrist a few centimetres; a shot moves it far more.
+  min_wrist_rise_m: 0.18
+
+  # The wrist must reach at least this height relative to the shoulder.
+  # Negative means "may stay slightly below the shoulder", which keeps low
+  # set-shot releases valid while excluding a ball held at the waist.
+  min_wrist_above_shoulder_m: -0.12
+
+  # The same two tests in body heights, used when MediaPipe's visibility gate
+  # rejects the world-space wrist and the metric figures above are therefore
+  # all zero. Filming from behind triggers that on every frame, which used to
+  # throw away every real shot in such a clip as "preparation".
+  # Shoulders sit about 0.30 body heights above the hips; a shot lifts the
+  # wrist from roughly hip level to overhead.
+  min_wrist_rise_ratio: 0.20
+  min_wrist_above_shoulder_ratio: -0.08
+
+  # An attempt shorter than this is noise; longer than this is not one motion.
+  # The upper bound is generous so genuine slow-motion footage still passes.
+  min_duration_s: 0.20
+  max_duration_s: 12.0
+
+# How long after the ball leaves the hand an attempt may still be running.
+# BACKSTOP ONLY. An attempt normally closes when the shooting hand comes back
+# down below the shoulder, which adapts to the player's own pace. This cap only
+# applies when the wrist cannot be seen well enough to observe that.
+#
+# This number used to be load-bearing and is not any more. An attempt that
+# overstayed used to block every later shot, because a new attempt could only
+# start from rest -- so the cap had to be tight enough to get out of the way in
+# time, and no single value could serve both a jump shot with a long hang and
+# set shots fired every two seconds. At 2.0 s the ten-shot video merged
+# attempts (4 of 10 found) while the jump-shot video was correct (3 of 3); at
+# 1.0 s that reversed exactly (5 of 10, and 2 of 3). The number was fitting the
+# footage, not the movement.
+#
+# Attempts are now anchored on the release and rebuilt backwards out of the
+# frame buffer, so an overstaying attempt no longer costs the next shot. The
+# cap can therefore be set to what a follow-through actually takes.
+post_release_s: 1.2
+
+# The finish is held briefly before the arm drops, so the descent is not looked
+# for until at least this long after release. Low again, for the same reason:
+# it was raised to 2.50 s only to keep the descent rule from firing early, back
+# when firing early cost a whole shot.
+min_follow_through_s: 0.30
+
+# REMOVED: refractory_s (0.60 s).
+# It suppressed new attempts for a fixed time after a confirmed one. That guard
+# only made sense while attempts opened on a posture change, where a re-settle
+# right after a shot looked identical to the start of the next one. Attempts
+# now open on the release itself, and double-counting is prevented by the frames
+# already spoken for (`_consumed_until_ms`) plus the requirement that the state
+# machine has left the release state -- both of which are evidence rather than a
+# timer. Keeping the timer as well measurably cost shots: one genuine attempt
+# began 0.13 s after the previous closed and was ignored.
+
+# How far back a candidate reaches when it opens, so the knee dip is captured
+# even though nothing about the dip decides anything any more.
+#
+# Any live signal opens LATE -- the signal is the movement already underway --
+# and the loading rules score what happened before that. Rather than adding
+# states to catch the dip earlier (which is what made detection fragile), every
+# candidate simply back-fills from the frame buffer.
+#
+# Also the boundary between one attempt and the next: the walk back from the
+# opening frame stops once the player has been at rest for longer than this.
+preroll_s: 1.5
+
+# Hard cap on how far back a release may be reconstructed. Bounds the work and
+# stops a release detected right after a long idle stretch from dragging that
+# whole stretch into the shot.
+max_lookback_s: 4.0
+
+# A candidate that never reaches release within this window is abandoned.
+# This is what discards toe-jiggling: the player bends and re-settles, no
+# release ever arrives, the candidate is dropped without becoming a shot.
+candidate_timeout_s: 6.0
+
+# Caps that stop a detector state becoming a sink. On expiry the state machine
+# is nudged onward rather than left stuck. Generous on purpose: slow-motion
+# capture stretches real durations, and a false timeout is worse than a late one.
+#
+# There are three of these now instead of seven, because the detector tracks
+# four states instead of eight. `ready` is deliberately absent: it is the
+# resting state and has nowhere to be nudged to.
+#
+# `rise` is generous because it covers the dip, the lift and the take-off in one
+# state, and because its clock measures time WITHOUT PROGRESS rather than time
+# in state -- a lift takes 0.4 s at normal speed and 5.4 s in slow motion, and
+# only movement can tell a slow shot from a stuck one.
+state_timeouts_s:
+  rise: 3.0
+  release: 1.5
+  recovery: 2.0

@@ -32,6 +32,10 @@ _PREDICTED_BALL_COLOR = (255, 220, 0)
 _RIM_COLOR = (0, 220, 80)     # green in RGB
 _RIM_GEOMETRY_COLOR = (70, 150, 255)
 _FITTED_TRAJECTORY_COLOR = (40, 255, 170)
+<<<<<<< HEAD
+=======
+_IDEAL_TRAJECTORY_COLOR = (80, 190, 255)
+>>>>>>> balltraking-fixedpose
 _DISPLAY_CONFIG = load_yaml("display.yaml")
 _SHOW_BALL_OVERLAY = bool(_DISPLAY_CONFIG.get("show_ball_overlay", True))
 _TRAJECTORY_CONFIG = _DISPLAY_CONFIG.get("trajectory_overlay", {})
@@ -44,6 +48,12 @@ _SHOW_OBSERVED_POLYLINE = bool(
 _SHOW_FITTED_TRAJECTORY = bool(
     _TRAJECTORY_CONFIG.get("show_fitted", True)
 )
+<<<<<<< HEAD
+=======
+_SHOW_IDEAL_TRAJECTORY = bool(
+    _TRAJECTORY_CONFIG.get("show_ideal", True)
+)
+>>>>>>> balltraking-fixedpose
 _OBSERVED_TRAJECTORY_THICKNESS = max(
     1, int(_TRAJECTORY_CONFIG.get("observed_thickness", 3))
 )
@@ -53,6 +63,12 @@ _OBSERVED_POINT_RADIUS = max(
 _FITTED_TRAJECTORY_THICKNESS = max(
     1, int(_TRAJECTORY_CONFIG.get("fitted_thickness", 3))
 )
+<<<<<<< HEAD
+=======
+_IDEAL_TRAJECTORY_THICKNESS = max(
+    1, int(_TRAJECTORY_CONFIG.get("ideal_thickness", 2))
+)
+>>>>>>> balltraking-fixedpose
 
 
 def _draw_observed_ball_trajectory(
@@ -63,6 +79,31 @@ def _draw_observed_ball_trajectory(
     if not _SHOW_OBSERVED_TRAJECTORY:
         return
 
+<<<<<<< HEAD
+=======
+    ideal = frame_result.ideal_ball_path
+    if _SHOW_IDEAL_TRAJECTORY and len(ideal) >= 2:
+        ideal_points = np.asarray(ideal, dtype=np.int32).reshape((-1, 1, 2))
+        cv2.polylines(
+            annotated,
+            [ideal_points],
+            False,
+            _IDEAL_TRAJECTORY_COLOR,
+            _IDEAL_TRAJECTORY_THICKNESS,
+            cv2.LINE_AA,
+        )
+        target = frame_result.ideal_rim_target_xy
+        if target is not None:
+            cv2.circle(
+                annotated,
+                (int(round(target[0])), int(round(target[1]))),
+                5,
+                _IDEAL_TRAJECTORY_COLOR,
+                2,
+                cv2.LINE_AA,
+            )
+
+>>>>>>> balltraking-fixedpose
     fitted = frame_result.fitted_observed_ball_path
     if _SHOW_FITTED_TRAJECTORY and len(fitted) >= 2:
         fitted_points = np.asarray(fitted, dtype=np.int32).reshape((-1, 1, 2))
@@ -167,7 +208,8 @@ def _draw_ball_rim(annotated: np.ndarray, frame_result: FrameResult) -> None:
 
     state_text = (
         f"Ball: {frame_result.ball_state.upper()} | "
-        f"{frame_result.ball_tracking_status.upper()}"
+        f"{frame_result.ball_tracking_status.upper()} | "
+        f"{frame_result.ball_measurement_source.upper()}"
     )
     if frame_result.shot_outcome is not None:
         state_text += f" | {frame_result.shot_outcome.result.upper()}"
@@ -217,11 +259,30 @@ def _draw_ball_rim(annotated: np.ndarray, frame_result: FrameResult) -> None:
     )
 
 
+def draw_ball_overlays(
+    rgb_image: np.ndarray,
+    frame_result: FrameResult,
+) -> np.ndarray:
+    """Draw every ball/rim/trajectory layer used by video mode.
+
+    Keeping this separate from pose rendering lets offline replay reuse the
+    exact same basketball visualization without running YOLO or NanoTrack a
+    second time.
+    """
+    _draw_observed_ball_trajectory(rgb_image, frame_result)
+    _draw_ball_rim(rgb_image, frame_result)
+    return rgb_image
+
+
 def render_frame(rgb_image: np.ndarray, detection_result, frame_result: FrameResult) -> np.ndarray:
     """Draw ball/rim, skeleton, compact joint markers, and organized HUD."""
     annotated = np.copy(rgb_image)
+<<<<<<< HEAD
     _draw_observed_ball_trajectory(annotated, frame_result)
     _draw_ball_rim(annotated, frame_result)
+=======
+    draw_ball_overlays(annotated, frame_result)
+>>>>>>> balltraking-fixedpose
 
     if not detection_result or not getattr(detection_result, "pose_landmarks", None):
         return annotated

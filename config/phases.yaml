@@ -1,30 +1,87 @@
 # Phase detection thresholds for jump-shot FSM.
 # Tune these per camera distance and frame rate.
 
-hysteresis_frames: 2  # consecutive frames required to confirm a phase change
-min_dwell_frames: 2   # minimum frames to hold a phase before allowing exit
+# Confirmation and dwell are DURATIONS, not frame counts: footage runs from
+# 12 to 30 fps and includes slow motion, so a frame count means a different
+# amount of real time in every file. 0.07 s is about two frames at 30 fps,
+# which is what these were tuned as.
+hysteresis_s: 0.07    # how long a new phase must persist before it is believed
+min_dwell_s: 0.07     # how long a phase must be held before it may be left
+
+# Fallback for callers that supply no timestamps (unit tests build features
+# directly). Production always passes timestamps and uses the seconds above.
+hysteresis_frames: 2
+min_dwell_frames: 2
 
 thresholds:
   # ready_stance -> loading
-  loading_hip_drop_velocity: -0.02      # m/s — hip dropping
+  #
+  # REMOVED: loading_hip_drop_velocity (-0.02 m/s).
+  # It tested `hip_velocity_y`, which is identically zero on every frame:
+  # MediaPipe world landmarks are hip-centred, so the hip midpoint IS the
+  # origin and its velocity cannot be anything else. The condition could never
+  # fire. Knee flexion is the live signal for a dip, and
+  # tests/test_phases.py::test_hip_velocity_alone_cannot_start_a_shot now
+  # guards against the condition coming back.
+  #
+  # WARNING FOR ANYONE EDITING THIS FILE: the loader
+  # (ShotPhaseDetector._t) silently falls back to a hardcoded default when a
+  # key is missing. Deleting a LIVE key therefore does not raise -- it quietly
+  # changes behaviour. Check the key is actually read before removing it.
   loading_knee_flex_delta: -1.0        # degrees/frame — knee bending
-  loading_wrist_below_shoulder: 0.05   # m — wrist below shoulder plane
   loading_wrist_up_velocity: 0.03      # m/s — wrist rising into shot (re-shot)
-  loading_wrist_chest_offset: 0.35     # m — wrist within chest/ball-carry zone (hip-relative)
+
+  # The window in which the ball could plausibly be carried or set, measured
+  # against real anatomy rather than against the hip-centred origin. Replaces
+  # loading_wrist_below_shoulder / loading_wrist_chest_offset, which compared
+  # the wrist to a hip origin that is always ~0 and so encoded an absolute
+  # height limit by accident.
+  carry_below_hip: 0.15                # m the wrist may hang below the hips
+  carry_above_shoulder: 0.30           # m the wrist may sit above the shoulder
 
   # loading -> knee_flexion / ball_lift
   knee_extend_delta: 0.5               # degrees/frame — knee reversing (bottom of dip)
-  ball_lift_wrist_velocity: 0.03       # m/s — wrist rising
+  ball_lift_wrist_velocity: 0.03       # m/s — wrist rising (world landmarks)
+
+  # Fallback used when MediaPipe's visibility gate rejects the wrist, which
+  # happens routinely on footage filmed from behind. Body-heights per second:
+  # the wrist travels roughly hip-to-overhead (about 0.6 body heights) in
+  # around half a second during a shot, so ~1.2/s at the peak. 0.25/s is a
+  # deliberately low bar for "the ball is on its way up".
+  ball_lift_wrist_rise_rate: 0.25
 
   # ball_lift -> jump
-  jump_ankle_rise: 0.03                # m above baseline
-  jump_ankle_velocity: 0.02            # m/s upward
+  #
+  # Fraction of the player's own on-screen height that the body has risen.
+  # Measured in IMAGE space: world landmarks are hip-centred and structurally
+  # cannot observe whole-body translation.
+  #
+  # Deliberately BELOW the 0.12 the classifier uses to call a shot a jump
+  # shot. This gate only asks "is the player leaving the floor?", so it should
+  # open early enough to capture take-off; deciding whether the jump was big
+  # enough to change the shot type is the classifier's job, later, with the
+  # whole attempt in view.
+  jump_body_rise_ratio: 0.06
 
   # ball_lift -> release (set shot / no jump)
   set_shot_wrist_down: 0.035           # m/s — wrist driving through
   set_shot_elbow_min: 145               # degrees
 
-  # jump -> release
+  # rise -> release
+  #
+  # How far the shooting hand must have climbed since the rise began before
+  # any release condition is allowed to fire. Body heights when the
+  # image-space signal is available, metres otherwise.
+  #
+  # This guard used to be implicit: reaching the old `jump` state meant the
+  # ball had already been carried up through `ball_lift`. With one merged
+  # `rise` state nothing enforced it, and the opening frames of a clip --
+  # where the One Euro filter, the ankle baseline and every velocity are still
+  # settling from nothing -- produced a release inside 0.3 s on three separate
+  # fixtures. Well under the ~0.6 body heights a real shot travels, so it only
+  # excludes a hand that never went up.
+  release_min_wrist_climb: 0.10
+
   release_peak_tolerance: 0.02         # m from wrist peak
   release_elbow_min: 150               # degrees
   release_wrist_velocity_max: 0.05     # m/s — wrist slowing at apex
