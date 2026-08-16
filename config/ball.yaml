@@ -5,7 +5,7 @@ enabled: true
 detector:
   backend: yolo
   # Fine-tuned ball+hoop weights (E-BARD). Use .pt on CPU/VPS; .engine needs NVIDIA+TensorRT.
-  model_path: models/best.pt
+  model_path: mlRingBall/runs/basketball_rim_training/basketball_and_rim/best.pt
   hf_repo: GabrieleGiudici/E-BARD-detection-models
   hf_file: BODD_yolov8n_0001.pt
 
