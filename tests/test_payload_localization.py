@@ -72,7 +72,7 @@ def test_measured_only_rule_has_no_fake_score():
     payload = _rule_dict(rule)
 
     assert payload["score"] is None
-    assert "لا يدخل في النتيجة" in payload["feedback"]["ar"]
+    assert "لا تدخل في النتيجة" in payload["feedback"]["ar"]
 
 
 def test_coaching_keeps_legacy_arrays_and_adds_bilingual_sections():

@@ -38,7 +38,7 @@ def main() -> int:
     print(f"Executable:   {sys.executable}")
     print(f"Ultralytics:  {package_version('ultralytics')}")
     print(f"MediaPipe:    {package_version('mediapipe')}")
-    print(f"OpenCV:       {package_version('opencv-python')}")
+    print(f"OpenCV:       {package_version('opencv-contrib-python')}")
 
     try:
         import torch

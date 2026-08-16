@@ -185,13 +185,9 @@ def analyze_video(
         True   -> force on
         False  -> force off
 
-    This is NOT only about reporting a make or a miss. With the detector
-    active, `ShotTracker` waits for a ball outcome before closing a shot
-    instead of closing on body motion alone, so the flag moves where one shot
-    ends and the next begins. It used to be hardcoded to False here while
-    `modes/video_mode.py` passed nothing and therefore read the config, which
-    meant the same video could be segmented differently depending on which
-    entry point you launched.
+    This affects more than reporting a make or miss. With the detector active,
+    `ShotTracker` waits for a ball outcome before closing a shot instead of
+    closing on body motion alone.
     """
     video_path = Path(video_path)
 

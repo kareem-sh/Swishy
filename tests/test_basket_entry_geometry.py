@@ -51,7 +51,7 @@ def _update(
         ankle_y=800.0,
         pose_phase=pose_phase,
         timestamp_ms=timestamp_ms,
-        player_height_px=700.0,
+        player_height_px=400.0,
     )
 
 

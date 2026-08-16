@@ -1,26 +1,17 @@
 """Tests for the observed ball trajectory overlay recorder."""
 
-<<<<<<< HEAD
-import sys
-from pathlib import Path
-
-=======
 import math
 import sys
 from pathlib import Path
 
 import numpy as np
 
->>>>>>> balltraking-fixedpose
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from ball.models import BallSnapshot
 from ball.trajectory_overlay import ObservedTrajectoryRecorder
-<<<<<<< HEAD
-=======
 from pipeline import FrameResult
 from visualization.renderer import draw_ball_overlays
->>>>>>> balltraking-fixedpose
 
 
 def _ball(
@@ -131,8 +122,6 @@ def test_interpolated_snapshot_is_not_recorded() -> None:
     assert recorder.screen_segments((200, 100), 20) == [[(100.0, 100.0)]]
 
 
-<<<<<<< HEAD
-=======
 def test_reused_detection_is_not_recorded_as_observed() -> None:
     recorder = ObservedTrajectoryRecorder()
     reused = _ball(120, 80, frame=1)
@@ -203,7 +192,6 @@ def test_release_confirmation_backtracks_to_last_near_wrist_point() -> None:
     assert recorder.release_kinematics_start_timestamp_ms() == 66
 
 
->>>>>>> balltraking-fixedpose
 def test_robust_fit_ignores_one_jitter_outlier() -> None:
     recorder = ObservedTrajectoryRecorder(
         maximum_jump_rim_radii=100,
@@ -233,8 +221,6 @@ def test_robust_fit_ignores_one_jitter_outlier() -> None:
     assert middle_y < 280.0
 
 
-<<<<<<< HEAD
-=======
 def test_shared_ball_renderer_can_be_reused_by_offline_replay() -> None:
     canvas = np.zeros((240, 320, 3), dtype=np.uint8)
     frame_result = FrameResult(
@@ -255,18 +241,13 @@ def test_shared_ball_renderer_can_be_reused_by_offline_replay() -> None:
     assert np.count_nonzero(canvas) > 0
 
 
->>>>>>> balltraking-fixedpose
 if __name__ == "__main__":
     test_path_follows_current_rim_after_camera_motion()
     test_missing_detection_starts_a_new_segment()
     test_finished_shot_stops_recording_until_next_release()
     test_interpolated_snapshot_is_not_recorded()
-<<<<<<< HEAD
-    test_robust_fit_ignores_one_jitter_outlier()
-=======
     test_reused_detection_is_not_recorded_as_observed()
     test_release_confirmation_backtracks_to_last_near_wrist_point()
     test_robust_fit_ignores_one_jitter_outlier()
     test_shared_ball_renderer_can_be_reused_by_offline_replay()
->>>>>>> balltraking-fixedpose
     print("All observed trajectory overlay tests passed.")

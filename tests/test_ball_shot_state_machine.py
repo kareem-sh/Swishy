@@ -150,18 +150,6 @@ def test_outside_crossing_becomes_missed() -> None:
     assert missed.outcome.result == "missed"
 
 
-<<<<<<< HEAD
-def test_front_rim_contact_can_deflect_in_and_become_made() -> None:
-    machine = BallShotStateMachine()
-    _release(machine)
-
-    _update(machine, 530, 245, 2, 200, (100, -180))
-    _update(machine, 530, 280, 3, 300, (0, 180))
-    contact = _update(machine, 530, 315, 4, 400, (0, 350))
-    made = _update(machine, 512, 338, 5, 500, (-180, 230))
-
-    assert contact.state == BallShotState.RIM_CONTACT
-=======
 def test_miss_confirmation_uses_elapsed_time_not_frame_count() -> None:
     machine = BallShotStateMachine()
     machine.miss_confirmation_s = 0.05
@@ -190,26 +178,10 @@ def test_inside_center_crossing_can_continue_diagonally_and_become_made() -> Non
     made = _update(machine, 512, 338, 5, 500, (-180, 230))
 
     assert contact.state == BallShotState.CROSSED_INSIDE
->>>>>>> balltraking-fixedpose
     assert contact.crossed_rim_this_frame
     assert made.state == BallShotState.MADE
     assert made.outcome is not None
     assert made.outcome.result == "made"
-<<<<<<< HEAD
-    assert "after rim contact" in made.outcome.evidence[-1]
-
-
-def test_back_rim_contact_can_deflect_in_and_become_made() -> None:
-    machine = BallShotStateMachine()
-    _release(machine)
-
-    _update(machine, 470, 245, 2, 200, (-100, -180))
-    _update(machine, 470, 280, 3, 300, (0, 180))
-    contact = _update(machine, 470, 315, 4, 400, (0, 350))
-    made = _update(machine, 488, 338, 5, 500, (180, 230))
-
-    assert contact.state == BallShotState.RIM_CONTACT
-=======
     assert "center crossed inside opening" in made.outcome.evidence[-1]
 
 
@@ -223,26 +195,11 @@ def test_inside_center_crossing_from_other_side_becomes_made() -> None:
     made = _update(machine, 488, 338, 5, 500, (180, 230))
 
     assert contact.state == BallShotState.CROSSED_INSIDE
->>>>>>> balltraking-fixedpose
     assert made.state == BallShotState.MADE
     assert made.outcome is not None
     assert made.outcome.result == "made"
 
 
-<<<<<<< HEAD
-def test_rim_contact_that_bounces_away_becomes_missed() -> None:
-    machine = BallShotStateMachine()
-    _release(machine)
-
-    _update(machine, 530, 245, 2, 200, (100, -180))
-    _update(machine, 530, 280, 3, 300, (0, 180))
-    contact = _update(machine, 530, 315, 4, 400, (0, 350))
-    first_bounce = _update(machine, 548, 285, 5, 500, (180, -300))
-    missed = _update(machine, 568, 260, 6, 600, (200, -250))
-
-    assert contact.state == BallShotState.RIM_CONTACT
-    assert first_bounce.state == BallShotState.RIM_CONTACT
-=======
 def test_inside_center_crossing_that_bounces_away_becomes_missed() -> None:
     machine = BallShotStateMachine()
     _release(machine)
@@ -255,7 +212,6 @@ def test_inside_center_crossing_that_bounces_away_becomes_missed() -> None:
 
     assert contact.state == BallShotState.CROSSED_INSIDE
     assert first_bounce.state == BallShotState.CROSSED_INSIDE
->>>>>>> balltraking-fixedpose
     assert missed.state == BallShotState.MISSED
     assert missed.outcome is not None
     assert missed.outcome.result == "missed"
@@ -290,10 +246,6 @@ def test_ball_flight_continues_when_pose_is_missing() -> None:
     assert made.state == BallShotState.MADE
 
 
-<<<<<<< HEAD
-def test_moving_camera_uses_ball_position_relative_to_rim() -> None:
-    machine = BallShotStateMachine()
-=======
 def test_nanotrack_evidence_is_labelled_separately_from_yolo() -> None:
     machine = BallShotStateMachine()
     detection, snapshot = _ball(100, 500, 0, 0)
@@ -318,7 +270,6 @@ def test_nanotrack_evidence_is_labelled_separately_from_yolo() -> None:
 def test_moving_camera_uses_ball_position_relative_to_rim() -> None:
     machine = BallShotStateMachine()
     machine.dynamic_rim = True
->>>>>>> balltraking-fixedpose
 
     def moving_update(
         base_ball_xy,
@@ -362,23 +313,16 @@ def test_moving_camera_uses_ball_position_relative_to_rim() -> None:
             ball_snapshot=snapshot,
             rim_detection=rim,
             wrist_xy=wrist_xy,
-<<<<<<< HEAD
-=======
             # The feet are part of the scene, so they pan with the camera
             # exactly as the ball and the rim do.
             ankle_y=_STANDING_ANKLE_Y + offset_y,
->>>>>>> balltraking-fixedpose
             pose_phase=pose_phase,
             timestamp_ms=timestamp_ms,
         )
 
     moving_update(
         (100, 500), (0, 0), 0, 0, (0, 0),
-<<<<<<< HEAD
-        pose_phase="ball_lift", wrist_base_xy=(100, 500),
-=======
         pose_phase="rise", wrist_base_xy=(100, 500),
->>>>>>> balltraking-fixedpose
     )
     released = moving_update(
         (200, 400), (20, 10), 1, 100, (700, -400),
@@ -397,9 +341,6 @@ def test_moving_camera_uses_ball_position_relative_to_rim() -> None:
     assert made.outcome.result == "made"
 
 
-<<<<<<< HEAD
-def _body_snapshot(timestamp_ms: int, phase: str) -> FrameSnapshot:
-=======
 def _scaled_release(player_height_px: float):
     """The same body-relative release at any on-screen player size."""
     machine = BallShotStateMachine()
@@ -628,7 +569,6 @@ def _body_snapshot(
 ) -> FrameSnapshot:
     from phase_detection.features import KinematicFeatures
 
->>>>>>> balltraking-fixedpose
     return FrameSnapshot(
         timestamp_ms=timestamp_ms,
         angles={},
@@ -849,14 +789,6 @@ def test_release_timeout_waits_for_required_ball_outcome() -> None:
 if __name__ == "__main__":
     test_clean_inside_crossing_becomes_made()
     test_outside_crossing_becomes_missed()
-<<<<<<< HEAD
-    test_front_rim_contact_can_deflect_in_and_become_made()
-    test_back_rim_contact_can_deflect_in_and_become_made()
-    test_rim_contact_that_bounces_away_becomes_missed()
-    test_predicted_points_cannot_confirm_a_make()
-    test_ball_flight_continues_when_pose_is_missing()
-    test_moving_camera_uses_ball_position_relative_to_rim()
-=======
     test_miss_confirmation_uses_elapsed_time_not_frame_count()
     test_inside_center_crossing_can_continue_diagonally_and_become_made()
     test_inside_center_crossing_from_other_side_becomes_made()
@@ -871,7 +803,6 @@ if __name__ == "__main__":
     test_camera_motion_does_not_fake_upward_release()
     test_ball_below_wrist_cannot_confirm_release()
     test_labelled_non_shot_actions_do_not_activate_release()
->>>>>>> balltraking-fixedpose
     test_shot_tracker_waits_for_ball_after_body_finishes()
     test_ball_outcome_can_finish_after_body_grace_when_pose_never_lands()
     test_large_release_disagreement_marks_trajectory_low_confidence()

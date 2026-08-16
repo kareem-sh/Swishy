@@ -451,6 +451,7 @@ rules:
 
   guide_hand_support_lift:
     name: "Guide-Hand Support"
+    direction: lower_better
     metric: guide_hand_ball_distance_ratio
     phases: [ball_lift]
     # The closest observed point answers whether the guide hand joined the
@@ -487,40 +488,31 @@ rules:
       to include the ball's radius. Re-measure these bands on labelled clips
       before treating the EXCELLENT-versus-GOOD split as a validated norm.
 
-  # guide_wrist_release_proxy:
-  #   name: "Guide-Hand Release (push proxy)"
-  #   metric: guide_wrist_align
-  #   phases: [release]
-  #   aggregate: max
-  #   min: 120
-  #   max: 180
-  #   ideal_min: 145
-  #   ideal_max: 180
-  #   severity: info
-  #   scored: false
-  #   message_excellent: "Guide-wrist alignment, for reference - this push proxy isn't scored."
-  #   refine_low: "Guide-wrist alignment, for reference - this push proxy isn't scored."
-  #   message_low: "Guide-wrist alignment, for reference - this push proxy isn't scored."
-  #   evidence: >
-  #     NOT SUPPORTED FOR SCORING. This is the 2D elbow-wrist-index angle of the
-  #     NON-shooting hand at release. A markedly bent guide wrist can be
-  #     consistent with a thumb flick or guide-hand push, but a single monocular
-  #     pose cannot measure hand force and this angle cannot prove that force was
-  #     or was not applied. It is explicitly a proxy, never a force reading.
+  guide_wrist_release_proxy:
+    name: "Guide-Hand Release (push proxy)"
+    direction: higher_better
+    metric: guide_wrist_align
+    phases: [release]
+    aggregate: max
+    min: 120
+    max: 180
+    ideal_min: 145
+    ideal_max: 180
+    severity: info
+    scored: false
+    message_excellent: "Guide-wrist alignment, for reference - this push proxy isn't scored."
+    refine_low: "Guide-wrist alignment, for reference - this push proxy isn't scored."
+    message_low: "Guide-wrist alignment, for reference - this push proxy isn't scored."
+    evidence: >
+      NOT SUPPORTED FOR SCORING. This is the 2D elbow-wrist-index angle of the
+      non-shooting hand at release. A bent guide wrist can be consistent with a
+      thumb flick or push, but a monocular pose cannot measure hand force. This
+      is explicitly a displayed proxy, never a force reading.
 
-  #     The measurement is also too uncertain to penalise. The 3D sibling of the
-  #     same elbow-wrist-index construction on the shooting side has 39.2 deg
-  #     mean disagreement between MediaPipe's full and heavy models on identical
-  #     frames, with more than 10 deg disagreement on 92.4% of frames. Projecting
-  #     the guide chain into 2D makes it available more often; it does not remove
-  #     hand-landmark error or out-of-plane ambiguity. The guide hand is also
-  #     often partly hidden by the ball. 120-180 and 145-180 are display bands
-  #     only.
-
-  #     Kept because it exposes the wrist-angle signal requested for guide-hand
-  #     review. A future scored rule needs labelled thumb-flick/push footage and
-  #     either a validated hand model or direct ball/hand contact dynamics.
-  #     scripts/measure_angle_uncertainty.py; docs/LIMITS.md.
+      The measurement is too uncertain to penalise. The same angle construction
+      on the shooting side has 39.2 degrees mean disagreement between the full
+      and heavy pose models on identical frames. A future scored rule requires
+      labelled thumb-flick/push footage and a validated hand or contact model.
 
   shoulder_alignment_lift:
     name: "Shoulder Elevation"
@@ -821,6 +813,29 @@ rules:
       the range shoots better than another. Until then the number is shown, the
       phase reports honestly that it was observed and not judged, and nobody is
       penalised for our sample size. SOURCES.md A1, A6; shots/elevation.py.
+
+  jump_release_timing:
+    name: "Jump Release Timing"
+    direction: lower_better
+    metric: jump_release_apex_offset_s  # shot-level; see feedback/scorer.py
+    phases: [release]
+    shot_types: [jump_shot]
+    # Negative = rising; zero = apex plateau; positive = descending.
+    max: 0.12
+    ideal_max: 0.04
+    unit: "s"
+    severity: warning
+    scored: true
+    message_excellent: "The ball leaves on the rise or at the top of your jump, so your lift flows into the shot."
+    refine_high: "Your release is just after the top of the jump. Let the ball go a little sooner so the lift still carries it."
+    message_high: "You wait until you are dropping before releasing the ball. Let it go on the rise or at the top so the jump can power the shot."
+    evidence: >
+      DIRECTION SUPPORTED WITH LIMITATIONS; METRIC AND THRESHOLDS ARE AN
+      ENGINEERING DECISION. Positive values measure time after the apex plateau;
+      negative values mean release while still rising. Ball release is used when
+      available, with the pose shooting event as a lower-confidence fallback.
+      The 0.04 s ideal and 0.12 s outer tolerance are time-based project choices,
+      not published norms, and apply only to classified jump shots.
 
   trunk_posture:
     name: "Upper Body Posture"

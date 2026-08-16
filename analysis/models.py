@@ -38,30 +38,12 @@ class RuleOutcome(str, Enum):
         }[self]
 
 
-# Credit for a measurement inside the acceptable band but outside the ideal
-# one. This is the number that sets where "nothing wrong, nothing exceptional"
-# lands: score every rule GOOD and the shot scores exactly 100 x this.
-#
-# 0.72 puts that shot at 72, in the middle of the 70-85 the maintainer asked
-# for rather than at its ceiling. It was 0.80 first, and 0.80 is too flat to
-# coach with: on salah_video shot 4, eight of seventeen weight units came back
-# GOOD and the shot still scored 90 -- a rep that is merely acceptable in half
-# its mechanics should not sit two points off a rep that is exemplary in all
-# of them.
+# Credit for a measurement inside the acceptable band but outside the ideal.
+# A shot with every rule rated GOOD therefore scores 72 rather than excellent.
 GOOD_CREDIT = 0.72
 
-# The most a rule can still earn once it has missed its band outright.
-#
-# It used to be zero, and zero is what made the scale unusable as coaching: one
-# rule missing its bound by a degree took its whole weight away, so a shot with
-# a single marginal flaw could not reach the 70s no matter how good the rest
-# of it was. Measured on video8 shot 1, `hip_hinge_loading` missed its floor by
-# 8.7 deg -- while the knee rule beside it, on the same frames, read the load as
-# good -- and the Loading phase scored 0/100.
-#
-# A miss is still a miss and still costs more than any pass: 0.45 sits below
-# GOOD_CREDIT by a wide margin. What changed is that the cost now scales with
-# the size of the error instead of being a cliff at the boundary.
+# A missed band can retain limited credit so small errors decay smoothly rather
+# than dropping the rule immediately to zero.
 MISS_CREDIT_MAX = 0.45
 
 

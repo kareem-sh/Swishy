@@ -11,7 +11,6 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from feedback.console import save_session_report_json
 from modes.headless_video import analyze_video
 
 

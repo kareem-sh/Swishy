@@ -53,7 +53,7 @@ from shots.elevation import (
     shooting_event_ms,
     takeoff_elevation,
 )
-from shots.types import RejectionReason, ShotType
+from shots.types import RejectionReason
 from utils.config_loader import load_yaml
 from utils.frame_buffer import FrameSnapshot
 

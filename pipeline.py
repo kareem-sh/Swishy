@@ -57,7 +57,7 @@ from feedback.phase_refiner import hold_duration_s, refine_phases
 from shots.segmenter import explain_absence, segment
 from utils.config_loader import load_yaml
 from utils.frame_buffer import FrameBuffer, FrameSnapshot
-from visualization.hud_display import HudDisplay, HudDisplaySmoother
+from visualization.hud_display import HudDisplaySmoother
 
 
 # How rarely a wrist may be trackable before that side is ruled out as the
@@ -899,7 +899,6 @@ class ShotAnalysisPipeline:
         analysis = self._biomechanics.evaluate(phase, angles, features, shooting_side)
 
         wrist_xy = self._shooting_wrist_xy(raw["image"], shooting_side)
-        # print("ankle" , ankle_y_px , " , " , "basket_y" , ball_snapshot.y)
         ball_state_update = self._ball_shot_fsm.update(
             ball_detection=ball,
             ball_snapshot=ball_snapshot,
@@ -924,8 +923,6 @@ class ShotAnalysisPipeline:
                 standing_ankle_y_px or self._last_standing_ankle_y_px
             ),
         )
-        self._update_observed_trajectory(ball_snapshot, ball_state_update)
-
         snapshot = FrameSnapshot(
             timestamp_ms=timestamp_ms,
             angles=angles,

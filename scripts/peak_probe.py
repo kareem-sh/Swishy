@@ -295,49 +295,6 @@ def _fallback_peaks(signal: np.ndarray, prominence: float, distance: int) -> tup
     )
 
 
-def evidence_window(
-    signal: np.ndarray, peak: int, fraction: float = 0.25, max_span: int = 10**9
-) -> tuple:
-    """Bound one attempt by where the hand was last down, not by a fraction
-    of prominence.
-
-    `peak_widths(rel_height=...)` descends a share of the PROMINENCE and then
-    runs outward until the signal crosses that level. On practice footage the
-    player walks between reps holding the ball, so the signal never returns
-    that low and the window runs away -- measured at 25 s for a 2 s shot.
-
-    Descending a share of THIS PEAK'S OWN RISE instead gives a level the signal
-    is guaranteed to have crossed, because the peak rose from it.
-    """
-    n = len(signal)
-    lo_bound = max(0, peak - max_span)
-    hi_bound = min(n - 1, peak + max_span)
-
-    left_floor = float(np.min(signal[lo_bound:peak + 1]))
-    right_floor = float(np.min(signal[peak:hi_bound + 1]))
-    left_cut = left_floor + fraction * (signal[peak] - left_floor)
-    right_cut = right_floor + fraction * (signal[peak] - right_floor)
-
-    start = peak
-    while start > lo_bound and signal[start] > left_cut:
-        start -= 1
-    end = peak
-    while end < hi_bound and signal[end] > right_cut:
-        end += 1
-
-    # The cuts above land where the hand STARTS rising and where it finishes
-    # dropping, which is the lift and the release -- but a coaching report also
-    # talks about the knee dip that precedes the lift and the landing that
-    # follows the finish, and the hand is already low through both. So the
-    # window is extended outward while the hand STAYS low, and capped, because
-    # "the hand is low" is also true of the entire walk to fetch the ball.
-    while start > lo_bound and signal[start - 1] <= left_cut:
-        start -= 1
-    while end < hi_bound and signal[end + 1] <= right_cut:
-        end += 1
-    return start, end
-
-
 def _interpolate(signal: List[Optional[float]]) -> np.ndarray:
     """Bridge unseen frames without inventing a height for them.
 

@@ -9,7 +9,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from analysis.models import AnalysisResult, RuleResult
+from analysis.models import RuleResult
 from feedback.models import ShotSummary
 from feedback.report_builder import build_detailed_shot_report, build_session_report
 from feedback.report_models import KeyFrame

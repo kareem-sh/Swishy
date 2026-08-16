@@ -32,10 +32,7 @@ _PREDICTED_BALL_COLOR = (255, 220, 0)
 _RIM_COLOR = (0, 220, 80)     # green in RGB
 _RIM_GEOMETRY_COLOR = (70, 150, 255)
 _FITTED_TRAJECTORY_COLOR = (40, 255, 170)
-<<<<<<< HEAD
-=======
 _IDEAL_TRAJECTORY_COLOR = (80, 190, 255)
->>>>>>> balltraking-fixedpose
 _DISPLAY_CONFIG = load_yaml("display.yaml")
 _SHOW_BALL_OVERLAY = bool(_DISPLAY_CONFIG.get("show_ball_overlay", True))
 _TRAJECTORY_CONFIG = _DISPLAY_CONFIG.get("trajectory_overlay", {})
@@ -48,12 +45,9 @@ _SHOW_OBSERVED_POLYLINE = bool(
 _SHOW_FITTED_TRAJECTORY = bool(
     _TRAJECTORY_CONFIG.get("show_fitted", True)
 )
-<<<<<<< HEAD
-=======
 _SHOW_IDEAL_TRAJECTORY = bool(
     _TRAJECTORY_CONFIG.get("show_ideal", True)
 )
->>>>>>> balltraking-fixedpose
 _OBSERVED_TRAJECTORY_THICKNESS = max(
     1, int(_TRAJECTORY_CONFIG.get("observed_thickness", 3))
 )
@@ -63,12 +57,9 @@ _OBSERVED_POINT_RADIUS = max(
 _FITTED_TRAJECTORY_THICKNESS = max(
     1, int(_TRAJECTORY_CONFIG.get("fitted_thickness", 3))
 )
-<<<<<<< HEAD
-=======
 _IDEAL_TRAJECTORY_THICKNESS = max(
     1, int(_TRAJECTORY_CONFIG.get("ideal_thickness", 2))
 )
->>>>>>> balltraking-fixedpose
 
 
 def _draw_observed_ball_trajectory(
@@ -79,8 +70,6 @@ def _draw_observed_ball_trajectory(
     if not _SHOW_OBSERVED_TRAJECTORY:
         return
 
-<<<<<<< HEAD
-=======
     ideal = frame_result.ideal_ball_path
     if _SHOW_IDEAL_TRAJECTORY and len(ideal) >= 2:
         ideal_points = np.asarray(ideal, dtype=np.int32).reshape((-1, 1, 2))
@@ -103,7 +92,6 @@ def _draw_observed_ball_trajectory(
                 cv2.LINE_AA,
             )
 
->>>>>>> balltraking-fixedpose
     fitted = frame_result.fitted_observed_ball_path
     if _SHOW_FITTED_TRAJECTORY and len(fitted) >= 2:
         fitted_points = np.asarray(fitted, dtype=np.int32).reshape((-1, 1, 2))
@@ -277,12 +265,7 @@ def draw_ball_overlays(
 def render_frame(rgb_image: np.ndarray, detection_result, frame_result: FrameResult) -> np.ndarray:
     """Draw ball/rim, skeleton, compact joint markers, and organized HUD."""
     annotated = np.copy(rgb_image)
-<<<<<<< HEAD
-    _draw_observed_ball_trajectory(annotated, frame_result)
-    _draw_ball_rim(annotated, frame_result)
-=======
     draw_ball_overlays(annotated, frame_result)
->>>>>>> balltraking-fixedpose
 
     if not detection_result or not getattr(detection_result, "pose_landmarks", None):
         return annotated

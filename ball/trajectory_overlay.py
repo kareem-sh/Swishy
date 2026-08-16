@@ -3,14 +3,9 @@
 from __future__ import annotations
 
 import math
-<<<<<<< HEAD
-from dataclasses import dataclass
-from typing import List, Optional, Tuple
-=======
 from collections import deque
 from dataclasses import dataclass
 from typing import Deque, List, Optional, Sequence, Tuple
->>>>>>> balltraking-fixedpose
 
 import numpy as np
 
@@ -24,13 +19,10 @@ class _RelativeTrajectoryPoint:
     x: float
     y: float
     timestamp_ms: int
-<<<<<<< HEAD
-=======
     wrist_distance_px: Optional[float] = None
     wrist_relative_xy: Optional[Point] = None
     measurement_source: str = "unknown"
     is_direct_observation: bool = True
->>>>>>> balltraking-fixedpose
 
 
 class ObservedTrajectoryRecorder:
@@ -49,11 +41,8 @@ class ObservedTrajectoryRecorder:
         fit_min_points: int = 5,
         fit_samples: int = 60,
         fit_outlier_threshold_rim_radii: float = 0.75,
-<<<<<<< HEAD
-=======
         release_preroll_s: float = 0.4,
         release_near_wrist_scale: float = 0.5,
->>>>>>> balltraking-fixedpose
     ) -> None:
         self.max_points = max(2, int(max_points))
         self.maximum_jump_rim_radii = max(
@@ -64,9 +53,6 @@ class ObservedTrajectoryRecorder:
         self.fit_outlier_threshold_rim_radii = max(
             0.05, float(fit_outlier_threshold_rim_radii)
         )
-<<<<<<< HEAD
-        self._segments: List[List[_RelativeTrajectoryPoint]] = []
-=======
         self.release_near_wrist_scale = max(
             0.05, float(release_near_wrist_scale)
         )
@@ -74,7 +60,6 @@ class ObservedTrajectoryRecorder:
         self._segments: List[List[_RelativeTrajectoryPoint]] = []
         self._preroll: Deque[_RelativeTrajectoryPoint] = deque()
         self._kinematics_start_timestamp_ms: Optional[int] = None
->>>>>>> balltraking-fixedpose
         self._active = False
         self._gap_before_next_point = False
 
@@ -84,11 +69,8 @@ class ObservedTrajectoryRecorder:
 
     def reset(self) -> None:
         self._segments.clear()
-<<<<<<< HEAD
-=======
         self._preroll.clear()
         self._kinematics_start_timestamp_ms = None
->>>>>>> balltraking-fixedpose
         self._active = False
         self._gap_before_next_point = False
 
@@ -100,34 +82,15 @@ class ObservedTrajectoryRecorder:
         shot_finished: bool,
         rim_center_xy: Optional[Point],
         rim_radius: Optional[float],
-<<<<<<< HEAD
-    ) -> None:
-        if released_this_frame:
-            self.reset()
-            self._active = True
-
-        if not self._active:
-            return
-
-=======
         wrist_xy: Optional[Point] = None,
         release_distance_px: float = 60.0,
     ) -> None:
->>>>>>> balltraking-fixedpose
         valid_rim = (
             rim_center_xy is not None
             and rim_radius is not None
             and math.isfinite(float(rim_radius))
             and float(rim_radius) > 1e-6
         )
-<<<<<<< HEAD
-        observed_snapshot = snapshot is not None and not snapshot.is_interpolated
-        if not observed_snapshot or not valid_rim:
-            self._gap_before_next_point = True
-        else:
-            rim_x, rim_y = rim_center_xy
-            radius = float(rim_radius)
-=======
         observed_snapshot = (
             snapshot is not None and snapshot.is_visual_observation
         )
@@ -146,14 +109,10 @@ class ObservedTrajectoryRecorder:
                     (float(wrist_xy[0]) - rim_x) / radius,
                     (float(wrist_xy[1]) - rim_y) / radius,
                 )
->>>>>>> balltraking-fixedpose
             relative_point = _RelativeTrajectoryPoint(
                 x=(snapshot.x - rim_x) / radius,
                 y=(snapshot.y - rim_y) / radius,
                 timestamp_ms=snapshot.timestamp_ms,
-<<<<<<< HEAD
-            )
-=======
                 wrist_distance_px=wrist_distance,
                 wrist_relative_xy=wrist_relative,
                 measurement_source=snapshot.measurement_source,
@@ -184,14 +143,11 @@ class ObservedTrajectoryRecorder:
         elif relative_point is None:
             self._gap_before_next_point = True
         else:
->>>>>>> balltraking-fixedpose
             self._append(relative_point)
 
         if shot_finished:
             self._active = False
 
-<<<<<<< HEAD
-=======
     def relative_points(self) -> List[Tuple[float, float, int]]:
         """Return recorded points for calculations in rim-radius units."""
         return [
@@ -227,7 +183,6 @@ class ObservedTrajectoryRecorder:
         """First observed frame after the ball has separated from the hand."""
         return self._kinematics_start_timestamp_ms
 
->>>>>>> balltraking-fixedpose
     def screen_segments(
         self,
         rim_center_xy: Optional[Point],
@@ -342,8 +297,6 @@ class ObservedTrajectoryRecorder:
         self._gap_before_next_point = False
         self._trim_oldest_points()
 
-<<<<<<< HEAD
-=======
     def _release_preroll(
         self, release_distance_px: float
     ) -> Sequence[_RelativeTrajectoryPoint]:
@@ -390,7 +343,6 @@ class ObservedTrajectoryRecorder:
         # safest fallback because the ball FSM has already accepted release.
         return points[-1].timestamp_ms
 
->>>>>>> balltraking-fixedpose
     def _trim_oldest_points(self) -> None:
         excess = sum(len(segment) for segment in self._segments) - self.max_points
         while excess > 0 and self._segments:
@@ -400,8 +352,6 @@ class ObservedTrajectoryRecorder:
             excess -= remove_count
             if not first:
                 self._segments.pop(0)
-<<<<<<< HEAD
-=======
 
     def _trim_preroll(self, newest_timestamp_ms: int) -> None:
         while (
@@ -410,4 +360,3 @@ class ObservedTrajectoryRecorder:
             > self.release_preroll_ms
         ):
             self._preroll.popleft()
->>>>>>> balltraking-fixedpose

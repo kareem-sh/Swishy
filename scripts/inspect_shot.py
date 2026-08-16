@@ -30,7 +30,7 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import List
 
 PROJECT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT))
@@ -38,7 +38,7 @@ sys.path.insert(0, str(PROJECT))
 from analysis.models import RuleOutcome, RuleResult  # noqa: E402
 from feedback.models import PhaseScore, ShotSummary  # noqa: E402
 from feedback.scorer import WHOLE_SHOT_PHASE  # noqa: E402
-from phase_detection.phases import PHASE_LABELS, PHASE_ORDER  # noqa: E402
+from phase_detection.phases import PHASE_ORDER  # noqa: E402
 from scripts.coach_report import analyze_video  # noqa: E402
 from utils.config_loader import load_yaml  # noqa: E402
 

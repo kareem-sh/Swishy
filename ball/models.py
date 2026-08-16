@@ -107,22 +107,6 @@ class BallSnapshot:
 
 
 @dataclass
-class BallTrajectory:
-    """Fitted flight path for one shot attempt."""
-
-    release_frame: Optional[int] = None
-    apex_frame: Optional[int] = None
-    entry_frame: Optional[int] = None
-    entry_angle_deg: Optional[float] = None
-    snapshots: List[BallSnapshot] = field(default_factory=list)
-    fit_params: Optional[Dict[str, float]] = None
-    r_squared: Optional[float] = None
-    apex_x: Optional[float] = None
-    apex_y: Optional[float] = None
-    apex_time_ms: Optional[float] = None
-
-
-@dataclass
 class ShotOutcome:
     """Make / miss / unknown result for one shot."""
 

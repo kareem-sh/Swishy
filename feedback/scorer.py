@@ -451,7 +451,17 @@ def _jump_release_timing_rule(
         ),
         phase=str(phases[0]),
         measured_value=offset_s,
-        )
+        min_value=min_v,
+        max_value=max_v,
+        ideal_min=ideal_min,
+        ideal_max=ideal_max,
+        unit=rule.get("unit", "s"),
+        scored=bool(rule.get("scored", True)),
+        outcome=outcome,
+        confidence=max(0.0, min(1.0, float(confidence))),
+    )
+
+
 _MIN_EXCURSION_FRAMES = 5
 
 

@@ -82,44 +82,16 @@ rim_tracking:
   position_alpha: 0.75
   size_alpha: 0.50
 
-# Follow the hoop on every frame when the camera pans, shakes, or zooms.
-# YOLO corrects NanoTrack periodically; geometry gates reject oversized boxes.
-rim_tracking:
-  enabled: true
-  device: auto
-  cuda_fp16: false
-  backbone_path: models/nanotrack/nanotrack_backbone_sim.onnx
-  neckhead_path: models/nanotrack/nanotrack_head_sim.onnx
-  yolo_correction_interval: 10
-  yolo_reinitialize_confidence: 0.25
-  minimum_tracking_confidence: 0.10
-  yolo_max_correction_distance_px: 120
-  yolo_max_correction_distance_scale: 1.5
-  maximum_width_change_ratio: 1.5
-  maximum_center_jump_px: 220
-  minimum_box_size_px: 16
-  minimum_frame_size_ratio: 0.65
-  maximum_frame_size_ratio: 1.55
-  minimum_aspect_ratio: 0.35
-  maximum_aspect_ratio: 8.0
-  initial_box_scale: 1.0
-  position_alpha: 0.75
-  size_alpha: 0.50
-
 outcome:
   post_shot_capture_ms: 2000
   rim_inner_scale: 0.95
-
-release_sync:
-  max_body_ball_time_delta_s: 0.10
-  ball_wrist_release_distance_px: 40
 
 ball_state_machine:
   enabled: true
   dynamic_rim: false
   # Print the exact rim-entry, confirmation-counter, rebound, timeout, and
   # final-decision evidence used for MADE/MISSED/UNKNOWN.
-  debug_outcome: true
+  debug_outcome: false
 
   # Release separation is measured in fractions of the player's visible
   # anatomical height. This keeps the same gate at close and distant framing.

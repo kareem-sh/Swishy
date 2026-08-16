@@ -6,7 +6,7 @@ Single camera, MediaPipe pose, no markers, no sensors.
 
 ```bash
 python main.py                                    # the video set in main.py
-python main.py assets/videos/salah_video.mp4      # or any file
+python main.py assets/videos/video_01_free_throw.mp4  # or any file
 ```
 
 It prints a report, then replays the video with the analysis drawn on it.
@@ -79,9 +79,9 @@ video
   └─ modes/replay.py       redraw the video with the final labels
 ```
 
-`ball/` and `mlRingBall/` are ball and rim detection, owned separately. Ball
-outcome is not yet joined to the offline path; `shots/ball_check.py` is the
-verifier that will do it.
+`ball/` and `mlRingBall/` provide ball and rim detection. The ball state
+machine confirms release from measured possession and flight, then determines
+the made/missed outcome used by the offline report.
 
 ---
 
@@ -99,7 +99,7 @@ verifier that will do it.
 ## Tests
 
 ```bash
-./venv/Scripts/python.exe -m pytest tests -q
+.\.venv\Scripts\python.exe -m pytest tests -q
 ```
 
 The venv matters — system Python has no `cv2`.
@@ -113,7 +113,8 @@ limitation cannot quietly become a regression.
 ## Setup
 
 ```powershell
-.\venv\Scripts\Activate.ps1
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 ```
 

@@ -63,23 +63,12 @@ def print_shot_summary(summary: ShotSummary):
 
     print("=" * 50 + "\n")
 
-    # json_path = save_shot_summary_json(summary)
-    # print(f"  Shot JSON saved: {json_path}\n")
-
-
 def shot_summary_to_dict(
     summary: ShotSummary,
     start_timestamp_ms: int | None = None,
     end_timestamp_ms: int | None = None,
 ) -> dict:
-    """Convert one shot summary into a JSON-compatible dictionary.
-
-    Delegates to `feedback.payload`, which reports only what was measured.
-    This wrapper used to accept `shot_type="jump_shot"` and
-    `court_location="right_wing_three_point_line"` as defaults and emit them
-    verbatim, so every shot was described as a jump shot from the right wing
-    no matter what the classifier had actually decided.
-    """
+    """Convert one measured shot summary into a JSON-compatible dictionary."""
     return shot_to_dict(summary, start_timestamp_ms, end_timestamp_ms)
 
 

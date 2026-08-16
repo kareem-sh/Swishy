@@ -108,8 +108,8 @@ It is still a real bar. A clip of someone walking past must find nothing.
 ## What it cannot do
 
 **Tell a shot from a catch.** Both are the hand going up and coming down. The
-body does not distinguish them; the ball's direction of travel does, which is
-what `shots/ball_check.py` is for.
+ball state machine confirms release only after measured possession, upward
+separation from the wrist, and an above-wrist ball position.
 
 **Find a shot already in progress when recording starts.** No rise from rest
 means no prominence. This is a truncation case, not a threshold case, and more

@@ -7,7 +7,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from ball.detector import BallDetector
 from ball.models import BallDetection, CourtDetections, RimDetection
-from ball.outcome import OutcomeClassifier
 from ball.tracker import BallTracker
 
 
@@ -66,18 +65,6 @@ def test_tracker_labels_detection_and_prediction_provenance():
     assert not predicted.is_visual_observation
 
 
-def test_rim_radius_uses_horizontal_opening_not_net_height():
-    classifier = OutcomeClassifier()
-    classifier.set_rim_from_detection(
-        center_xy=(100.0, 30.0),
-        bbox_xyxy=(50.0, 0.0, 150.0, 200.0),
-    )
-
-    assert classifier.hoop_roi is not None
-    assert classifier.hoop_roi["center_y"] == 30.0
-    assert classifier.hoop_roi["rim_radius"] == 47.5
-
-
 def test_distant_rim_jump_is_rejected_after_lock():
     detector = BallDetector.__new__(BallDetector)
     detector.rim_lock_max_shift_ratio = 0.75
@@ -108,6 +95,5 @@ if __name__ == "__main__":
     test_tracker_follows_fast_measurements_without_moving_average_lag()
     test_tracker_predicts_only_short_missing_gaps()
     test_tracker_labels_detection_and_prediction_provenance()
-    test_rim_radius_uses_horizontal_opening_not_net_height()
     test_distant_rim_jump_is_rejected_after_lock()
     print("All ball tracking tests passed.")

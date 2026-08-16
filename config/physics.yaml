@@ -1,4 +1,4 @@
-# Future improvement #11 — physics-based trajectory estimation (not wired yet)
+# Ball-trajectory calibration and metric projection.
 
 enabled: true
 
@@ -22,8 +22,8 @@ fiba_half_court:
 
 # Print one copyable calibration line per detected release. This is separate
 # from the made/missed state-machine debug output in ball.yaml.
-debug_trajectory: true
-debug_trajectory_comparison: true
+debug_trajectory: false
+debug_trajectory_comparison: false
 
 # MediaPipe measures nose-to-ankle rather than full head-to-floor height.
 # These fractions convert that visible span and ankle landmark to floor height.
