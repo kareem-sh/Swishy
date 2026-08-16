@@ -256,6 +256,79 @@ def interpolate(values: Sequence[Optional[float]]) -> List[float]:
     return out
 
 
+# The fastest the shooting hand can travel, in body-heights per SECOND.
+#
+# A hand crosses roughly one body height in a shooting motion of about half a
+# second, so 4 per second is several times any real movement -- this is a
+# physical impossibility bound, not a smoothness filter, and it must stay loose
+# enough that no genuine release trips it.
+_MAX_WRIST_RATE = 4.0
+
+# How far below the hip the shooting hand can credibly be, in body-heights.
+# Arms are not that long; a reading past this is a reconstruction failure, not
+# a posture.
+_MIN_CREDIBLE_WRIST = -0.75
+
+
+def _reject_impossible(
+    values: Sequence[Optional[float]], fps: float
+) -> List[Optional[float]]:
+    """Drop readings no body could produce, BEFORE prominence is measured.
+
+    WHY SEGMENTATION NEEDS THIS AND WHY IT DID NOT HAVE IT
+    ------------------------------------------------------
+    Two other places in this project already guard against a single corrupt
+    frame -- `phase_refiner._mask_impossible` before the knee argmin, and
+    `scorer._despike` before rule aggregation. The segmentation signal had no
+    such guard at all: `interpolate` fills gaps where a value is MISSING, and
+    says nothing about a value that is present and absurd.
+
+    That gap is not theoretical. Switching the pose model from `lite` to `full`
+    put one frame of salah_video at t=25.17s at -1.169 -- the shooting wrist
+    reported more than a full body height BELOW the hip -- with its neighbours
+    at -0.41 and -0.17. `lite` produced no reading below -0.5 anywhere in the
+    same clip.
+
+    ONE FRAME WAS ENOUGH TO INVENT A SHOT. Prominence measures a peak against
+    the terrain around it, so a spuriously deep trough anywhere raises the
+    prominence of every ordinary bump measured across it. A hand-raise at
+    t=43s, correctly ignored under `lite`, cleared MIN_PROMINENCE under `full`
+    and was reported as a sixth attempt in a five-shot clip.
+
+    The test is the same shape as `_despike`'s and for the same reason: a plain
+    rate check passes a spike that follows a tracking gap, because across a
+    long gap a hand really can travel far. What gives a corrupt frame away is
+    that its neighbours agree with each other and only it disagrees, so the
+    excursion is measured from the line joining them and bounded by the SHORTER
+    side -- the value had to depart and return within it.
+
+    Rejected samples become None, which `interpolate` then bridges. They are
+    never replaced with a number, so a frame nobody could read stays unread.
+    """
+    n = len(values)
+    if n < 3 or fps <= 0:
+        return list(values)
+
+    dt = 1.0 / fps
+    out = list(values)
+    for i in range(n):
+        here = values[i]
+        if here is None:
+            continue
+        if here < _MIN_CREDIBLE_WRIST:
+            out[i] = None
+            continue
+        if i == 0 or i == n - 1:
+            continue                      # nothing to corroborate an edge with
+        before, after = values[i - 1], values[i + 1]
+        if before is None or after is None:
+            continue
+        expected = (before + after) / 2.0
+        if abs(here - expected) > _MAX_WRIST_RATE * dt:
+            out[i] = None
+    return out
+
+
 def segment(
     wrist_height_ratio: Sequence[Optional[float]],
     fps: float,
@@ -270,7 +343,7 @@ def segment(
     """
     if not wrist_height_ratio or fps <= 0:
         return []
-    signal = interpolate(wrist_height_ratio)
+    signal = interpolate(_reject_impossible(wrist_height_ratio, fps))
     if len(signal) < 3:
         return []
 

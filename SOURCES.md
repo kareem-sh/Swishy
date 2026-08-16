@@ -290,6 +290,50 @@ inside those `evidence:` blocks. **See F10.**
 
 ---
 
+## A11. Struzik, Pietraszewski & Zawadzki 2014 - Jump-shot biomechanics
+
+- **Journal:** *Journal of Human Kinetics* 42:73-79
+- **DOI:** 10.2478/hukin-2014-0062 - **PMC:** PMC4234772
+- **Source type:** Primary empirical - **Verification:** FULL TEXT VERIFIED
+
+### What we take from it
+
+The paper frames a high release point reached in the shortest time as a jump-
+shot objective and identifies jump height and coordination as contributors to
+release height. This supports the direction of avoiding a deliberately delayed
+release after descent has begun.
+
+### What we do NOT take from it
+
+It reports no release-to-jump-apex time interval and no individual pass/fail
+cutoff. It therefore cannot supply the numeric band for
+`jump_release_timing`; that band is an engineering decision.
+
+### Used in
+
+`config/biomechanics.yaml` (`jump_release_timing`).
+
+---
+
+## A12. Penner 2021 - Mechanics of the jump-shot dip
+
+- **Journal:** *Frontiers in Psychology* 12:658102
+- **DOI:** 10.3389/fpsyg.2021.658102 - **PMC:** PMC8273237
+- **Source type:** Primary empirical - **Verification:** FULL TEXT VERIFIED
+
+### What we take from it
+
+The paper discusses coordination, high release and release-time concerns, but
+explicitly calls for future research measuring release times. It is evidence
+that the quantitative release-timing question remains open, not a source of a
+timing norm.
+
+### Used in
+
+`config/biomechanics.yaml` (`jump_release_timing`, evidence limitation only).
+
+---
+
 # PART B — PLAYER HEIGHT & ANTHROPOMETRY
 
 ## B1. Brancazio geometric rule (physics, secondary-sourced)

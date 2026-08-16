@@ -6,7 +6,7 @@ using the two most recent frames in the buffer.
 """
 
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 import numpy as np
 
@@ -68,7 +68,23 @@ class KinematicFeatures:
     #
     # body_rise_ratio: positive means the body moved UP the frame.
     # hip_x_ratio:     horizontal hip position, for stationary-vs-driving.
-    body_rise_ratio: float = 0.0
+    #
+    # `body_rise_ratio` is Optional and None means NOT MEASURED -- the ankles
+    # were not found, no standing baseline had been established yet, or the
+    # player was too small in frame to divide by. It used to default to 0.0,
+    # and 0.0 in this signal is a real and perfectly plausible reading: "the
+    # body is exactly where it started", i.e. the feet never left the floor.
+    # Nothing downstream could tell that apart from a measurement.
+    #
+    # Measured across 6,911 frames it was fabricated on 2.5% of them (ankles
+    # missing 0.9%, player under the size floor 1.6%). Rare, but the harm is
+    # concentrated: `landing_settle` aggregates with `min`, so a fabricated
+    # 0.0 wins the minimum outright and reports a perfectly settled landing
+    # from a frame in which nothing was seen. The `max` readers -- the
+    # classifier, the takeoff cut, `jump_elevation` -- were never affected,
+    # because a zero cannot win a maximum. That asymmetry is exactly why this
+    # survived: it was invisible everywhere except the one place it mattered.
+    body_rise_ratio: Optional[float] = None
     hip_x_ratio: float = 0.0
     body_pixel_height: float = 0.0
 
@@ -86,6 +102,10 @@ class KinematicFeatures:
     # pick its own reference. None means the ankles were not seen; it is never
     # 0.0, which would read as "ankles at the top of the frame".
     ankle_image_y: Optional[float] = None
+    # Hip midpoint in normalized image coordinates. Unlike MediaPipe world
+    # coordinates, this retains whole-body vertical translation and is used
+    # after the shot to locate the player's jump apex.
+    hip_image_y: Optional[float] = None
 
     # Wrist height, also from image space, as a fraction of on-screen body
     # height above the hip line. Positive means above the hips.
@@ -106,6 +126,18 @@ class KinematicFeatures:
     # an explicitly supplied `wrist_y` is by definition a real measurement.
     wrist_world_valid: bool = True
 
+    # Distance from the centre of the visually observed ball to the guide
+    # wrist, divided by the player's nose-to-ankle height in the image. This
+    # is the observable part of "use the guide hand": close during the lift,
+    # then clear of the ball at release. None means either the ball, guide
+    # wrist, or a credible body scale was not visible; it must never be turned
+    # into a zero-distance success.
+    guide_hand_ball_distance_ratio: Optional[float] = None
+    # 2D elbow-wrist-index angle of the non-shooting hand. This is deliberately
+    # diagnostic-only: it can expose a possible wrist/thumb flick, but cannot
+    # measure force and is not reliable enough to score.
+    guide_wrist_align_angle: Optional[float] = None
+
 
 def _lm_y(world: Dict[str, dict], name: str) -> Optional[float]:
     lm = world.get(name)
@@ -123,14 +155,14 @@ def _avg_y(world: Dict[str, dict], names: tuple) -> Optional[float]:
 
 
 def _image_metrics(image_landmarks: Optional[Dict[str, dict]]) -> tuple:
-    """Return (ankle_y_norm, hip_x_norm, body_height_norm) from image space.
+    """Return ankle y, hip x/y, and body height from image space.
 
     Image y grows DOWNWARD, so callers must invert it to express "up".
     body_height_norm is nose-to-ankle in normalized units; dividing by it makes
     the other two invariant to zoom and camera distance.
     """
     if not image_landmarks:
-        return None, None, 0.0
+        return None, None, None, 0.0
 
     def norm(name, axis):
         lm = image_landmarks.get(name)
@@ -142,16 +174,18 @@ def _image_metrics(image_landmarks: Optional[Dict[str, dict]]) -> tuple:
 
     ankles = [v for v in (norm("left_ankle", 1), norm("right_ankle", 1)) if v is not None]
     hips_x = [v for v in (norm("left_hip", 0), norm("right_hip", 0)) if v is not None]
+    hips_y = [v for v in (norm("left_hip", 1), norm("right_hip", 1)) if v is not None]
     nose_y = norm("nose", 1)
 
     ankle_y = float(np.mean(ankles)) if ankles else None
     hip_x = float(np.mean(hips_x)) if hips_x else None
+    hip_y = float(np.mean(hips_y)) if hips_y else None
 
     body_height = 0.0
     if ankle_y is not None and nose_y is not None:
         body_height = abs(ankle_y - nose_y)
 
-    return ankle_y, hip_x, body_height
+    return ankle_y, hip_x, hip_y, body_height
 
 
 def _image_wrist_ratios(
@@ -197,6 +231,88 @@ def _image_wrist_ratios(
     return above_hip, above_shoulder
 
 
+def _guide_hand_ball_distance_ratio(
+    image_landmarks: Optional[Dict[str, dict]],
+    shooting_side: str,
+    body_height_norm: float,
+    ball_center_xy: Optional[Tuple[float, float]],
+    image_height_px: Optional[float],
+) -> Optional[float]:
+    """Guide-wrist distance to the ball centre, in player-height units.
+
+    Pixel coordinates are used before normalising. Computing Euclidean
+    distance directly from x_norm/y_norm would distort horizontal distance on
+    every non-square video.
+    """
+    if (
+        not image_landmarks
+        or ball_center_xy is None
+        or image_height_px is None
+        or image_height_px <= 0.0
+        or body_height_norm < MIN_BODY_PIXEL_HEIGHT
+    ):
+        return None
+
+    guide_side = "left" if shooting_side == "right" else "right"
+    wrist = image_landmarks.get(f"{guide_side}_wrist")
+    if wrist is None:
+        return None
+    if (
+        float(wrist.get("visibility", 0.0)) < 0.3
+        or float(wrist.get("presence", 0.0)) < 0.3
+    ):
+        return None
+
+    wrist_x = wrist.get("x")
+    wrist_y = wrist.get("y")
+    if wrist_x is None or wrist_y is None:
+        return None
+
+    body_height_px = body_height_norm * float(image_height_px)
+    if body_height_px <= 0.0:
+        return None
+    return float(
+        np.hypot(
+            float(wrist_x) - float(ball_center_xy[0]),
+            float(wrist_y) - float(ball_center_xy[1]),
+        )
+        / body_height_px
+    )
+
+
+def _guide_wrist_align_angle(
+    image_landmarks: Optional[Dict[str, dict]],
+    shooting_side: str,
+) -> Optional[float]:
+    """Return the guide elbow-wrist-index angle in the image plane."""
+    if not image_landmarks:
+        return None
+    guide_side = "left" if shooting_side == "right" else "right"
+    points = []
+    for suffix in ("elbow", "wrist", "index"):
+        landmark = image_landmarks.get(f"{guide_side}_{suffix}")
+        if landmark is None:
+            return None
+        if (
+            float(landmark.get("visibility", 0.0)) < 0.3
+            or float(landmark.get("presence", 0.0)) < 0.3
+        ):
+            return None
+        x, y = landmark.get("x"), landmark.get("y")
+        if x is None or y is None:
+            return None
+        points.append(np.asarray((float(x), float(y)), dtype=float))
+
+    elbow, wrist, index = points
+    proximal = elbow - wrist
+    distal = index - wrist
+    denominator = float(np.linalg.norm(proximal) * np.linalg.norm(distal))
+    if denominator <= 1e-9:
+        return None
+    cosine = float(np.dot(proximal, distal) / denominator)
+    return float(np.degrees(np.arccos(np.clip(cosine, -1.0, 1.0))))
+
+
 def _landmark_speed(world: Dict[str, dict], prev_world: Dict[str, dict], dt_s: float) -> float:
     if dt_s <= 0:
         return 0.0
@@ -231,6 +347,8 @@ def extract_features(
     image_landmarks: Optional[Dict[str, dict]] = None,
     ankle_image_baseline: float = 0.0,
     prev_image_landmarks: Optional[Dict[str, dict]] = None,
+    ball_center_xy: Optional[Tuple[float, float]] = None,
+    image_height_px: Optional[float] = None,
 ) -> KinematicFeatures:
     """Build kinematic features for the current frame."""
     wrist_key = f"{shooting_side}_wrist"
@@ -298,8 +416,10 @@ def extract_features(
     # Whole-body vertical translation, from image space, as a fraction of the
     # player's own on-screen height. Image y grows downward, so a body moving
     # UP produces a SMALLER ankle y -- hence baseline minus current.
-    ankle_img_y, hip_x_norm, body_height_norm = _image_metrics(image_landmarks)
-    body_rise_ratio = 0.0
+    ankle_img_y, hip_x_norm, hip_img_y, body_height_norm = _image_metrics(
+        image_landmarks
+    )
+    body_rise_ratio = None
     if (
         ankle_img_y is not None
         and ankle_image_baseline > 0.0
@@ -319,9 +439,20 @@ def extract_features(
     wrist_above_hip, wrist_above_shoulder = _image_wrist_ratios(
         image_landmarks, shooting_side, body_height_norm
     )
+    guide_ball_distance = _guide_hand_ball_distance_ratio(
+        image_landmarks,
+        shooting_side,
+        body_height_norm,
+        ball_center_xy,
+        image_height_px,
+    )
+    guide_wrist_angle = _guide_wrist_align_angle(
+        image_landmarks,
+        shooting_side,
+    )
     wrist_ratio_velocity = 0.0
     if wrist_above_hip is not None and prev_image_landmarks is not None and dt_s > 0:
-        _, _, prev_body_height = _image_metrics(prev_image_landmarks)
+        _, _, _, prev_body_height = _image_metrics(prev_image_landmarks)
         prev_above_hip, _ = _image_wrist_ratios(
             prev_image_landmarks, shooting_side, prev_body_height
         )
@@ -349,10 +480,13 @@ def extract_features(
         hip_x_ratio=hip_x_ratio,
         body_pixel_height=body_height_norm,
         ankle_image_y=ankle_img_y,
+        hip_image_y=hip_img_y,
         wrist_height_ratio=wrist_above_hip,
         wrist_height_velocity=wrist_ratio_velocity,
         wrist_above_shoulder_ratio=wrist_above_shoulder,
         wrist_world_valid=_lm_y(world_landmarks, wrist_key) is not None,
+        guide_hand_ball_distance_ratio=guide_ball_distance,
+        guide_wrist_align_angle=guide_wrist_angle,
     )
 
 
@@ -368,7 +502,7 @@ def update_ankle_image_baseline(
     updated while the player is relatively still, so a jump cannot drag the
     baseline up with it.
     """
-    ankle_y, _, body_height = _image_metrics(image_landmarks)
+    ankle_y, _, _, body_height = _image_metrics(image_landmarks)
     if ankle_y is None:
         return current_baseline
 

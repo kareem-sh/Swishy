@@ -23,12 +23,46 @@ class RuleOutcome(str, Enum):
 
     @property
     def credit(self) -> float:
-        """Fraction of this rule's weight earned toward the score."""
+        """Fraction of this rule's weight earned, tier only.
+
+        The fallback for results that carry no numbers to grade against --
+        `follow_through_hold` builds its result by hand, and older callers set
+        an outcome without a band. `RuleResult.credit` refines NEEDS_WORK by
+        HOW FAR outside the band the measurement fell; this is what it decays
+        to when that is unknowable.
+        """
         return {
             RuleOutcome.EXCELLENT: 1.0,
-            RuleOutcome.GOOD: 0.75,
+            RuleOutcome.GOOD: GOOD_CREDIT,
             RuleOutcome.NEEDS_WORK: 0.0,
         }[self]
+
+
+# Credit for a measurement inside the acceptable band but outside the ideal
+# one. This is the number that sets where "nothing wrong, nothing exceptional"
+# lands: score every rule GOOD and the shot scores exactly 100 x this.
+#
+# 0.72 puts that shot at 72, in the middle of the 70-85 the maintainer asked
+# for rather than at its ceiling. It was 0.80 first, and 0.80 is too flat to
+# coach with: on salah_video shot 4, eight of seventeen weight units came back
+# GOOD and the shot still scored 90 -- a rep that is merely acceptable in half
+# its mechanics should not sit two points off a rep that is exemplary in all
+# of them.
+GOOD_CREDIT = 0.72
+
+# The most a rule can still earn once it has missed its band outright.
+#
+# It used to be zero, and zero is what made the scale unusable as coaching: one
+# rule missing its bound by a degree took its whole weight away, so a shot with
+# a single marginal flaw could not reach the 70s no matter how good the rest
+# of it was. Measured on video8 shot 1, `hip_hinge_loading` missed its floor by
+# 8.7 deg -- while the knee rule beside it, on the same frames, read the load as
+# good -- and the Loading phase scored 0/100.
+#
+# A miss is still a miss and still costs more than any pass: 0.45 sits below
+# GOOD_CREDIT by a wide margin. What changed is that the cost now scales with
+# the size of the error instead of being a cliff at the boundary.
+MISS_CREDIT_MAX = 0.45
 
 
 @dataclass
@@ -64,6 +98,66 @@ class RuleResult:
     @property
     def is_excellent(self) -> bool:
         return self.outcome is RuleOutcome.EXCELLENT
+
+    @property
+    def credit(self) -> float:
+        """Fraction of this rule's weight earned, graded by how far off it was.
+
+        Three tiers, and inside the failing one a slope:
+
+            in the ideal band          1.00
+            in the acceptable band     GOOD_CREDIT
+            outside it                 MISS_CREDIT_MAX, decaying to 0.00
+
+        The decay is measured in UNITS OF THE RULE'S OWN BAND, not in degrees
+        or metres. A rule is only as strict as its band is narrow, so a fixed
+        penalty would punish a 5 deg overshoot on a 68 deg band exactly as hard
+        as the same overshoot on a 20 deg one. Dividing by the band's own width
+        makes "missed by a little" mean the same thing to every rule, whatever
+        it measures and whatever unit it measures in.
+
+        Miss by a full band-width or more and the credit is zero, which is
+        where the old cliff still lives -- for gross deviation, where it
+        belongs.
+        """
+        if self.outcome is not RuleOutcome.NEEDS_WORK:
+            return self.outcome.credit
+        excess = self._excess()
+        span = self._span()
+        if excess is None or span is None or span <= 0:
+            # Nothing to grade against. Fall back to the tier, which for
+            # NEEDS_WORK is 0.0 -- the strict reading, never a generous guess.
+            return self.outcome.credit
+        return MISS_CREDIT_MAX * max(0.0, 1.0 - excess / span)
+
+    def _excess(self) -> Optional[float]:
+        """How far outside the acceptable band the measurement fell."""
+        if self.measured_value is None:
+            return None
+        if self.min_value is not None and self.measured_value < self.min_value:
+            return self.min_value - self.measured_value
+        if self.max_value is not None and self.measured_value > self.max_value:
+            return self.measured_value - self.max_value
+        return None
+
+    def _span(self) -> Optional[float]:
+        """The rule's own scale, for turning an excess into a fraction.
+
+        Preference order matters. A two-sided band states its scale outright.
+        A one-sided band (`follow_through_hold` has a floor and no ceiling)
+        does not, so the distance from the bound to the ideal bound stands in
+        for it -- that gap is the rule's own statement of what counts as a
+        meaningful amount of this quantity.
+        """
+        if self.min_value is not None and self.max_value is not None:
+            return self.max_value - self.min_value
+        for bound, ideal in ((self.min_value, self.ideal_min),
+                             (self.max_value, self.ideal_max)):
+            if bound is not None and ideal is not None:
+                gap = abs(ideal - bound)
+                if gap > 0:
+                    return gap
+        return None
 
 
 @dataclass

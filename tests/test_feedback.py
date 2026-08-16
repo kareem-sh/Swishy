@@ -102,6 +102,37 @@ def test_score_shot_weighted():
     assert 0 < summary.score < 100
 
 
+def test_jump_release_timing_scores_a_late_jump_shot():
+    summary = score_shot(
+        [_snapshot("release", [_rule("pose", True)])],
+        shot_number=1,
+        shot_type="jump_shot",
+        jump_release_apex_offset_s=0.20,
+        jump_release_timing_confidence=0.9,
+    )
+
+    timing = next(
+        rule for rule in summary.violations
+        if rule.rule_id == "jump_release_timing"
+    )
+    assert timing.measured_value == 0.20
+    assert timing.max_value == 0.12
+    assert timing.confidence == 0.9
+    assert "dropping" in timing.message
+
+
+def test_jump_release_timing_is_not_applied_to_a_set_shot():
+    summary = score_shot(
+        [_snapshot("release", [_rule("pose", True)])],
+        shot_number=1,
+        shot_type="set_shot",
+        jump_release_apex_offset_s=0.20,
+    )
+
+    reported = summary.passed_rules + summary.violations
+    assert all(rule.rule_id != "jump_release_timing" for rule in reported)
+
+
 def test_shot_tracker_completes():
     """A full credible shooting motion produces exactly one scored shot."""
     tracker = ShotTracker()

@@ -84,6 +84,17 @@ MIN_BODY_HEIGHT = 0.10
 # A stance shorter than this is not enough to establish where the floor is.
 MIN_BASELINE_SAMPLES = 5
 
+# Release timing is evaluated against the top of the jump within this window.
+# It is deliberately time-based because footage in the corpus ranges from 12
+# to 30 fps and includes slow motion.
+RELEASE_APEX_HALF_WINDOW_S = 0.60
+RELEASE_APEX_MIN_SIDE_S = 0.06
+
+# The top of a real jump is not one mathematically exact video frame. Treat hip
+# positions within 1.5% of visible body height of the highest point as the apex
+# plateau; release anywhere inside it has zero delay.
+RELEASE_APEX_PLATEAU_RATIO = 0.015
+
 
 def _median(values: Sequence[float]) -> float:
     ordered = sorted(values)
@@ -191,3 +202,79 @@ def shooting_event_ms(
         if ratio > best:
             best, best_ms = float(ratio), int(ts)
     return best_ms
+
+
+def jump_release_apex_offset_s(
+    timestamps_ms: Sequence[int],
+    hip_image_y: Sequence[Optional[float]],
+    body_height: Sequence[float],
+    release_ms: int,
+) -> Optional[float]:
+    """Seconds the ball release occurred before/after the jump apex plateau.
+
+    Negative means the player was still rising, zero means the release landed
+    inside the near-stationary apex plateau, and positive means the player had
+    begun descending. The hip midpoint is used instead of the ankles so leg
+    tucking in flight does not masquerade as the whole player rising/falling.
+
+    This is an image-space measurement and therefore cannot distinguish camera
+    motion from player motion. Missing coverage on either side of release is
+    returned as None rather than assuming the release occurred at the apex.
+    """
+    if not timestamps_ms:
+        return None
+
+    half_window_ms = int(RELEASE_APEX_HALF_WINDOW_S * 1000)
+    points = [
+        (int(ts), float(hip), float(height))
+        for ts, hip, height in zip(timestamps_ms, hip_image_y, body_height)
+        if hip is not None
+        and height >= MIN_BODY_HEIGHT
+        and abs(int(ts) - int(release_ms)) <= half_window_ms
+    ]
+    if len(points) < 3:
+        return None
+
+    minimum_side_ms = int(RELEASE_APEX_MIN_SIDE_S * 1000)
+    if (
+        points[0][0] > int(release_ms) - minimum_side_ms
+        or points[-1][0] < int(release_ms) + minimum_side_ms
+    ):
+        return None
+
+    # Three-sample median suppresses one-frame pose spikes without changing
+    # the timebase or fabricating positions across missing frames.
+    smoothed: List[float] = []
+    for i, (_, hip, _) in enumerate(points):
+        neighbourhood = [hip]
+        if i > 0:
+            neighbourhood.append(points[i - 1][1])
+        if i + 1 < len(points):
+            neighbourhood.append(points[i + 1][1])
+        smoothed.append(_median(neighbourhood))
+
+    median_height = _median([height for _, _, height in points])
+    tolerance = RELEASE_APEX_PLATEAU_RATIO * median_height
+    peak_index = min(range(len(smoothed)), key=smoothed.__getitem__)
+    peak_limit = smoothed[peak_index] + tolerance
+
+    # Only the contiguous near-peak region containing the highest sample is
+    # the plateau. A later noisy sample at the same height must not stretch the
+    # plateau across an intervening descent.
+    plateau_start = peak_index
+    while plateau_start > 0 and smoothed[plateau_start - 1] <= peak_limit:
+        plateau_start -= 1
+    plateau_end = peak_index
+    while (
+        plateau_end + 1 < len(smoothed)
+        and smoothed[plateau_end + 1] <= peak_limit
+    ):
+        plateau_end += 1
+
+    plateau_start_ms = points[plateau_start][0]
+    plateau_end_ms = points[plateau_end][0]
+    if release_ms < plateau_start_ms:
+        return (int(release_ms) - plateau_start_ms) / 1000.0
+    if release_ms > plateau_end_ms:
+        return (int(release_ms) - plateau_end_ms) / 1000.0
+    return 0.0

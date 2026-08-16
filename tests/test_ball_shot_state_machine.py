@@ -66,6 +66,7 @@ def _update(
     wrist_xy=None,
     observed=True,
     ankle_y=None,
+    player_height_px=None,
 ):
     detection, snapshot = _ball(
         x,
@@ -83,6 +84,7 @@ def _update(
         ankle_y=ankle_y,
         pose_phase=pose_phase,
         timestamp_ms=timestamp_ms,
+        player_height_px=player_height_px,
     )
 
 
@@ -339,6 +341,226 @@ def test_moving_camera_uses_ball_position_relative_to_rim() -> None:
     assert made.outcome.result == "made"
 
 
+def _scaled_release(player_height_px: float):
+    """The same body-relative release at any on-screen player size."""
+    machine = BallShotStateMachine()
+    ankle_y = 2.0 * player_height_px
+    wrist_xy = (0.0, 1.4 * player_height_px)
+    _update(
+        machine,
+        wrist_xy[0],
+        wrist_xy[1],
+        0,
+        0,
+        (0.0, 0.0),
+        pose_phase="rise",
+        wrist_xy=wrist_xy,
+        ankle_y=ankle_y,
+        player_height_px=player_height_px,
+    )
+    return _update(
+        machine,
+        wrist_xy[0] + 0.32 * player_height_px,
+        wrist_xy[1] - 0.05 * player_height_px,
+        1,
+        100,
+        (0.0, 0.0),
+        pose_phase="release",
+        wrist_xy=wrist_xy,
+        ankle_y=ankle_y,
+        player_height_px=player_height_px,
+    )
+
+
+def test_release_thresholds_are_player_scale_invariant() -> None:
+    for player_height_px in (100.0, 400.0):
+        released = _scaled_release(player_height_px)
+        assert released.released_this_frame, player_height_px
+        assert released.state == BallShotState.ASCENDING, player_height_px
+
+
+def test_release_requires_a_previous_in_hand_observation() -> None:
+    machine = BallShotStateMachine()
+
+    # Every instantaneous release signal is present, but the ball was never
+    # observed near the hand. It must not jump WAITING -> RELEASED.
+    unowned = _update(
+        machine,
+        100,
+        400,
+        0,
+        0,
+        (1000, -1000),
+        pose_phase="release",
+        wrist_xy=(0, 500),
+        ankle_y=700,
+        player_height_px=200,
+    )
+    assert unowned.state == BallShotState.WAITING
+    assert not unowned.released_this_frame
+
+    # Once possession was observed on an earlier frame, the same physical
+    # separation is allowed to become a release.
+    held = _update(
+        machine,
+        0,
+        500,
+        1,
+        100,
+        (0, 0),
+        pose_phase="rise",
+        wrist_xy=(0, 500),
+        ankle_y=700,
+        player_height_px=200,
+    )
+    assert held.state == BallShotState.IN_HAND
+    released = _update(
+        machine,
+        64,
+        490,
+        2,
+        200,
+        (640, -100),
+        pose_phase="release",
+        wrist_xy=(0, 500),
+        ankle_y=700,
+        player_height_px=200,
+    )
+    assert released.released_this_frame
+
+
+def test_fast_downward_ball_is_not_a_release() -> None:
+    machine = BallShotStateMachine()
+    _update(
+        machine, 0, 300, 0, 0, (0, 0),
+        pose_phase="rise", wrist_xy=(0, 300), ankle_y=700,
+        player_height_px=200,
+    )
+    result = _update(
+        machine, 100, 400, 1, 100, (1000, 1000),
+        pose_phase="release", wrist_xy=(0, 410), ankle_y=700,
+        player_height_px=200,
+    )
+    assert result.state == BallShotState.IN_HAND
+    assert not result.released_this_frame
+
+
+def test_camera_motion_does_not_fake_upward_release() -> None:
+    machine = BallShotStateMachine()
+    machine.dynamic_rim = True
+
+    first_detection, first_snapshot = _ball(100, 500, 0, 0)
+    machine.update(
+        ball_detection=first_detection,
+        ball_snapshot=first_snapshot,
+        rim_detection=_rim(0, 0),
+        wrist_xy=(100, 500),
+        ankle_y=700,
+        pose_phase="rise",
+        timestamp_ms=0,
+        player_height_px=200,
+    )
+
+    # The camera pans upward by 100 px: rim and ball move upward together, so
+    # the ball's rim-relative vertical velocity is zero. Large horizontal
+    # hand separation must not turn that camera motion into a release.
+    second_detection, second_snapshot = _ball(
+        164, 400, 1, 100, velocity=(640, -1000)
+    )
+    moved_rim = RimDetection(
+        center_xy=(500, 200),
+        bbox_xyxy=(450, 200, 550, 330),
+        confidence=0.9,
+        frame_index=1,
+        timestamp_ms=100,
+    )
+    result = machine.update(
+        ball_detection=second_detection,
+        ball_snapshot=second_snapshot,
+        rim_detection=moved_rim,
+        wrist_xy=(100, 410),
+        ankle_y=600,
+        pose_phase="release",
+        timestamp_ms=100,
+        player_height_px=200,
+    )
+    assert result.state == BallShotState.IN_HAND
+    assert not result.released_this_frame
+
+
+def test_ball_below_wrist_cannot_confirm_release() -> None:
+    machine = BallShotStateMachine()
+    _update(
+        machine, 0, 500, 0, 0, (0, 0),
+        pose_phase="rise", wrist_xy=(0, 500), ankle_y=700,
+        player_height_px=200,
+    )
+    result = _update(
+        machine, 100, 410, 1, 100, (1000, -900),
+        pose_phase="release", wrist_xy=(0, 400), ankle_y=700,
+        player_height_px=200,
+    )
+    assert result.state == BallShotState.IN_HAND
+    assert not result.released_this_frame
+
+
+def test_labelled_non_shot_actions_do_not_activate_release() -> None:
+    """Adversarial dribble/gather/catch motions, all explicitly labelled."""
+    player_height_px = 200.0
+    ankle_y = 700.0
+    cases = {
+        "low_dribble": [
+            ((0, 500), (0, 500), "rise"),
+            ((0, 620), (0, 500), "release"),
+        ],
+        "high_dribble": [
+            ((0, 400), (0, 400), "rise"),
+            ((70, 430), (0, 400), "release"),
+        ],
+        "crossover": [
+            ((0, 450), (0, 450), "rise"),
+            ((100, 450), (0, 450), "release"),
+        ],
+        "gather": [
+            ((0, 450), (0, 450), "rise"),
+            ((20, 440), (0, 450), "release"),
+        ],
+        "pump_fake": [
+            ((0, 420), (0, 420), "rise"),
+            ((15, 380), (0, 420), "release"),
+        ],
+        # The middle frame places the incoming ball far from the hand while
+        # pose remains in rise; on the candidate frame it moves TOWARD the
+        # wrist, so separation growth is negative.
+        "catch": [
+            ((0, 400), (0, 400), "rise"),
+            ((80, 350), (0, 400), "rise"),
+            ((55, 360), (0, 400), "release"),
+        ],
+    }
+
+    for label, frames in cases.items():
+        machine = BallShotStateMachine()
+        for frame_index, (ball_xy, wrist_xy, phase) in enumerate(frames):
+            result = _update(
+                machine,
+                ball_xy[0],
+                ball_xy[1],
+                frame_index,
+                frame_index * 100,
+                (0, 0),
+                pose_phase=phase,
+                wrist_xy=wrist_xy,
+                ankle_y=ankle_y,
+                player_height_px=player_height_px,
+            )
+            assert not result.released_this_frame, label
+        assert machine.state in {
+            BallShotState.WAITING,
+            BallShotState.IN_HAND,
+        }, label
+
+
 def _body_snapshot(
     timestamp_ms: int,
     phase: str,
@@ -575,6 +797,12 @@ if __name__ == "__main__":
     test_ball_flight_continues_when_pose_is_missing()
     test_nanotrack_evidence_is_labelled_separately_from_yolo()
     test_moving_camera_uses_ball_position_relative_to_rim()
+    test_release_thresholds_are_player_scale_invariant()
+    test_release_requires_a_previous_in_hand_observation()
+    test_fast_downward_ball_is_not_a_release()
+    test_camera_motion_does_not_fake_upward_release()
+    test_ball_below_wrist_cannot_confirm_release()
+    test_labelled_non_shot_actions_do_not_activate_release()
     test_shot_tracker_waits_for_ball_after_body_finishes()
     test_ball_outcome_can_finish_after_body_grace_when_pose_never_lands()
     test_large_release_disagreement_marks_trajectory_low_confidence()

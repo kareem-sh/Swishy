@@ -46,8 +46,50 @@
 rules:
 
   # ---------------------------------------------------------------- loading
+#
+# ---------------------------------------------------------------------------
+# HOW BOTH BANDS ARE BUILT, AND WHY THEY ARE PER-MODEL
+# ---------------------------------------------------------------------------
+# Decided 16 August 2026. THE COACH DEFINES THE TARGET. Where the instructional
+# footage (video8) and the published means disagreed, the coach wins: this is a
+# teaching product and must teach one coherent technique rather than an average
+# of three populations filmed under conditions we cannot check.
+#
+#   perfect     (ideal_min..ideal_max)  the coach's interquartile range,
+#                                       WIDENED if narrower than that joint's
+#                                       measurement uncertainty
+#   acceptable  (min..max)              the coach's full observed range,
+#                                       widened by the same uncertainty
+#
+# Every rep the coach performed passes, and no band is narrower than the
+# instrument. docs/LIMITS.md measures model disagreement at elbow 11.5, knee
+# 8.9, hip 6.2 deg; a band tighter than that is scoring noise.
+#
+# THE LITERATURE IS VALIDATION, NOT OVERRIDE, and it disagrees:
+#
+#       joint    coach (video8)   published     outcome
+#       knee     96-129 med 108   112-122       overlapping; coach kept
+#       hip      88-145 med 124   135-144       NO OVERLAP at the median
+#       elbow    78-105 med  83    58-64        NO OVERLAP at all
+#
+# The comparison is not obviously fair -- those are preparatory-phase values
+# from lab capture on other populations, and this pipeline measures a different
+# instant, in a different reference frame, from monocular video. Whether the
+# two describe the same quantity has NOT been established.
+#
+# SALAH_VIDEO WAS NOT USED. It is held-out evaluation footage.
+#
+# `calibration:` -- BANDS ARE PER POSE MODEL. Swapping lite for full moved
+# scores by up to 17 points on identical frames, so a band is only valid for
+# the model it was measured against. Each rule may carry a `calibration:` block
+# keyed by model name; `analysis.engine.apply_calibration` selects the one
+# matching `config.settings.POSE_MODEL` and falls back to the rule's top-level
+# numbers, which describe `lite`.
+
+
   knee_flexion_loading:
     name: "Leg Load"
+    direction: two_sided    # too straight and too deep are both faults
     metric: knee
     phases: [loading]
     # min: the DEPTH of the dip is the whole point. The phase begins at the
@@ -55,12 +97,43 @@ rules:
     # that has not bent yet.
     aggregate: min
     max_rate: 1200          # deg/s, physical ceiling; see scorer._despike
-    min: 80
-    max: 145
-    ideal_min: 100
-    ideal_max: 128
+    # COACH-DERIVED, 16 Aug 2026. See "HOW BOTH BANDS ARE BUILT" below.
+    # coach video8, deepest loading knee per shot, n=9:
+    #   96.0  99.2  99.4  103.4  108.0  111.2  113.8  118.4  128.5
+    # acceptable = coach min/max +/- 8.9 (knee uncertainty, docs/LIMITS.md)
+    # perfect    = coach IQR, widened to the uncertainty
+    min: 87                 # 96.0 - 8.9
+    max: 137                # 128.5 + 8.9
+    ideal_min: 98           # centre 106.5 -/+ 8.9
+    ideal_max: 115
+    calibration:
+      # Derived against the `lite` pose model, which is what
+      # config/settings.py ships. See analysis.engine.apply_calibration.
+      lite:
+        min: 87
+        max: 137
+        ideal_min: 98
+        ideal_max: 115
+      # coach 99.0-128.2 med 118.5, u=8.97. NOTE: 118.5 now sits INSIDE the
+        # published 112-122 range, which lite's 108.0 did not -- the more
+        # accurate model agrees better with the literature unprompted.
+      full:
+        min: 90
+        max: 137
+        ideal_min: 106
+        ideal_max: 124
+      # heavy: ALIASED TO `full`, not derived. `heavy` reads angles
+      # differently again, so these numbers are not ITS calibration --
+      # they are a deliberate choice that a heavy run should score like a
+      # full run rather than silently fall back to the lite bands at the
+      # top of the rule. Derive properly before trusting a heavy score.
+      heavy:
+        min: 90
+        max: 137
+        ideal_min: 106
+        ideal_max: 124
     severity: info
-    scored: false          # DEMOTED -- see evidence below
+    scored: true           # RESTORED by maintainer -- see OVERRIDE below
     message_excellent: "Good load. That shot's powered from the floor, which is what you want."
     refine_low: "Your legs are loading well. Sink slightly less so you can rise in one smooth motion."
     refine_high: "Your leg load is good. Sit a little deeper before you rise to build more lift."
@@ -69,6 +142,20 @@ rules:
     evidence: >
       NOT SUPPORTED as a proficiency discriminator. This is the most
       thoroughly contradicted claim in the project.
+
+      ✅ RESOLVED 16 AUGUST 2026 — MAINTAINER OVERRIDE, TAKEN DELIBERATELY.
+      The conflict recorded below asked for exactly this decision and named it
+      the maintainer's to take. It has been taken: the rule is SCORED, on the
+      product judgement that knee load is fundamental to a shot and a coach
+      that stays silent about it is not coaching.
+
+      This does NOT resolve the evidence. Everything below still stands, and
+      the class is still NOT SUPPORTED. What the override says is that a
+      teaching tool may assert a well-attested coaching convention that the
+      proficiency literature has failed to confirm EITHER WAY -- the studies
+      are underpowered nulls, not demonstrations of no effect. `severity: info`
+      (weight 1, the smallest available) is the bound on how much a contested
+      rule may move a score, and it is kept for that reason.
 
       ⚠️ UNRESOLVED CONFLICT — THIS RULE IS SCORED AGAINST THE CORPUS'S OWN
       INSTRUCTION. SOURCES.md Part E gives this rule the class NOT SUPPORTED
@@ -141,14 +228,47 @@ rules:
 
   hip_hinge_loading:
     name: "Hip Drive"
+    direction: two_sided    # too upright and folded double are both faults
     metric: hip
     phases: [loading]
     aggregate: min          # deepest hinge, same reasoning as the knee
     max_rate: 1200          # deg/s, physical ceiling; see scorer._despike
-    min: 100                # widened from 110 -- see WIDENED BAND below
-    max: 168
-    ideal_min: 125
-    ideal_max: 152
+    # COACH-DERIVED, 16 Aug 2026 -- this is the band that MOVED AWAY FROM THE
+    # LITERATURE, deliberately and on instruction. See "HOW BOTH BANDS ARE
+    # BUILT" in knee_flexion_loading, and THE CONFLICT note below.
+    # coach video8, deepest loading hip per shot, n=9:
+    #   87.5  103.2  110.0  118.4  123.8  125.0  126.1  129.4  145.0
+    # acceptable = coach min/max +/- 6.2 (hip uncertainty, docs/LIMITS.md)
+    # perfect    = coach IQR (16.5 deg, already wider than the uncertainty)
+    min: 81                 # 87.5 - 6.2
+    max: 151                # 145.0 + 6.2
+    ideal_min: 110
+    ideal_max: 126
+    calibration:
+      # Derived against the `lite` pose model, which is what
+      # config/settings.py ships. See analysis.engine.apply_calibration.
+      lite:
+        min: 81
+        max: 151
+        ideal_min: 110
+        ideal_max: 126
+      # coach 90.3-147.2 med 126.1, u=8.68. Still below the published 135-144,
+        # though 2 deg closer than lite. The gap is real, not an artefact.
+      full:
+        min: 82
+        max: 156
+        ideal_min: 114
+        ideal_max: 131
+      # heavy: ALIASED TO `full`, not derived. `heavy` reads angles
+      # differently again, so these numbers are not ITS calibration --
+      # they are a deliberate choice that a heavy run should score like a
+      # full run rather than silently fall back to the lite bands at the
+      # top of the rule. Derive properly before trusting a heavy score.
+      heavy:
+        min: 82
+        max: 156
+        ideal_min: 114
+        ideal_max: 131
     severity: info
     scored: true
     message_excellent: "Hips are set well — chest tall, weight balanced over your feet."
@@ -268,16 +388,53 @@ rules:
   # -------------------------------------------------------------- ball lift
   elbow_slot_ball_lift:
     name: "Ball Set Position"
+    direction: two_sided    # tucked in and flared out are both faults
     metric: elbow
     phases: [ball_lift]
     # min: the set point is where the ball is held closest before the drive,
     # i.e. the most flexed elbow of the lift.
     aggregate: min
     max_rate: 2000          # deg/s, physical ceiling; see scorer._despike
-    min: 60
-    max: 118
-    ideal_min: 74
-    ideal_max: 98
+    # COACH-DERIVED, 16 Aug 2026. coach video8, elbow at ball_lift, n=7:
+    #   77.5  78.5  81.0  83.4  84.2  86.9  104.7
+    # acceptable = coach min/max +/- 11.5 (elbow uncertainty, docs/LIMITS.md)
+    # perfect    = the coach's IQR here is only 8.4 deg wide, NARROWER THAN
+    #   THE INSTRUMENT. docs/LIMITS.md states that a band narrower than the
+    #   uncertainty is scoring noise, so it is widened to the uncertainty
+    #   about its own centre (82.7) instead of borrowing a precision that does
+    #   not exist. This is the one place the two inputs disagreed and the
+    #   measurement won.
+    min: 66                 # 77.5 - 11.5
+    max: 116                # 104.7 + 11.5
+    ideal_min: 71           # centre 82.7 -/+ 11.5
+    ideal_max: 94
+    calibration:
+      # Derived against the `lite` pose model, which is what
+      # config/settings.py ships. See analysis.engine.apply_calibration.
+      lite:
+        min: 66
+        max: 116
+        ideal_min: 71
+        ideal_max: 94
+      # coach 44.9-84.2 med 70.1, u=16.31. Moved 13 deg toward the published
+        # 58-64 under this model. The band is wide because the elbow is
+        # the second-noisiest angle here; narrowing it would be invented
+        # precision.
+      full:
+        min: 29
+        max: 100
+        ideal_min: 54
+        ideal_max: 87
+      # heavy: ALIASED TO `full`, not derived. `heavy` reads angles
+      # differently again, so these numbers are not ITS calibration --
+      # they are a deliberate choice that a heavy run should score like a
+      # full run rather than silently fall back to the lite bands at the
+      # top of the rule. Derive properly before trusting a heavy score.
+      heavy:
+        min: 29
+        max: 100
+        ideal_min: 54
+        ideal_max: 87
     severity: warning
     scored: true
     message_excellent: "The ball's in a strong spot to launch from."
@@ -292,19 +449,181 @@ rules:
       10-34 in one laboratory — which is low statistical power, NOT
       demonstrated invariance. Treated as a tunable prior. SOURCES.md D2.
 
+  guide_hand_support_lift:
+    name: "Guide-Hand Support"
+    metric: guide_hand_ball_distance_ratio
+    phases: [ball_lift]
+    # The closest observed point answers whether the guide hand joined the
+    # ball during the lift. The distance is divided by visible player height,
+    # so this does not change when the player moves closer to the camera.
+    aggregate: min
+    min: 0.00
+    max: 0.24
+    ideal_max: 0.16
+    unit: "body heights"
+    severity: info
+    scored: true
+    message_excellent: "Your guide hand supports the side of the ball as it rises."
+    refine_high: "Your guide hand reaches the ball. Bring it a little closer to the side so the lift stays centred."
+    message_high: "Your guide hand stays too far from the ball during the lift. Support the side of the ball until the shooting arm begins the release."
+    evidence: >
+      COACHING HEURISTIC; THE METRIC AND THRESHOLDS ARE AN ENGINEERING
+      DECISION. No non-retracted source in SOURCES.md validates guide-hand use
+      as a proficiency discriminator, publishes a diagnostic wrist-to-ball
+      distance, or provides an individual pass/fail cutoff. The mechanically
+      narrow assumption is that a hand cannot support the ball without coming
+      close to it; this rule does not claim that proximity alone improves
+      accuracy.
+
+      This rule therefore measures the narrow claim the camera can observe:
+      did the non-shooting wrist come close to the ball during ball_lift? It
+      uses the visually detected ball and the opposite wrist, with distance
+      divided by the player's visible nose-to-ankle height. If the ball, guide
+      wrist, or body scale is missing, the rule is skipped rather than reading
+      missing evidence as zero distance.
+
+      0.16 and 0.24 body heights are initial engineering bands, not published
+      biomechanics. They deliberately allow the wrist-to-ball-centre distance
+      to include the ball's radius. Re-measure these bands on labelled clips
+      before treating the EXCELLENT-versus-GOOD split as a validated norm.
+
+  # guide_wrist_release_proxy:
+  #   name: "Guide-Hand Release (push proxy)"
+  #   metric: guide_wrist_align
+  #   phases: [release]
+  #   aggregate: max
+  #   min: 120
+  #   max: 180
+  #   ideal_min: 145
+  #   ideal_max: 180
+  #   severity: info
+  #   scored: false
+  #   message_excellent: "Guide-wrist alignment, for reference - this push proxy isn't scored."
+  #   refine_low: "Guide-wrist alignment, for reference - this push proxy isn't scored."
+  #   message_low: "Guide-wrist alignment, for reference - this push proxy isn't scored."
+  #   evidence: >
+  #     NOT SUPPORTED FOR SCORING. This is the 2D elbow-wrist-index angle of the
+  #     NON-shooting hand at release. A markedly bent guide wrist can be
+  #     consistent with a thumb flick or guide-hand push, but a single monocular
+  #     pose cannot measure hand force and this angle cannot prove that force was
+  #     or was not applied. It is explicitly a proxy, never a force reading.
+
+  #     The measurement is also too uncertain to penalise. The 3D sibling of the
+  #     same elbow-wrist-index construction on the shooting side has 39.2 deg
+  #     mean disagreement between MediaPipe's full and heavy models on identical
+  #     frames, with more than 10 deg disagreement on 92.4% of frames. Projecting
+  #     the guide chain into 2D makes it available more often; it does not remove
+  #     hand-landmark error or out-of-plane ambiguity. The guide hand is also
+  #     often partly hidden by the ball. 120-180 and 145-180 are display bands
+  #     only.
+
+  #     Kept because it exposes the wrist-angle signal requested for guide-hand
+  #     review. A future scored rule needs labelled thumb-flick/push footage and
+  #     either a validated hand model or direct ball/hand contact dynamics.
+  #     scripts/measure_angle_uncertainty.py; docs/LIMITS.md.
+
   shoulder_alignment_lift:
     name: "Shoulder Elevation"
+    direction: two_sided    # too low and riding high are both faults
     metric: shoulder
-    phases: [ball_lift, jump]
-    aggregate: worst        # unscored anyway; displayed only
-    min: 55
-    max: 135
+    # RE-SCOPED AND RE-DERIVED 16 Aug 2026. `ball_lift` is DROPPED and
+    # `release` restored -- the opposite of the previous attempt, and measured
+    # this time. At ball_lift the phase runs 1 to 15 frames and the coach's own
+    # shoulder spreads 59 deg across shots; a rule cannot be built on a phase
+    # that is sometimes a single frame. At release it is 9 frames on every
+    # shot and the coach spreads 16.3 deg.
+    phases: [release]
+    # median, for the same reason as the wrist rules -- but note it barely
+    # helped here (worst 16.8 -> median 16.3 deg), and that is itself the
+    # finding: this angle's per-frame noise is only 6.4 deg on the coach's
+    # footage, so extreme-selection was never the dominant error. The 16.3 deg
+    # that remains is REAL between-rep variation in the reference technique.
+    aggregate: median
+    # coach video8, per-shot median shoulder at release, n=9:
+    #   118.3  120.1(p25)  126.6(med)  131.8(p75)  134.6
+    # uncertainty of a median over 9 frames = 1.25 x 6.43 / sqrt(9) = 2.7 deg
+    min: 116                # 118.3 - 2.7
+    max: 137                # 134.6 + 2.7
+    ideal_min: 120          # coach IQR, already far wider than 2.7
+    ideal_max: 132
+    calibration:
+      # Derived against the `lite` pose model, which is what
+      # config/settings.py ships. See analysis.engine.apply_calibration.
+      lite:
+        min: 116
+        max: 137
+        ideal_min: 120
+        ideal_max: 132
+      # coach per-shot medians 117.8-130.7, u=2.68 after median over 9 frames.
+      full:
+        min: 115
+        max: 133
+        ideal_min: 120
+        ideal_max: 125
+      # heavy: ALIASED TO `full`, not derived. `heavy` reads angles
+      # differently again, so these numbers are not ITS calibration --
+      # they are a deliberate choice that a heavy run should score like a
+      # full run rather than silently fall back to the lite bands at the
+      # top of the rule. Derive properly before trusting a heavy score.
+      heavy:
+        min: 115
+        max: 133
+        ideal_min: 120
+        ideal_max: 125
     severity: info
-    scored: false          # measured and displayed, never scored
-    message_excellent: "Shoulder elevation, for reference — this one isn't scored."
-    message_low: "Shoulder elevation, for reference — this one isn't scored."
-    message_high: "Shoulder elevation, for reference — this one isn't scored."
+    scored: true            # RESTORED -- see WHY, and the honesty note, below
+    message_excellent: "Shoulder position is where you want it through the lift and the release."
+    refine_low: "Shoulder position is good. Let the shoulder ride a touch higher as you set the ball."
+    refine_high: "Shoulder position is good. Keep it a fraction lower so the arm stays relaxed into the release."
+    message_low: "Your shooting shoulder stays low through the lift. Raise it so the arm works under the ball, not beside it."
+    message_high: "Your shooting shoulder rides high through the release. Settle it so the arm can extend freely."
     evidence: >
+      WHY THIS IS UNSCORED AND OFF `release` — INVESTIGATED 16 AUGUST 2026,
+      after the rule was found to INVERT the maintainer's own ranking of
+      salah_video: it fired CHANGE on shot 1 (labelled good) and ON TARGET on
+      shot 4 (labelled bad). Three causes were checked in order.
+
+      1. SHOOTING SIDE — NOT THE CAUSE, ALREADY CORRECT. `_measure` builds the
+         key as f"{shooting_side}_shoulder" (analysis/engine.py), and
+         `shooting_side` is resolved across the whole clip rather than per
+         frame. The rule has always read the shooting shoulder.
+
+      2. PHASE SCOPE — A REAL DEFECT, AND MINE. The band 55..135 was set for
+         `ball_lift`/`jump`, where the arm is still folded near the torso.
+         Re-scoping the rule to `release` kept the band but moved the moment:
+         at release the arm is extended overhead, so the angle is naturally far
+         larger. Measured at release across both clips, the shoulder sits at
+         110-137 deg -- pressed against a ceiling of 135 that was never derived
+         for that instant. Comparing a release-phase measurement against a
+         lift-phase bound is the unfair comparison SOURCES.md warns about, and
+         the scope is withdrawn.
+
+      3. TOLERANCE vs UNCERTAINTY — WHY IT IS STILL UNSCORED EVEN AT THE RIGHT
+         PHASE. Under the calibration policy the coach defines the target and
+         the tolerance comes from coach variability combined with measurement
+         uncertainty. Measured:
+
+             coach (video8) shoulder spread across shots   ~12 deg
+             MediaPipe full-vs-heavy model disagreement     8.6 deg
+             required tolerance  sqrt(12^2 + 8.6^2)        ~14.8 deg
+             effect the rule exists to detect               11.5 deg
+
+         The tolerance the measurement forces is WIDER than the difference the
+         rule is meant to find. A band honest about its own uncertainty cannot
+         separate the two groups; a band narrow enough to separate them is
+         narrower than the noise. Salah shot 1 failed by 2.0 deg on a metric
+         carrying 8.6 deg of uncertainty -- that verdict was noise, not a
+         measurement.
+
+      The rule therefore stays MEASURED AND DISPLAYED and contributes nothing
+      to the score, which is the policy's stated outcome when a metric remains
+      unreliable after its definition is fixed. It is NOT deleted: the angle is
+      real and worth showing, and if a lower-variance pose model lands the
+      arithmetic above should be redone rather than re-argued.
+
+      Salah was used here to DETECT the inversion, never to set a number. No
+      threshold in this block comes from it.
+
       NOT SUPPORTED FOR SCORING — held back by MEASUREMENT first, and by an
       unverified citation second.
 
@@ -357,6 +676,7 @@ rules:
   # -------------------------------------------------------------------- jump
   jump_elevation:
     name: "Elevation"
+    direction: two_sided    # no lift and over-jumping are both faults
     metric: takeoff_elevation
     phases: [jump]
     shot_types: [jump_shot]   # a set shot has no flight to assess
@@ -365,6 +685,14 @@ rules:
     max: 0.35
     ideal_min: 0.15
     ideal_max: 0.28
+    calibration:
+      # Derived against the `lite` pose model, which is what
+      # config/settings.py ships. See analysis.engine.apply_calibration.
+      lite:
+        min: 0.12
+        max: 0.35
+        ideal_min: 0.15
+        ideal_max: 0.28
     unit: ""
     severity: info
     scored: true
@@ -496,6 +824,7 @@ rules:
 
   trunk_posture:
     name: "Upper Body Posture"
+    direction: lower_better    # 0 is an upright trunk and is the target, so it must PASS
     metric: trunk
     aggregate: worst
     max_rate: 600          # deg/s, physical ceiling; see scorer._despike
@@ -504,6 +833,30 @@ rules:
     max: 25
     ideal_min: 0
     ideal_max: 13
+    calibration:
+      # Derived against the `lite` pose model, which is what
+      # config/settings.py ships. See analysis.engine.apply_calibration.
+      lite:
+        min: 0
+        max: 25
+        ideal_min: 0
+        ideal_max: 13
+      # coach 3.5-11.1 med 6.0. NO LOWER BOUND: an upright trunk is the target,
+        # so 0 must pass. The derivation's proposed min of 4 would have
+        # failed perfect posture. Outer max stays the gross-lean bound.
+      full:
+        min: 0
+        max: 25
+        ideal_max: 8
+      # heavy: ALIASED TO `full`, not derived. `heavy` reads angles
+      # differently again, so these numbers are not ITS calibration --
+      # they are a deliberate choice that a heavy run should score like a
+      # full run rather than silently fall back to the lite bands at the
+      # top of the rule. Derive properly before trusting a heavy score.
+      heavy:
+        min: 0
+        max: 25
+        ideal_max: 8
     severity: info
     scored: true
     message_excellent: "You stay tall and square as the ball leaves."
@@ -550,45 +903,14 @@ rules:
       three-landmark joint angles it depends on the coordinate convention
       being right. See pose/landmarks.py and tests/test_coordinates.py.
 
-  head_stability:
-    name: "Eyes and Head"
-    metric: head_velocity
-    aggregate: worst        # continuous
-    phases: [loading, ball_lift, jump, release]
-    max: 0.08
-    ideal_max: 0.05
-    unit: "m/s"
-    severity: info
-    scored: false          # measured and displayed, never scored
-    message_excellent: "Head movement, for reference — this one isn't scored."
-    refine_high: "Head movement, for reference — this one isn't scored."
-    message_high: "Head movement, for reference — this one isn't scored."
-    evidence: >
-      NOT SUPPORTED FOR SCORING — the threshold never had a basis, and now has
-      a measurement against it.
-
-      It was always an ENGINEERING DECISION: no published threshold for head
-      movement during shooting was found. The old note claimed "the
-      measurement is reliable". That claim is now contradicted by data.
-
-      Measured across five videos, head velocity during the shot ran
-      p10 = 0.00, median = 0.20, p90 = 0.50 m/s against a maximum of 0.08 --
-      so the rule failed 59 of 80 evaluations, roughly three players in four.
-      A threshold nobody derived, which almost nobody meets, is not measuring
-      head stability; it is measuring the threshold.
-
-      There is a second problem it cannot escape. head_velocity is computed
-      from hip-centred world landmarks, so it is the head's motion RELATIVE TO
-      THE HIPS, not in space. A player who rises smoothly with a perfectly
-      still gaze still registers motion here. Re-deriving it against an
-      image-space reference is the honest fix, and until that exists the
-      number is shown and not scored.
-
-      Displayed because a stable gaze is genuine coaching practice.
-
-  # ---------------------------------------------------------------- release
   elbow_extension_release:
     name: "Reach at Release"
+    # two_sided, NOT higher_better. Tempting to call "straighter is better",
+    # but the corpus reports a CENTRE (158.8 / 159.3 deg), not a maximum, and
+    # locking the elbow out is a real fault. The direction test caught this
+    # exact mislabel: declared higher_better, the rule's own ideal_max of 168
+    # became a contradiction.
+    direction: two_sided
     metric: elbow
     phases: [release]
     aggregate: max          # the reach ACHIEVED, not the frame before it
@@ -597,6 +919,33 @@ rules:
     max: 180
     ideal_min: 152
     ideal_max: 168
+    calibration:
+      # Derived against the `lite` pose model, which is what
+      # config/settings.py ships. See analysis.engine.apply_calibration.
+      lite:
+        min: 142
+        max: 180
+        ideal_min: 152
+        ideal_max: 168
+      # coach 150.9-158.2 med 152.6, u=16.31. The ideal band is WIDER than lite's
+        # 152-168 on purpose: docs/LIMITS.md warns that a 16 deg ideal band
+        # on a 16 deg instrument is not a measurement, and full's own
+        # elbow disagreement is 16.31 deg.
+      full:
+        min: 135
+        max: 175
+        ideal_min: 137
+        ideal_max: 170
+      # heavy: ALIASED TO `full`, not derived. `heavy` reads angles
+      # differently again, so these numbers are not ITS calibration --
+      # they are a deliberate choice that a heavy run should score like a
+      # full run rather than silently fall back to the lite bands at the
+      # top of the rule. Derive properly before trusting a heavy score.
+      heavy:
+        min: 135
+        max: 175
+        ideal_min: 137
+        ideal_max: 170
     severity: warning
     scored: true
     message_excellent: "You reach all the way to the rim at release."
@@ -681,53 +1030,56 @@ rules:
 
       SOURCES.md A3 (Cabarkapa et al. 2026, PMC-pending), D4.
 
-  index_alignment_release:
-    name: "Finger Direction"
-    metric: index_align
-    phases: [release]
-    aggregate: max          # the straightest finger line the release reached
-    min: 148
-    max: 180
-    ideal_min: 160
-    ideal_max: 180
-    severity: info
-    scored: false          # measured and displayed, never scored
-    message_excellent: "Fingertip direction, for reference — this one isn't scored."
-    refine_low: "Fingertip direction, for reference — this one isn't scored."
-    message_low: "Fingertip direction, for reference — this one isn't scored."
-    evidence: >
-      NOT SUPPORTED FOR SCORING — withdrawn from the score on MEASUREMENT
-      grounds, exactly as shoulder_alignment_lift was.
-
-      It was never more than an ENGINEERING DECISION: no published norm for an
-      elbow-wrist-index alignment angle exists, and this is a Swichy-defined
-      proxy for a clean fingertip release. What has changed is that its
-      reliability is now measured rather than assumed.
-
-      MediaPipe's full and heavy models, on the same 448 frames of
-      salah_video.mp4, disagree about this angle by a mean of 39.2 deg
-      (median 41.3, p90 62.0) and differ by more than 10 deg on 92.4% of
-      frames. The ideal band is 20 deg wide. The uncertainty is TWICE the
-      entire band, so every tier boundary sits well inside the noise.
-
-      The cause is not mysterious: the index landmark is the least reliable
-      point used anywhere in this project (visibility p10 = 0.58 on the same
-      footage), and the angle is built from a short elbow-wrist-index chain
-      where a small positional error becomes a large angular one.
-
-      Kept and displayed because a fingertip release is real coaching and the
-      number is worth showing. Scoring it would penalise players for our
-      measurement. scripts/measure_angle_uncertainty.py; docs/LIMITS.md.
-
   release_height:
     name: "Release Height"
+    direction: higher_better    # a higher release is the one release-phase finding the corpus supports
+    # (p=0.010); the outer max remains only as a gross over-reach bound
     metric: release_height
     phases: [release]
     aggregate: max          # the highest point the ball was let go from
-    min: 0.06
-    max: 0.62
-    ideal_min: 0.16
-    ideal_max: 0.46
+    # COACH-DERIVED 16 Aug 2026. video8, release height above the head, n=9:
+    #   0.122  0.141(p25)  0.152(med)  0.165(p75)  0.214(max)   IQR 0.023
+    #
+    # The floor is the coach's lowest release less one IQR, the only spread
+    # measure this metric has -- docs/LIMITS.md bounds ANGLE uncertainty, not
+    # a distance, and inventing one would be the guess this policy forbids.
+    #
+    # NO IDEAL CEILING, and that is a directional claim rather than an
+    # omission: a higher release is the one release-phase finding the corpus
+    # actually supports (release height separated proficient from
+    # non-proficient free-throw shooters, p=0.010, while release ANGLE did not,
+    # p=0.179). Capping the ideal band at the coach's own maximum would score a
+    # player who releases HIGHER than the reference as worse than the
+    # reference, which inverts the only direction we have evidence for. The
+    # outer `max` stays as a gross-deviation bound on over-reaching.
+    min: 0.10               # 0.122 - 0.023
+    max: 0.62               # unchanged: outer bound on over-reaching
+    ideal_min: 0.14         # coach p25
+    calibration:
+      # Derived against the `lite` pose model, which is what
+      # config/settings.py ships. See analysis.engine.apply_calibration.
+      lite:
+        min: 0.10
+        max: 0.62
+        ideal_min: 0.14
+      # coach 0.15-0.21 med 0.16. NO IDEAL CEILING and the outer max is left at
+        # the gross-deviation bound: a HIGHER release is the one
+        # release-phase finding the corpus supports (p=0.010), so capping
+        # the ideal at the coach's own maximum would score a better
+        # release as worse than the reference.
+      full:
+        min: 0.1
+        max: 0.62
+        ideal_min: 0.15
+      # heavy: ALIASED TO `full`, not derived. `heavy` reads angles
+      # differently again, so these numbers are not ITS calibration --
+      # they are a deliberate choice that a heavy run should score like a
+      # full run rather than silently fall back to the lite bands at the
+      # top of the rule. Derive properly before trusting a heavy score.
+      heavy:
+        min: 0.1
+        max: 0.62
+        ideal_min: 0.15
     unit: "m"
     severity: warning
     scored: true
@@ -778,133 +1130,19 @@ rules:
 
       SOURCES.md A2, A6, Part G #2; docs/LIMITS.md.
 
-  release_height_ratio:
-    name: "Release Height (relative to your height)"
-    metric: release_height_ratio
-    phases: [release]
-    aggregate: max
-    min: 1.02
-    max: 1.58
-    ideal_min: 1.14
-    ideal_max: 1.46
-    unit: ""
-    severity: info
-    scored: false          # measured and displayed, never scored — see below
-    message_excellent: "Release height relative to your build, for reference — this one isn't scored."
-    refine_low: "Release height relative to your build, for reference — this one isn't scored."
-    refine_high: "Release height relative to your build, for reference — this one isn't scored."
-    message_low: "Release height relative to your build, for reference — this one isn't scored."
-    message_high: "Release height relative to your build, for reference — this one isn't scored."
-    evidence: >
-      NOT SUPPORTED FOR SCORING — withdrawn on MEASUREMENT grounds, exactly as
-      shoulder_alignment_lift and index_alignment_release were. The direction
-      below is unchanged and still supported; what is withdrawn is the claim
-      that THIS pipeline measures it well enough to penalise anyone for it.
-
-      IT FAILED 15 OF 15 ATTEMPTS. Measured across every clip in the corpus —
-      salah_video.mp4 (5 shots), video8 (10 shots), video9 (1 shot):
-
-          observed  0.65 .. 0.97      band starts at 1.02
-          failures  15/15 = 100%
-
-      A rule that no observed human has ever passed is not measuring the
-      player. Compare release_height, the head-relative sibling, on the same
-      frames: 0 failures in 15, observed 0.13-0.28 m inside a 0.06-0.62 band.
-      Same concept, same footage, opposite verdict — so the discrepancy is in
-      this metric, not in the shooting.
-
-      WHY IT READS LOW, STRUCTURALLY. The subtraction behind it is NOT
-      same-frame: `wrist_y` is this frame's hip-relative wrist, while
-      `ankle_baseline_y` was averaged while the player stood still before the
-      shot. In hip-centred world coordinates the origin therefore does not
-      cancel, because the hip itself moved between the two moments.
-      `analysis/engine.py` adds `body_rise_ratio` back to restore the missing
-      elevation term, and even so the result lands a full 0.05-0.37 below the
-      published floor. The correction is not sufficient, and the reason it is
-      needed at all is that the quantity is assembled from two different
-      instants in a coordinate frame that is blind to whole-body translation.
-
-      IT ALSO PENALISED HONESTY. This was the ONLY height-dependent scored
-      rule, so entering a height could only ever lower a score:
-
-          salah_video  height=None   92, 90, 79, 85, 83
-          salah_video  height=185    85, 83, 73, 79, 77
-
-      Six to seven points on every shot, for supplying correct information.
-      A player who told us the truth about themselves was scored worse than
-      one who left the field blank, which inverts the incentive the height
-      field exists to create.
-
-      THE CONCEPT IS NOT LOST. `release_height` carries the same coaching idea
-      head-relative, same-frame, scale-free, needs no entered height, and
-      passes on real footage. Nothing the player is told changes by withdrawing
-      this rule from the score; it is still measured and still displayed.
-
-      TO RESTORE IT, the ratio must be rebuilt in IMAGE space against the
-      player's own on-screen height, the way `wrist_height_ratio` and
-      `body_rise_ratio` already are, and the band re-derived from what that
-      produces. Do not simply widen the band downward to fit: 1.02-1.58 is
-      centred on A2's published means, and moving it to admit values a broken
-      subtraction happens to emit would keep the citation while discarding what
-      it says. scripts/ phase audit, 15 shots across 9 videos.
-
-      ---- the original evidence, unchanged, for whenever it is rebuilt ----
-
-      DIRECTION supported from a single laboratory; THE BAND IS AN ENGINEERING
-      DECISION.
-
-      The Cabarkapa group reports release height ONLY as a ratio of body
-      height, never as raw metres — A2 gives 1.12 non-proficient vs 1.17
-      proficient, p=0.010 — and that consistent precedent across four of its
-      papers is why this rule exists alongside the head-relative one.
-      SOURCES.md B2 classes the normalisation itself SUPPORTED WITH
-      LIMITATIONS, on the explicit ground that all four papers come from one
-      group with no independent replication (Part G #2). Other groups report
-      release height in absolute metres (A6 2.02-2.13 m; A8 2.46 down to
-      2.33 m with distance), which is not comparable across players and is not
-      what this rule measures.
-
-      THE BAND IS OURS. 1.02-1.58 and 1.14-1.46 are centred on A2's two group
-      means, which differ by 0.05 body heights. No published dispersion for
-      this ratio is recorded in the corpus, so there was no interval to narrow
-      toward, and a two-group mean difference is not an individual cutoff in
-      any case.
-
-      SKIPPED ENTIRELY when no player height is provided — never estimated
-      from the camera. SOURCES.md A2, A6, A8, B2, B3, Part G #2.
-
-      The head-relative construction in `release_height` is what makes that
-      rule scale-free; this one is the version the literature actually reports,
-      and it is the one that needs a height. That trade is why both exist.
-
-  # --------------------------------------------------------- follow-through
-  follow_through_elbow:
-    name: "Follow-Through"
-    metric: elbow
-    phases: [follow_through]
-    # max: the finish is a HELD position. Scoring its worst frame scores the
-    # arm on its way back down, which every shot does and no rule intends.
-    aggregate: max
-    max_rate: 2000          # deg/s, physical ceiling; see scorer._despike
-    min: 145
-    max: 180
-    ideal_min: 155
-    ideal_max: 180
-    severity: warning
-    scored: false          # redundant with release -- see evidence
-    message_excellent: "You hold the finish well after the ball's gone."
-    refine_low: "Good finish. Hold the reach toward the rim a moment longer."
-    message_low: "Keep your elbow up after the ball leaves. It drops straight away — hold the reach toward the rim until the ball gets there."
-    evidence: >
-      ENGINEERING DECISION. Holding the follow-through is standard coaching
-      practice; no published angular threshold was found. Thresholds are ours.
-
   follow_through_hold:
     name: "Holding the Finish"
+    direction: higher_better    # holding longer is never worse
     metric: hold_duration          # SHOT-LEVEL: see scorer._hold_rule
     phases: [follow_through]
     min: 0.25
     ideal_min: 0.50
+    calibration:
+      # Derived against the `lite` pose model, which is what
+      # config/settings.py ships. See analysis.engine.apply_calibration.
+      lite:
+        min: 0.25
+        ideal_min: 0.50
     unit: "s"
     severity: warning
     scored: true
@@ -968,34 +1206,10 @@ rules:
       scored -- a recording that stopped early must not be read as a perfect
       follow-through, nor as a dropped one.
 
-  follow_through_index:
-    name: "Finish Position"
-    metric: index_align
-    phases: [follow_through]
-    aggregate: max          # the held finish, as above
-    min: 150
-    max: 180
-    ideal_min: 162
-    ideal_max: 180
-    severity: info
-    scored: false          # measured and displayed, never scored
-    message_excellent: "Finish position, for reference — this one isn't scored."
-    refine_low: "Finish position, for reference — this one isn't scored."
-    message_low: "Finish position, for reference — this one isn't scored."
-    evidence: >
-      NOT SUPPORTED FOR SCORING. Same metric as index_alignment_release and
-      withdrawn from the score for the same measured reason: 39.2 deg mean
-      model disagreement against an 18 deg ideal band.
-
-      follow_through_elbow remains SCORED. The two are not equivalent: the
-      elbow angle carries 11.5 deg of uncertainty against a 25 deg band, which
-      is tight but usable, while the finger line carries 39 deg against 18.
-      Same phase, same footage, different verdict, because the measurement
-      quality is different -- not because the coaching idea is.
-
-  # ---------------------------------------------------------------- landing
   landing_balance:
     name: "Landing"
+    direction: lower_better    # 0 is standing at your own baseline and is the target; the metric's zero
+    # is definitional, not a chosen threshold
     metric: landing_settle
     phases: [landing]
     # min: the LOWEST the body got. That is the question -- did you come back
@@ -1005,7 +1219,46 @@ rules:
     # jump shot for the part of the landing that is still a fall.
     aggregate: min
     min: -0.10
-    max: 0.02
+    # 0.02 -> 0.035, MEASURED 16 AUGUST 2026. The old ceiling was inside this
+    # metric's own noise, and a set shot proves it: the player never leaves the
+    # floor, so every landing reading is noise around zero BY CONSTRUCTION.
+    # Across 11 set shots in video8 and salah_video those readings ran
+    #
+    #     -0.009 -0.005 -0.002 -0.001 +0.004 +0.009 +0.009
+    #     +0.014 +0.016 +0.018 +0.022
+    #
+    # -- reaching +0.022, PAST a ceiling of +0.020. video8 shot 7 is a set shot
+    # failing a landing rule for not coming back down from a jump it never
+    # made. 0.035 clears the highest reading a definitionally-passing shot
+    # produced, with margin, and is not tuned to any clip's score.
+    #
+    # The ZERO is untouched and is not a threshold: `body_rise_ratio` is
+    # measured against the player's own local baseline, so returning to the
+    # floor IS zero by definition of the metric. What moved is only the
+    # allowance for how precisely we can observe that zero.
+    max: 0.035
+    calibration:
+      # Derived against the `lite` pose model, which is what
+      # config/settings.py ships. See analysis.engine.apply_calibration.
+      lite:
+        min: -0.10
+        max: 0.035
+      # UNCHANGED from the noise-derived value. 0.035 came from 11 SET shots
+        # across two clips -- shots that never left the floor, so their
+        # readings are this metric's noise floor by construction. Nine
+        # coach shots are a worse estimate of that floor than eleven
+        # definitionally-passing ones, so the better evidence is kept.
+      full:
+        min: -0.1
+        max: 0.035
+      # heavy: ALIASED TO `full`, not derived. `heavy` reads angles
+      # differently again, so these numbers are not ITS calibration --
+      # they are a deliberate choice that a heavy run should score like a
+      # full run rather than silently fall back to the lite bands at the
+      # top of the rule. Derive properly before trusting a heavy score.
+      heavy:
+        min: -0.1
+        max: 0.035
     unit: ""
     severity: info
     scored: true
@@ -1074,6 +1327,280 @@ rules:
 # larger labelled shot corpus. Apex progress is the scale-independent scored
 # position rule. Apex distance reports the same error in metres and is kept
 # measured-only to avoid penalising one apex-position mistake twice.
+  # ------------------------------------------------------------------ wrist
+  #
+  # ⚠️ WRIST UNCERTAINTY -- WHY BOTH RULES ARE DISPLAYED AND NOT SCORED.
+  # Measured 16 August 2026 on the COACH's own footage, after `index_align`
+  # was found to be missing from `measure_angle_uncertainty.py` entirely: the
+  # 39.2 deg figure this file quoted had never been reproduced by the
+  # project's own audit. It has now been, and it is the worst angle here by a
+  # wide margin.
+  #
+  #     video8, full vs heavy, 259 frames
+  #       shoulder       6.43 deg    18.5% of frames differ by >10 deg
+  #       hip            8.68        24.3%
+  #       knee           8.97        30.9%
+  #       elbow         16.31        61.4%
+  #       index_align   33.31        77.6%
+  #
+  # Two explanations are ruled out. NOT THE CAMERA ANGLE: the original figure
+  # came from salah_video, filmed from behind, and the suspicion was that the
+  # finger landmark was being guessed in depth. Shot from the front, on the
+  # reference footage, it is 33.3 deg -- the same order. NOT FIXABLE BY
+  # FILTERING: restricted to frames where every landmark scores
+  # visibility > 0.9 it gets WORSE, 33.3 -> 36.8 deg and 77.6% -> 83.4%, the
+  # same pattern docs/LIMITS.md records for the elbow.
+  #
+  # And there is no hand to switch to: `_measure` already builds
+  # f"{shooting_side}_index_align", so the shooting wrist was always the one
+  # being read.
+  #
+  # An honest band on a 33 deg instrument spans nearly the whole physical
+  # range and separates nobody; a band tight enough to separate people is
+  # narrower than the noise and separates them at random. Both rules stay
+  # MEASURED and DISPLAYED -- the replay readout shows the angle as "Wrist" --
+  # and contribute nothing to the score. Same policy and same reason as
+  # `shoulder_alignment_lift`.
+  #
+  # Added 16 August 2026 by maintainer instruction: "the wrist angle also
+  # separates the professionals."
+  #
+  # TWO RULES, NOT ONE. The instruction named one mechanic across `loading`
+  # and `release`, but `index_align` is the angle AT THE WRIST -- elbow ->
+  # wrist -> index -- and the hand is doing opposite things in those two
+  # phases. Measured across 41 shots in the corpus:
+  #
+  #     phase      agg     n     p05     p25     med     p75     p95
+  #     loading    min    31    43.9    92.9   101.9   121.8   152.7
+  #     release    max    40   136.2   142.2   147.4   158.0   169.3
+  #
+  # Cocked back under the ball, then snapped through. One band cannot hold
+  # both without passing everything, so the mechanic is split and each half
+  # takes its own numbers from the column above.
+  #
+  # ⚠️ BOTH BANDS ARE MEASURED DESCRIPTION, NOT PUBLISHED NORMS. No source in
+  # SOURCES.md gives a wrist angle for either phase. These describe what this
+  # corpus's shooters do; they do not describe what wins.
+  #
+  # ⚠️ AND THE METRIC IS THE NOISIEST IN THE PROJECT. MediaPipe's full and
+  # heavy models disagree about `index_align` by a mean of 39.2 deg (median
+  # 41.3, p90 62.0) and by more than 10 deg on 92.4% of frames. That is the
+  # measurement that cost `index_alignment_release` and `follow_through_index`
+  # their scores before they were deleted. Scoring the same metric now is a
+  # deliberate reversal, and it is why both rules sit at `info` (weight 1) --
+  # the smallest weight there is. The loading band is the weaker of the two:
+  # its own p05-p95 spread is 109 deg, wider than the noise, which means it
+  # will rarely fire at all rather than fire wrongly.
+  wrist_cock_loading:
+    name: "Wrist Set"
+    direction: two_sided    # flat and over-folded are both faults
+    metric: index_align
+    phases: [loading]
+    # median, NOT min. `min` selects the single most extreme frame, and on a
+    # metric whose per-frame error has a p90 of 67 deg that is the frame where
+    # the finger landmark collapsed. Switching to the median cut the coach's
+    # between-shot spread from 53.4 to 33.1 deg -- the noise the extreme was
+    # picking up, removed.
+    aggregate: median
+    max_rate: 1200          # deg/s, physical ceiling; see scorer._despike
+    # RE-DERIVED 16 Aug 2026, coach only -- the first numbers were corpus-wide
+    # percentiles that included salah_video, same contamination as
+    # `wrist_release`. video8, wrist at loading, n=9:
+    #   min 76.7  p25 89.8  med 98.5  p75 103.9  max 130.1   IQR 14.1
+    # acceptable = coach min/max +/- 39.2 (index_align uncertainty), clamped
+    # perfect    = IQR 14.1 < 39.2, so widened to the uncertainty about 96.9
+    # Same finding as `wrist_release`: at 39.2 deg of model disagreement this
+    # metric cannot support a discriminating band. Scored on instruction.
+    # RE-DERIVED from the MEDIAN aggregate, coach only, 16 Aug 2026.
+    #   video8 per-shot median wrist at loading, n=9:
+    #     101.1  111.4(p25)  119.9(med)  124.8(p75)  134.2
+    # Effective uncertainty of a median over ~20 loading frames is
+    # 1.25 x 33.3 / sqrt(20) = 9.3 deg, not the 33.3 deg per-frame figure.
+    min: 92                 # 101.1 - 9.3
+    max: 143                # 134.2 + 9.3
+    ideal_min: 111          # coach IQR, already wider than 9.3
+    ideal_max: 125
+    calibration:
+      # Derived against the `lite` pose model, which is what
+      # config/settings.py ships. See analysis.engine.apply_calibration.
+      lite:
+        min: 92
+        max: 143
+        ideal_min: 111
+        ideal_max: 125
+      # coach per-shot medians 114.6-152.8, u=9.31 after median over ~20 frames.
+      full:
+        min: 105
+        max: 162
+        ideal_min: 121
+        ideal_max: 139
+      # heavy: ALIASED TO `full`, not derived. `heavy` reads angles
+      # differently again, so these numbers are not ITS calibration --
+      # they are a deliberate choice that a heavy run should score like a
+      # full run rather than silently fall back to the lite bands at the
+      # top of the rule. Derive properly before trusting a heavy score.
+      heavy:
+        min: 105
+        max: 162
+        ideal_min: 121
+        ideal_max: 139
+    severity: info
+    scored: true            # RESTORED -- median aggregation, see below
+    message_excellent: "Good wrist set. The hand is cocked and ready under the ball."
+    refine_low: "Wrist set is working. Let the hand cock back a touch less so the release stays quick."
+    refine_high: "Wrist set is working. Cock the hand back a little more to load the snap."
+    message_low: "Your wrist is folded too far back as you load. Ease it off so the release doesn't have to travel so far."
+    message_high: "Your wrist stays flat as you load. Cock it back under the ball so the snap has something to give."
+
+  wrist_release:
+    name: "Wrist Snap"
+    direction: two_sided    # no snap and hyper-extension are both faults
+    metric: index_align
+    phases: [release]
+    # median, for the same reason as wrist_cock_loading.
+    aggregate: median
+    max_rate: 1200
+    # RE-DERIVED 16 Aug 2026 -- the first numbers here were CONTAMINATED.
+    # They came from a 41-shot corpus percentile sweep that INCLUDED
+    # salah_video, whose wrist reads ~21 deg higher than the coach's; the
+    # ideal floor of 147 was that mixed median. Under the stated policy salah
+    # is held-out evaluation and must not appear in any band. Coach only now:
+    #
+    #   video8, wrist at release, n=9:
+    #     min 137.7  p25 140.2  med 141.5  p75 142.4  max 146.1   IQR 2.2
+    #
+    # acceptable = coach min/max +/- 39.2 (index_align uncertainty)
+    # perfect    = coach IQR is 2.2 deg against a 39.2 deg instrument, so it is
+    #              widened to the uncertainty about its centre (141.3)
+    #
+    # ⚠️ AND THAT IS THE FINDING: honest bands for this metric are ~98..180,
+    # i.e. almost the whole physical range. The rule can no longer separate
+    # anyone, because `index_align` carries 39.2 deg of model disagreement
+    # (docs/LIMITS.md) and no band narrower than that is measuring the player.
+    # It is left scored on instruction, but it now contributes near-constantly
+    # to every shot rather than discriminating. The contaminated band was
+    # SEPARATING -- it was separating salah from the coach, which is exactly
+    # what a leaked calibration does.
+    # RE-DERIVED from the MEDIAN aggregate, coach only, 16 Aug 2026.
+    #   video8 per-shot median wrist at release, n=9:
+    #     130.4  135.4(p25)  135.7(med)  138.8(p75)  141.7
+    # Effective uncertainty of a median over ~9 release frames is
+    # 1.25 x 33.3 / sqrt(9) = 13.9 deg. The coach's IQR is only 3.4 deg wide,
+    # narrower than that, so the perfect band is widened to the uncertainty
+    # about its centre (137.1) rather than believed.
+    min: 116                # 130.4 - 13.9
+    max: 156                # 141.7 + 13.9
+    ideal_min: 123          # centre 137.1 -/+ 13.9
+    ideal_max: 151
+    calibration:
+      # Derived against the `lite` pose model, which is what
+      # config/settings.py ships. See analysis.engine.apply_calibration.
+      lite:
+        min: 116
+        max: 156
+        ideal_min: 123
+        ideal_max: 151
+      # coach per-shot medians 135.0-155.5, u=13.88 after median over 9 frames.
+      full:
+        min: 121
+        max: 169
+        ideal_min: 130
+        ideal_max: 158
+      # heavy: ALIASED TO `full`, not derived. `heavy` reads angles
+      # differently again, so these numbers are not ITS calibration --
+      # they are a deliberate choice that a heavy run should score like a
+      # full run rather than silently fall back to the lite bands at the
+      # top of the rule. Derive properly before trusting a heavy score.
+      heavy:
+        min: 121
+        max: 169
+        ideal_min: 130
+        ideal_max: 158
+    severity: info
+    scored: true            # RESTORED -- median aggregation, see below
+    message_excellent: "Clean wrist snap. The hand finishes through the ball."
+    refine_low: "Wrist snap is there. Drive the hand through a little further to finish the line."
+    refine_high: "Wrist snap is there. Keep it relaxed so the ball rolls off rather than being pushed."
+    message_low: "Your wrist doesn't snap through on release. Finish with the hand driving down through the ball."
+    message_high: "Your wrist is hyper-extending past the line of the forearm on release. Let it finish naturally."
+
+  knee_excursion_loading:
+    name: "Leg Drive"
+    direction: higher_better    # MORE countermovement is never the fault this rule judges; depth is
+    # bounded from below by knee_flexion_loading instead
+    metric: knee_excursion
+    phases: [loading]
+    aggregate: max          # the whole travel; see WHY A RANGE below
+    min: 35
+    ideal_min: 42
+    calibration:
+      # Derived against the `lite` pose model, which is what
+      # config/settings.py ships. See analysis.engine.apply_calibration.
+      lite:
+        min: 35
+        ideal_min: 42
+      # coach 9.5-55.7 med 42.0. FLOOR IS p25-u, NOT min-u: min-u gives 1 deg,
+        # which would accept a shot with no countermovement -- the exact
+        # thing this rule exists to catch. The 9.5 outlier is
+        # video8_shot10_jump, whose loading phase is 3 frames long and is
+        # an under-observation rather than a shallow load. No ceiling: a
+        # deeper countermovement is not a fault this rule judges.
+      full:
+        min: 32
+        ideal_min: 41
+      # heavy: ALIASED TO `full`, not derived. `heavy` reads angles
+      # differently again, so these numbers are not ITS calibration --
+      # they are a deliberate choice that a heavy run should score like a
+      # full run rather than silently fall back to the lite bands at the
+      # top of the rule. Derive properly before trusting a heavy score.
+      heavy:
+        min: 32
+        ideal_min: 41
+    severity: error         # weight 3, raised from `warning` by instruction
+    scored: true
+    message_excellent: "Strong countermovement. The legs travel through the shot, which is where the power comes from."
+    refine_low: "Your legs are driving. Let them travel a little further into the dip so the rise carries more."
+    message_low: "You barely dip before you shoot. Let the legs travel down and back up so the shot is driven from the floor, not lifted by the arm."
+    evidence: >
+      ENGINEERING DECISION, derived from the coach and from measurement
+      uncertainty. No published source states a countermovement RANGE.
+
+      WHY A RANGE AND NOT A DEPTH. `knee_flexion_loading` aggregates with `min`
+      -- the smallest angle reached -- which answers "how deep did the knee
+      get" and NOT "did the knee move at all". A player who begins already
+      bent and barely travels reaches the same minimum as one who dips into it
+      from standing, so the two are indistinguishable to that rule. Measured on
+      salah_video: a rep the maintainer identified by eye as having no loading
+      at all travelled 31 deg while the other four travelled 65-78, and the
+      depth rule placed all five inside its band. The mechanic the eye was
+      reading had no rule.
+
+      WHERE 35 COMES FROM. The coach defines the target; coach variability and
+      measurement uncertainty define the tolerance. Across seven video8 reps
+      with at least five loading frames the excursion ran
+
+          38.2  42.4  45.6  46.2  48.5  53.5  69.0     (median 46.2)
+
+      The floor is the coach's own smallest rep, 38.2, less one measurement
+      uncertainty -- knee frame-to-frame jitter measured 1-3 deg -- giving 35.
+      It is an OUTER BOUND: it fires on a player who did not perform a
+      countermovement, not on one who performed a shallow one. `ideal_min: 42`
+      is the coach's own p25.
+
+      NO UPPER BOUND. A larger countermovement is not a fault this rule can
+      judge; `knee_flexion_loading` already bounds the depth from below at
+      80 deg, and duplicating that here would score one mechanic twice.
+
+      SALAH WAS NOT USED TO SET EITHER NUMBER. It identified that a mechanic
+      was missing; every threshold above comes from video8 and from measured
+      jitter. Where salah lands under this rule is an OUTCOME and is reported
+      as such.
+
+      `severity: warning` (weight 2) rather than `info`: whether the shot was
+      driven from the floor is a core mechanic, and the maintainer's stated
+      position is that skipping the load must cost. That is a product
+      judgement, recorded here as one.
+
 trajectory_rules:
   trajectory_release_angle:
     name: "Ball Release Angle"

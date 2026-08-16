@@ -28,6 +28,12 @@ from __future__ import annotations
 
 from typing import List, Optional
 
+from feedback.localization import (
+    localized_coaching,
+    phase_label_ar,
+    rule_feedback_ar,
+    rule_name_ar,
+)
 from feedback.models import PhaseScore, ShotSummary
 from shots.types import describe
 
@@ -39,14 +45,29 @@ def _rule_dict(rule) -> dict:
     separates this from a template: "your elbow is low" is an opinion,
     "your elbow is low — measured 118 degrees, target 145-180" is a reading.
     """
+    # A rule's own 0-100 score is the exact credit used by the phase scorer
+    # before severity weighting. Measured-only rules deliberately expose null:
+    # displaying a number is not the same as grading it.
+    rule_score = int(round(100.0 * rule.credit)) if rule.scored else None
     return {
         "rule_id": rule.rule_id,
         "name": rule.name,
+        "name_localized": {
+            "en": rule.name,
+            "ar": rule_name_ar(rule.rule_id, rule.name),
+        },
         "phase": rule.phase,
+        "score": rule_score,
         "passed": rule.passed,
         "outcome": rule.outcome.value,
         "severity": rule.severity,
+        # Keep `message` untouched for existing frontend consumers. New code
+        # can select a stable language key from `feedback`.
         "message": rule.message,
+        "feedback": {
+            "en": rule.message,
+            "ar": rule_feedback_ar(rule),
+        },
         "measured_value": rule.measured_value,
         "unit": rule.unit,
         "target_min": rule.min_value,
@@ -61,6 +82,10 @@ def _phase_dict(phase: PhaseScore) -> dict:
     return {
         "phase": phase.phase,
         "label": phase.label,
+        "label_localized": {
+            "en": phase.label,
+            "ar": phase_label_ar(phase.phase, phase.label),
+        },
         "score": phase.score,
         "grade": phase.grade,
         "on_target": list(phase.strengths),
@@ -68,6 +93,35 @@ def _phase_dict(phase: PhaseScore) -> dict:
         "change": list(phase.fixes),
         "rules": [_rule_dict(r) for r in phase.rules],
         "measured_only": [_rule_dict(r) for r in phase.measured],
+    }
+
+
+def _coaching_dict(summary: ShotSummary) -> dict:
+    """Existing English coaching arrays plus a bilingual additive view."""
+    summary_items = list(summary.coaching_tips)
+    focus_items = list(summary.next_rep_focus)
+    drill_items = list(summary.practice_drills)
+    rules = [
+        rule
+        for phase in summary.phase_scores
+        for rule in (phase.rules + phase.measured)
+    ]
+    # A synthetic/API caller may populate passed_rules or violations without
+    # constructing phase scores. Include those as a translation fallback.
+    rules.extend(summary.passed_rules)
+    rules.extend(summary.violations)
+
+    return {
+        # Unchanged legacy fields.
+        "summary": summary_items,
+        "focus_next_rep": focus_items,
+        "drills": drill_items,
+        # Additive bilingual fields for new clients.
+        "localized": {
+            "summary": localized_coaching(summary_items, rules),
+            "focus_next_rep": localized_coaching(focus_items, rules),
+            "drills": localized_coaching(drill_items, rules),
+        },
     }
 
 
@@ -183,11 +237,7 @@ def shot_to_dict(
             "evaluated": summary.total_count,
         },
         "phases": [_phase_dict(p) for p in summary.phase_scores],
-        "coaching": {
-            "summary": list(summary.coaching_tips),
-            "focus_next_rep": list(summary.next_rep_focus),
-            "drills": list(summary.practice_drills),
-        },
+        "coaching": _coaching_dict(summary),
         "capture": {
             "note": summary.capture_note or None,
             "started_mid_shot": summary.started_mid_phase,

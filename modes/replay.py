@@ -58,8 +58,21 @@ ANGLE_LABELS = (
     ("knee", "Knee"),
     ("hip", "Hip"),
     ("shoulder", "Shoulder"),
-    ("index_align", "Finger"),
+    # The angle's vertex is the WRIST -- elbow -> wrist -> index. It was
+    # labelled "Finger", which named the far landmark instead of the joint and
+    # read as a measurement of the fingers themselves.
+    ("index_align", "Wrist"),
     ("trunk", "Trunk lean"),
+)
+
+# Non-angle readouts, with the unit shown on screen. Angles need no unit
+# because a number beside "Elbow" is unambiguously degrees; a release height
+# is 0.23 in metres or 1.21 as a multiple of the player's height, and without
+# the unit the two are indistinguishable.
+#
+# "Rel/height" is the demoted one -- measured and displayed, never scored.
+METRIC_LABELS = (
+    ("release_height", "Release ht", "m"),
 )
 
 
@@ -78,26 +91,57 @@ def _shade(frame, x1, y1, x2, y2, alpha=0.55):
         )
 
 
-def _draw_angles(frame, angles: Dict[str, float], side: str) -> None:
-    """Right-hand column of joint angles, in degrees."""
-    if not angles:
-        return
-    rows = [(label, angles.get(f"{side}_{key}", angles.get(key)))
-            for key, label in ANGLE_LABELS]
-    rows = [(l, v) for l, v in rows if v is not None]
-    if not rows:
+def _draw_readouts(
+    frame,
+    angles: Dict[str, float],
+    metrics: Dict[str, float],
+    side: str,
+) -> None:
+    """Right-hand column: joint angles in degrees, then the release heights.
+
+    ONE panel, sized from its own contents, rather than two panels each
+    positioned from a constant. Two boxes with independent origins overlap the
+    moment either grows a row -- and the row count here is not fixed: any angle
+    the visibility gate rejects drops out, and `release_height_ratio` is absent
+    entirely whenever no player height was entered.
+
+    A metric that is absent is DRAWN as absent. It is not drawn as 0.00, which
+    on a release height would read as a hand at floor level -- a measurement,
+    and a damning one, invented out of a missing input.
+    """
+    angle_rows = [(label, angles.get(f"{side}_{key}", angles.get(key)), "")
+                  for key, label in ANGLE_LABELS]
+    angle_rows = [r for r in angle_rows if r[1] is not None]
+    metric_rows = [(label, metrics.get(key), unit)
+                   for key, label, unit in METRIC_LABELS]
+    metric_rows = [r for r in metric_rows if r[1] is not None]
+    if not angle_rows and not metric_rows:
         return
 
+    # Header lines only appear when their section has something under them.
+    lines = (len(angle_rows) + bool(angle_rows)
+             + len(metric_rows) + bool(metric_rows))
     w = frame.shape[1]
-    x1, y1 = w - 210, 50
-    x2, y2 = w - 10, 62 + 24 * len(rows)
+    x1, y1 = w - 232, 50
+    x2, y2 = w - 10, y1 + 18 + 24 * lines
     _shade(frame, x1, y1, x2, y2)
-    _text(frame, "ANGLES", x1 + 12, y1 + 22, (180, 180, 180), 0.5)
-    y = y1 + 46
-    for label, value in rows:
-        _text(frame, label, x1 + 12, y, (190, 190, 190), 0.5)
-        _text(frame, f"{value:5.1f}", x1 + 135, y, (255, 255, 255), 0.55)
+
+    y = y1 + 22
+
+    def section(title, rows, fmt):
+        nonlocal y
+        if not rows:
+            return
+        _text(frame, title, x1 + 12, y, (180, 180, 180), 0.5)
         y += 24
+        for label, value, unit in rows:
+            _text(frame, label, x1 + 12, y, (190, 190, 190), 0.5)
+            text = fmt(value) + (f" {unit}" if unit else "")
+            _text(frame, text, x1 + 138, y, (255, 255, 255), 0.55)
+            y += 24
+
+    section("ANGLES", angle_rows, lambda v: f"{v:5.1f}")
+    section("RELEASE", metric_rows, lambda v: f"{v:5.2f}")
 
 
 def _draw_timeline(frame, ts_ms, duration_ms, overlay) -> None:
@@ -219,7 +263,8 @@ def replay(
                   12, 54, colour, 0.62, 2)
             if info["score"] is not None:
                 _text(frame, f"score {info['score']}/100", 12, 82)
-            _draw_angles(frame, info.get("angles") or {}, shooting_side)
+            _draw_readouts(frame, info.get("angles") or {},
+                           info.get("metrics") or {}, shooting_side)
         else:
             _text(frame, "no shot here", 12, 54, IDLE, 0.6)
 

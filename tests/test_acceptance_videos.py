@@ -40,7 +40,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
 from coach_report import analyze_video  # noqa: E402
-from shots.types import ShotType  # noqa: E402
+from shots.types import RejectionReason, ShotType  # noqa: E402
 
 VIDEO_DIR = PROJECT_ROOT / "assets" / "videos"
 
@@ -378,28 +378,36 @@ def video_09_full_run():
     return _run(VIDEO_09_FULL)
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "one candidate still spans two attempts plus the walk between them, so "
-    "its hip travel crosses the 0.18 driving threshold and a stationary set "
-    "shot is reported as a layup"
-))
 def test_video_08_full_never_reports_a_driving_action(video_08_full_run):
-    """A fixed-camera practice video contains no layups.
+    """A fixed-camera practice video contains no driving actions.
 
-    Measuring hip travel over the shooting window only (rather than over the
-    whole candidate) removed most of these, but not all: while several real
-    attempts are still merged into one candidate, that candidate legitimately
-    contains a walk, and no windowing fixes a window that spans two shots.
+    Every attempt here is a stationary shot, so every attempt must classify as
+    one of the two supported types. Anything refused as an unsupported type
+    means the driving gate fired on a player who never drove.
 
-    This is xfail rather than deleted because it is a WRONG ANSWER, not merely
-    a missed one. Under-counting is a quality problem; confidently calling a
-    stationary set shot a drive is a correctness problem, and it must stay
-    visible until segmentation stops merging attempts.
+    HISTORY: this was xfail(strict) because one candidate spanned two attempts
+    plus the walk between them, and that walk pushed hip travel over the 0.18
+    driving threshold. Restricting the travel window to the rise and anchor
+    phases (feedback/shot_tracker.py:_TRAVEL_STATES) fixed it.
+
+    The merging itself still happens -- test_video_08_full_detects_every_attempt
+    is xfail for exactly that -- so this test passes because the merged
+    candidate no longer CROSSES the threshold, not because candidates stopped
+    merging. Widening _TRAVEL_STATES, or lowering the threshold, would break it
+    again.
+
+    Asserted on the rejection rather than on the string "layup": the driving
+    branch reports UNKNOWN, so a label check would pass no matter what the gate
+    did, and a test that cannot fail is worse than no test.
     """
-    reported = [s.shot_type.value for s in video_08_full_run.shots if s.shot_type]
-    assert "layup" not in reported, (
+    offenders = [
+        s for s in video_08_full_run.shots
+        if s.rejection is RejectionReason.SHOT_TYPE_NOT_SUPPORTED_YET
+    ]
+    assert not offenders, (
         "the player never drives in this fixture; a candidate that spans the "
-        f"walk between attempts was misread.\n{_describe(video_08_full_run)}"
+        "walk between attempts was misread as a moving action.\n"
+        f"{_describe(video_08_full_run)}"
     )
 
 

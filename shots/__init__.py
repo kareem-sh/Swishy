@@ -1,6 +1,4 @@
 from shots.classifier import (
-    DRIVING_HORIZONTAL_TRAVEL_M,
-    JUMP_VERTICAL_DISPLACEMENT_M,
     AttemptEvidence,
     classify,
 )
@@ -26,6 +24,4 @@ __all__ = [
     "is_implemented",
     "AttemptEvidence",
     "classify",
-    "JUMP_VERTICAL_DISPLACEMENT_M",
-    "DRIVING_HORIZONTAL_TRAVEL_M",
 ]
