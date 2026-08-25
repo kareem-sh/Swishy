@@ -37,7 +37,9 @@ include = [
     "modes*",
     "phase_detection*",
     "physics*",
+    "player*",
     "pose*",
+    "shots*",
     "utils*",
     "visualization*",
 ]

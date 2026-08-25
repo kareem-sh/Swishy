@@ -30,7 +30,7 @@ def _pick_best(boxes: Sequence[Tuple[Tuple[float, float, float, float], float]])
 class BallDetector:
     """Detect ball + rim each frame with the custom basketball YOLO."""
 
-    def __init__(self, config_name: str = "ball.yaml"):
+    def __init__(self, config_name: str = "ball.yaml", device: Optional[str] = None):
         raw = load_yaml(config_name)
         det = raw.get("detector", raw)
 
@@ -52,7 +52,8 @@ class BallDetector:
             0,
             int(det.get("rim_search_retry_interval", 4)),
         )
-        self.device = resolve_device(det.get("device", "auto"))
+        preferred_device = device if device is not None else det.get("device", "auto")
+        self.device = resolve_device(preferred_device)
         self.frame_stride = max(1, int(det.get("frame_stride", 1)))
         self.min_radius = float(det.get("min_radius_px", 4))
         self.max_radius = float(det.get("max_radius_px", 140))

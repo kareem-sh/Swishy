@@ -45,6 +45,13 @@ temporal/data/*.npz
 temporal/data/*.npy
 !temporal/**/.gitkeep
 ml/datasets/videos
+# Local training/validation videos. Keep dataset code and metadata available,
+# but do not put the large source clips in Git.
+ml/datasets/**/*.mp4
+ml/datasets/**/*.mov
+ml/datasets/**/*.avi
+ml/datasets/**/*.mkv
+ml/datasets/**/*.webm
 mlRingBall/datasets
 mlRingBall/datasets/runs/basketball_rim_training/basketball_and_rim/weights
 

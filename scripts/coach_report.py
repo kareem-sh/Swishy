@@ -19,7 +19,7 @@ import json
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Tuple
 
 import cv2
 
@@ -74,6 +74,9 @@ class AnalysisRun:
 
     video: Path
     fps: float
+    height_cm: Optional[float] = None
+    rim_height_m: Optional[float] = None
+    shot_xy_m: Optional[Tuple[float, float]] = None
     shots: List[ShotSummary] = field(default_factory=list)
     # Playback data, present only when the caller asked to keep it.
     landmarks: Optional[list] = None
@@ -104,7 +107,7 @@ class AnalysisRun:
         One serialiser for the CLI's `--json` and for any future service, so
         the two can never drift into describing the same analysis differently.
         """
-        return session_to_dict(
+        payload = session_to_dict(
             video_name=self.video.name,
             fps=self.fps,
             frames_read=self.frames_read,
@@ -113,9 +116,18 @@ class AnalysisRun:
             rejection=self.rejection.value if self.rejection else None,
             rejection_detail=self.rejection_detail,
         )
+        payload["analysis_inputs"] = {
+            "height_cm": self.height_cm,
+            "rim_height_m": self.rim_height_m,
+            "shot_xy_m": (
+                list(self.shot_xy_m) if self.shot_xy_m is not None else None
+            ),
+            "shot_coordinate_system": "fiba_half_court_metres",
+        }
+        return payload
 
 
-def _decode_and_analyse(video_path, fps, pipe, progress):
+def _decode_and_analyse(video_path, fps, pipe, progress, inference_device=None):
     """Feed every frame through the pipeline.
 
     Every frame is read with a blocking read and none are skipped, and each
@@ -129,7 +141,7 @@ def _decode_and_analyse(video_path, fps, pipe, progress):
 
     with quiet_native_stderr():
         cap = cv2.VideoCapture(str(video_path))
-        detector = PoseDetector(vision.RunningMode.VIDEO)
+        detector = PoseDetector(vision.RunningMode.VIDEO, device=inference_device)
         while True:
             ok, frame = cap.read()
             if not ok:
@@ -173,11 +185,23 @@ def analyze_video(
     progress_factory: Optional[Callable[[VideoMetadata], ProgressReporter]] = None,
     enable_ball: Optional[bool] = None,
     keep_landmarks: bool = False,
+    rim_height_m: Optional[float] = None,
+    shot_xy_m: Optional[Tuple[float, float]] = None,
+    inference_device: Optional[str] = None,
 ) -> AnalysisRun:
     """Run one video through the real pipeline and return what was found.
 
     `on_start` and `progress_factory` are presentation hooks for the CLI.
     Neither affects analysis: every frame is read and processed either way.
+
+    `height_cm`, `rim_height_m`, and `shot_xy_m` are request-scoped physical
+    inputs. They are passed into the pipeline and never written to YAML, so
+    simultaneous backend requests cannot overwrite one another.
+
+    `inference_device` is request-scoped and never written to YAML.
+
+        None   -> pose / YOLO / NanoTrack follow their YAML (`auto` may use GPU)
+        "cpu"  -> force CPU for all three (VPS / headless)
 
     `enable_ball` decides whether the ball/rim detector runs.
 
@@ -210,13 +234,21 @@ def analyze_video(
         on_start(meta, profile)
 
     fps = meta.fps
-    pipe = ShotAnalysisPipeline(enable_ball=enable_ball, player=profile)
+    pipe = ShotAnalysisPipeline(
+        enable_ball=enable_ball,
+        player=profile,
+        rim_height_m=rim_height_m,
+        shot_xy_m=shot_xy_m,
+        inference_device=inference_device,
+    )
     pipe.set_fps(fps)
     # Uploading a file is an offline task, so it is analysed as one.
     pipe.enable_offline_segmentation(keep_landmarks=keep_landmarks)
 
     progress = progress_factory(meta) if progress_factory is not None else None
-    shots, pose_frames, index = _decode_and_analyse(video_path, fps, pipe, progress)
+    shots, pose_frames, index = _decode_and_analyse(
+        video_path, fps, pipe, progress, inference_device=inference_device
+    )
     if progress is not None:
         progress.finish(f"Analysed {index} frames in {progress.elapsed_s:.0f}s.")
 
@@ -228,6 +260,9 @@ def analyze_video(
     run = AnalysisRun(
         video=video_path,
         fps=fps,
+        height_cm=profile.height_cm,
+        rim_height_m=pipe.rim_height_m,
+        shot_xy_m=pipe.court_shot_xy_m,
         shots=shots,
         pose_share=pose_share,
         discarded_candidates=pipe.shot_tracker.discarded_candidates,

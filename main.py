@@ -32,11 +32,12 @@ release removes both at once, and the report will say so rather than guess.
 import json
 import sys
 from pathlib import Path
+from typing import Optional, Sequence
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from scripts.coach_report import (  # noqa: E402
-    analyze_video,
+    analyze_video as _analyze_video_run,
     print_rejection,
     print_session_summary,
     print_shot,
@@ -46,7 +47,7 @@ from scripts.coach_report import (  # noqa: E402
 # WHAT TO ANALYSE
 # ==================================
 
-VIDEO = "assets/videos/MikeDunnThirdMade.mov"
+VIDEO = "assets/videos/salahSecondmadeTest.mov"
 
 # Your height in centimetres, or None. Never estimated from the camera: a
 # single lens cannot separate a tall player from a near one. Without it, the
@@ -89,6 +90,41 @@ def save_latest_analysis(run, output_path: Path = LATEST_JSON) -> Path:
     return path
 
 
+def analyze_video(
+    video_path: str | Path,
+    *,
+    height_cm: Optional[float] = None,
+    rim_height_m: Optional[float] = None,
+    shot_xy_m: Optional[Sequence[float]] = None,
+    shooting_hand: str = "auto",
+    enable_ball: bool = True,
+) -> dict:
+    """Backend entry point: analyse one upload and return its JSON payload.
+
+    Physical inputs belong to this request. They are passed through memory and
+    never written to YAML, which keeps concurrent VPS requests isolated.
+
+    ``shot_xy_m`` uses FIBA half-court coordinates ``[x_m, y_m]``. When
+    ``rim_height_m`` or ``shot_xy_m`` is omitted, the local YAML value remains
+    the fallback for development runs.
+    """
+    shot_xy = (
+        tuple(shot_xy_m)
+        if shot_xy_m is not None
+        else None
+    )
+    run = _analyze_video_run(
+        video_path,
+        height_cm=height_cm,
+        rim_height_m=rim_height_m,
+        shot_xy_m=shot_xy,
+        shooting_hand=shooting_hand,
+        enable_ball=enable_ball,
+        keep_landmarks=False,
+    )
+    return run.to_payload()
+
+
 def main() -> int:
     video = sys.argv[1] if len(sys.argv) > 1 else VIDEO
     path = Path(video)
@@ -97,7 +133,7 @@ def main() -> int:
         return 2
 
     print(f"\nReading {path.name} ...")
-    run = analyze_video(
+    run = _analyze_video_run(
         path,
         height_cm=HEIGHT_CM,
         shooting_hand=SHOOTING_HAND,

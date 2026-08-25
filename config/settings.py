@@ -4,7 +4,7 @@ from pathlib import Path
 
 # Paths
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-POSE_MODEL = "full"          # lite | full | heavy
+POSE_MODEL = "lite"          # lite | full | heavy
 MODEL_PATH = str(PROJECT_ROOT / "models" / f"pose_landmarker_{POSE_MODEL}.task")
 
 # CHANGING `POSE_MODEL` CHANGES EVERY SCORE, and not by a rounding amount.

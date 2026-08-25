@@ -136,10 +136,16 @@ class ShotAnalysisPipeline:
         shooting_hand: Optional[str] = None,
         enable_ball: Optional[bool] = None,
         player: Optional[PlayerProfile] = None,
+        rim_height_m: Optional[float] = None,
+        shot_xy_m: Optional[Tuple[float, float]] = None,
+        inference_device: Optional[str] = None,
     ):
         # Player context is session-level and optional. A profile without a
         # height is a first-class state: height-independent analysis still runs.
         self._player = player if player is not None else load_player_profile()
+        # Request-scoped only. None keeps YAML (`auto` / GPU). `"cpu"` is
+        # what the VPS headless path uses so a CUDA box still stays on CPU.
+        self._inference_device = inference_device
 
         filter_cfg = load_yaml("filter_config.yaml")
         phase_cfg = load_yaml("phases.yaml")
@@ -148,8 +154,9 @@ class ShotAnalysisPipeline:
         ball_cfg = load_yaml("ball.yaml")
         physics_cfg = load_yaml("physics.yaml")
         court_cfg = physics_cfg.get("fiba_half_court", {})
+        configured_shot_xy_m = court_cfg.get("shot_xy_m")
         self._court_shot_xy_m = self._parse_court_xy(
-            court_cfg.get("shot_xy_m"),
+            shot_xy_m if shot_xy_m is not None else configured_shot_xy_m,
             label="shot_xy_m",
             enforce_half_court=True,
         )
@@ -166,6 +173,17 @@ class ShotAnalysisPipeline:
             if self._court_shot_xy_m is not None
             else None
         )
+        configured_rim_height_m = float(physics_cfg.get("rim_height_m", 3.05))
+        try:
+            self._rim_height_m = float(
+                configured_rim_height_m
+                if rim_height_m is None
+                else rim_height_m
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("rim_height_m must be a number in metres") from exc
+        if not math.isfinite(self._rim_height_m) or self._rim_height_m <= 0.0:
+            raise ValueError("rim_height_m must be a positive finite number")
 
         self._filter_bank = LandmarkFilterBank(
             min_cutoff=filter_cfg.get("min_cutoff", FILTER_MIN_CUTOFF),
@@ -300,7 +318,7 @@ class ShotAnalysisPipeline:
                     trajectory_display_cfg.get("rim_diameter_m", 0.457),
                 )
             ),
-            rim_height_m=float(physics_cfg.get("rim_height_m", 3.05)),
+            rim_height_m=self._rim_height_m,
             minimum_vertical_difference_m=float(
                 physics_cfg.get("minimum_release_to_rim_height_m", 0.25)
             ),
@@ -439,8 +457,13 @@ class ShotAnalysisPipeline:
                     initial_box_scale=float(
                         visual_tracking_cfg.get("initial_box_scale", 1.35)
                     ),
-                    device=str(visual_tracking_cfg.get("device", "auto")),
-                    cuda_fp16=bool(visual_tracking_cfg.get("cuda_fp16", False)),
+                    device=str(
+                        self._inference_device
+                        if self._inference_device is not None
+                        else visual_tracking_cfg.get("device", "auto")
+                    ),
+                    cuda_fp16=bool(visual_tracking_cfg.get("cuda_fp16", False))
+                    and self._inference_device != "cpu",
                 )
             except Exception as exc:
                 print(f"Warning: NanoTrack disabled ({exc})")
@@ -526,8 +549,13 @@ class ShotAnalysisPipeline:
                         rim_tracking_cfg.get("maximum_aspect_ratio", 8.0)
                     ),
                     center_y_fraction=rim_center_y_fraction,
-                    device=str(rim_tracking_cfg.get("device", "auto")),
-                    cuda_fp16=bool(rim_tracking_cfg.get("cuda_fp16", False)),
+                    device=str(
+                        self._inference_device
+                        if self._inference_device is not None
+                        else rim_tracking_cfg.get("device", "auto")
+                    ),
+                    cuda_fp16=bool(rim_tracking_cfg.get("cuda_fp16", False))
+                    and self._inference_device != "cpu",
                 )
             except Exception as exc:
                 # Keep periodic YOLO rim updates active as the fallback.
@@ -535,7 +563,7 @@ class ShotAnalysisPipeline:
 
         if self._ball_enabled:
             try:
-                detector = BallDetector("ball.yaml")
+                detector = BallDetector("ball.yaml", device=self._inference_device)
                 self._ball_detector = detector if detector.ready else None
             except Exception as exc:
                 print(f"Warning: ball/rim detector disabled ({exc})")
@@ -552,6 +580,16 @@ class ShotAnalysisPipeline:
     def set_fps(self, fps: float):
         if fps > 0:
             self._fps = fps
+
+    @property
+    def rim_height_m(self) -> float:
+        """Effective request/config rim height used by trajectory physics."""
+        return self._rim_height_m
+
+    @property
+    def court_shot_xy_m(self) -> Optional[Tuple[float, float]]:
+        """Validated FIBA shot coordinate, or None when vision is the fallback."""
+        return self._court_shot_xy_m
 
     @staticmethod
     def _parse_court_xy(

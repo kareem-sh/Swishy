@@ -19,6 +19,26 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Analyze a basketball video headlessly")
     parser.add_argument("--video", required=True, help="Path to input video file")
     parser.add_argument(
+        "--height-cm",
+        type=float,
+        default=None,
+        help="Player height supplied by the client, in centimetres",
+    )
+    parser.add_argument(
+        "--rim-height-m",
+        type=float,
+        default=None,
+        help="Rim height supplied by the client, in metres",
+    )
+    parser.add_argument(
+        "--shot-xy-m",
+        type=float,
+        nargs=2,
+        metavar=("X_M", "Y_M"),
+        default=None,
+        help="FIBA half-court shot coordinates in metres",
+    )
+    parser.add_argument(
         "--json-out",
         help="Optional path to write session JSON report",
     )
@@ -35,6 +55,9 @@ def main() -> int:
 
     payload = analyze_video(
         args.video,
+        height_cm=args.height_cm,
+        rim_height_m=args.rim_height_m,
+        shot_xy_m=args.shot_xy_m,
         save_key_frames=bool(args.key_frames_dir),
         key_frames_dir=args.key_frames_dir,
         save_report=args.save_report,
@@ -49,9 +72,13 @@ def main() -> int:
         )
         print(f"Session JSON saved: {out_path}")
 
+    name = payload.get("video") or payload.get("source_name")
+    score = payload.get("average_score")
+    if score is None:
+        score = payload.get("overall_score")
     print(
-        f"Analyzed {payload['source_name']}: "
-        f"{payload['shot_count']} shot(s), overall score {payload['overall_score']}"
+        f"Analyzed {name}: "
+        f"{payload['shot_count']} shot(s), overall score {score}"
     )
     return 0
 
